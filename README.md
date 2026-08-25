@@ -43,7 +43,7 @@
 
 - **H3 音视频工作流**：`MiniMaxH3ReferenceToVideo` + `audio_vae` + `VAEDecodeAudio` → `CreateVideo(audio)`，端到端生成**带声音**的单镜头视频（非静音）。
 - **参考图绑定**：`ref_nodes` 传角色卡/场景卡，经 `ref_images.ref_image_N`（dotted）绑定身份/环境，避免角色/服装漂移。
-- **快速/质量两档**：`mode=fast`（832×480·4步·Lightning LoRA，调试快 5×+）与 `mode=quality`（1344×768·20步，成片）。
+- **快速/质量两档**：`mode=fast`（4步·Lightning LoRA，调试快 5×+，默认 832×480）与 `mode=quality`（20步，成片，默认 1344×768）。**分辨率按画布 `aspectRatio` 推导，两档均支持 16:9/9:16/1:1 等任意比例**，显式传 `width`/`height` 可覆盖。
 - **末帧串联**：同场景续接镜用 `first_frame_node=上一镜末帧` 做连续性过渡。
 - **H3 原生字幕**：对白字幕直接写进 prompt，由 H3 端到端渲染（含中文）。
 - **项目设置持久化**：`canvas_set_state` 写入画幅/时长/音频模式/生成模式。
