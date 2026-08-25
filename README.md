@@ -1,6 +1,6 @@
 # dsh-short-video-studio
 
-**完全本地 · 免费 · 零云端依赖** 的 MiniMax-Design 风格**短剧 / 动画画布工作室**，作为 [DeepSeek Harness](https://github.com/deepseek-ai) 双面插件。所有生成（图片 FLUX / 视频 MiniMax H3）都跑在**本地 ComfyUI** 上，无需任何付费云 API/额度，一次生成、无限出片：
+**完全本地 · 免费 · 零云端依赖** 的 类MiniMax-Design 风格**短剧 / 动画画布工作室**，作为 [DeepSeek Harness](https://github.com/deepseek-ai) 双面插件。所有生成（图片 FLUX / 视频 MiniMax H3）都跑在**本地 ComfyUI** 上，无需任何付费云 API/额度，一次生成、无限出片：
 
 - **画布页**：每个会话多一个「画布」视图 tab，按生产顺序预览/编辑各步骤产物。
 - **生成服务**：统一走**本地 ComfyUI API**——图片用本地 FLUX（`flux2_dev`），视频用本地 MiniMax H3（**音视频 AV 模型，默认带声音**，支持参考图绑定与原生字幕），**完全本地、免费**。
