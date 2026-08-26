@@ -1,3 +1,7 @@
 node_modules/
 .DS_Store
 *.log
+
+# 生成产物 / 本地工作目录
+e2e-out/
+.tmp-workspace/

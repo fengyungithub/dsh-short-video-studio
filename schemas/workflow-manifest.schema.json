@@ -1,0 +1,159 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://dsh.local/schemas/workflow-manifest.schema.json",
+  "title": "Workflow Manifest",
+  "description": "一份「工作流绑定契约」：把一个抽象 capability 绑定到一条具体 ComfyUI 工作流（数据，非代码）。",
+  "type": "object",
+  "required": ["id", "version", "capability", "graph", "params"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+    "version": { "type": "integer", "minimum": 1 },
+    "capability": {
+      "type": "string",
+      "enum": [
+        "image.text2image",
+        "image.image2image",
+        "video.text2video",
+        "video.image2video",
+        "video.reference2video",
+        "audio.tts",
+        "audio.music"
+      ]
+    },
+    "runner": { "type": "string", "enum": ["comfyui"], "default": "comfyui" },
+    "displayName": { "type": "string" },
+    "description": { "type": "string" },
+    "modelNode": { "type": "string", "description": "基础模型输出节点 id（$model 哨兵的来源；缺省 '1'）" },
+    "output": {
+      "type": "object",
+      "properties": {
+        "mediaType": { "type": "string", "enum": ["image", "video", "audio"] },
+        "hasAudio": { "type": "boolean" }
+      }
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["default"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["checkpoint", "clip", "vae", "lora", "other"] },
+          "default": { "type": "string" },
+          "env": { "type": "string", "description": "可覆盖文件名的环境变量名" },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "graph": {
+      "type": "object",
+      "description": "ComfyUI API 格式图模板 {nodeId: {class_type, inputs}}。可变字段留 null，由 params 注入；模型资产用 \"$assets.<key>\"；模型连线用 [\"$model\", 0]。",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["class_type"],
+        "properties": {
+          "class_type": { "type": "string" },
+          "inputs": { "type": "object", "additionalProperties": true }
+        }
+      }
+    },
+    "params": {
+      "type": "object",
+      "description": "注入点：任务输入 → 图字段。",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["inject", "to"],
+            "properties": {
+              "inject": { "type": "string", "const": "scalar" },
+              "to": { "$ref": "#/definitions/targets" },
+              "default": {}
+            }
+          },
+          {
+            "type": "object",
+            "required": ["inject", "via", "to"],
+            "properties": {
+              "inject": { "type": "string", "const": "image" },
+              "via": { "type": "string", "enum": ["field", "node"] },
+              "to": { "$ref": "#/definitions/target" },
+              "node": { "type": "string", "description": "via=node 时的 LoadImage 类节点类名，默认 LoadImage" },
+              "preprocess": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["class_type"],
+                  "properties": {
+                    "class_type": { "type": "string" },
+                    "inputs": { "type": "object", "additionalProperties": true },
+                    "imageInput": { "type": "string", "description": "接收上一节点输出连线的输入字段，默认 image" }
+                  }
+                }
+              },
+              "max": { "type": "integer", "minimum": 1 }
+            }
+          }
+        ]
+      }
+    },
+    "modes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "steps": { "type": "integer", "minimum": 1 },
+          "longSide": { "type": "integer" },
+          "loras": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["asset"],
+              "properties": {
+                "asset": { "type": "string", "description": "assets 里的 key（lora 资产）" },
+                "strength": { "type": "number", "default": 1.0 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "resolution": {
+      "type": "object",
+      "properties": {
+        "policy": { "type": "string", "enum": ["explicit", "aspect-ratio"] },
+        "snap": { "type": "integer", "minimum": 1 },
+        "default": {
+          "oneOf": [
+            { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 },
+            { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 } }
+          ]
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "aspectRatios": { "type": "array", "items": { "type": "string" } },
+        "maxDurationFrames": { "type": "integer", "minimum": 1 },
+        "supportsSubtitles": { "type": "boolean" }
+      }
+    }
+  },
+  "definitions": {
+    "target": {
+      "type": "object",
+      "required": ["node", "field"],
+      "properties": {
+        "node": { "type": "string" },
+        "field": { "type": "string", "description": "字段名；支持 ${i} 索引占位与 dotted 字段（如 ref_images.ref_image_${i}）" }
+      }
+    },
+    "targets": {
+      "oneOf": [
+        { "$ref": "#/definitions/target" },
+        { "type": "array", "items": { "$ref": "#/definitions/target" }, "minItems": 1 }
+      ]
+    }
+  }
+}
