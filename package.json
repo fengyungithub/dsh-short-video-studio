@@ -1,6 +1,6 @@
 {
   "name": "dsh-short-video-studio",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MiniMax-Design 风格的短剧/动画画布工作室：会话「画布」视图页 + ComfyUI 生成服务（图片 FLUX / 视频 MiniMax H3 音视频，带声音/参考绑定/原生字幕/fast质量两档）+ Agent 画布工具 + 自带 skill。双面 DSH 插件。",
   "keywords": [
     "dsh",
@@ -52,6 +52,8 @@
     "studio",
     "skills",
     "scripts",
+    "workflows",
+    "schemas",
     "cordis.patch.yml",
     "README.md",
     "LICENSE"

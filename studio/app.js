@@ -50,6 +50,10 @@
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
   }
 
+  function slugify(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  }
+
   function renderMarkdownTable(content) {
     const lines = content.split('\n')
     const tableLines = lines.filter((l) => l.trim().startsWith('|') && l.trim().endsWith('|'))
@@ -198,6 +202,21 @@
     redoBtn.onclick = () => askAi('重做画布节点 ' + (node.id || '') + '（' + (node.title || node.kind) + '）：请按画布当前参数重新生成/重写该节点。')
     actions.appendChild(redoBtn)
 
+    if (node.kind === 'image') {
+      const regBtn = document.createElement('button')
+      regBtn.className = 'btn'
+      if (node.params && node.params.assetId) {
+        regBtn.textContent = '已入库'
+        regBtn.title = node.params.assetId
+        regBtn.disabled = true
+      } else {
+        regBtn.textContent = '入库'
+        regBtn.title = '一键登记为跨会话资产（角色卡/场景卡）'
+        regBtn.onclick = () => registerAssetToLibrary(node)
+      }
+      actions.appendChild(regBtn)
+    }
+
     const groupSel = document.createElement('select')
     groupSel.title = '分组'
     for (const g of GROUP_ORDER) {
@@ -267,6 +286,26 @@
   async function updateNode(id, patch) {
     const body = { id, ...patch }
     await api('/canvas/node', { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  async function registerAssetToLibrary(node) {
+    let type = 'character'
+    if (node.group === 'scene cards') type = 'scene'
+    else if (node.group === 'character cards') type = 'character'
+    const name = prompt('资产名（小写英文/拼音，如 luna）', slugify(node.title || ''))
+    if (!name) return
+    try {
+      const d = await api('/assets', { method: 'POST', body: JSON.stringify({ nodeId: node.id, type, name }) })
+      if (d && d.ok) {
+        await updateNode(node.id, { params: { ...(node.params || {}), assetId: d.id } })
+        alert('已入库: ' + d.id)
+        await load()
+      } else {
+        alert('入库失败: ' + ((d && d.error) || ''))
+      }
+    } catch (e) {
+      alert('入库失败: ' + (e.message || String(e)))
+    }
   }
 
   async function moveNode(id, delta) {

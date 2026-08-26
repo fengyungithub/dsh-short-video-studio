@@ -18,7 +18,7 @@ Assembly and BGM rules:
 
 - For `silent` projects (the most common 3D animation mode), no voice bus is needed; the final mix is BGM + SFX only. Lip-sync risk is zero by construction.
 - For `dialogue-led` projects, verify the dialogue bus is consistent and the speaker is identifiable per shot. The QC hard gate below will catch mis-binding. This is the most common lip-sync-risk case in 3D animation.
-- For `narration-led` projects (rare in 3D animation), the narration is mixed in by H3 (when H3 is the chosen model) or comes in via the per-shot audio. Verify the narration mix is consistent across the assembled film; if any shot's narration is too loud or too quiet, normalize the narration bus to -3dB below the dialogue bus and duck under SFX.
+- For `narration-led` projects (rare in 3D animation), the narration is mixed in by the video workflow (when it supports audio) or comes in via the per-shot audio. Verify the narration mix is consistent across the assembled film; if any shot's narration is too loud or too quiet, normalize the narration bus to -3dB below the dialogue bus and duck under SFX.
 
 Then show a user choice card:
 
@@ -102,7 +102,7 @@ Use a choice card for every place that requires user confirmation. Do not replac
 - After standardized shot table (gate 1: approve table before self-check)
 - After shot-table self-check passes (gate 2: approve self-check, then immediately choose storyboard mode: text only / text + pencil image)
 - After single-shot storyboards (text storyboards document by default with optional extracted standalone nodes; pencil images if the user opted in)
-- Before single-shot video-clip rendering, confirm the default MiniMax-H3 route or capability-check a model explicitly selected by the user
+- Before single-shot video-clip rendering, confirm the default workflow route（`comfy_list_workflows`）or capability-check a workflow explicitly selected by the user
 - Before single-shot video-clip rendering, to choose video resolution
 - After single-shot video clips (now including a "Speaker identity verified" gate)
 - After full-film assembly, BGM match, and final composite (now including the 12 hard checks, with speaker-identity and mouth-state as the gating pair)
