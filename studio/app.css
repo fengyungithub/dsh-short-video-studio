@@ -151,6 +151,7 @@ table.node-table { width: 100%; border-collapse: collapse; font-size: 12px; }
   padding: 5px 8px;
   font-size: 12px;
 }
+.node-actions .group-input { width: 140px; }
 .node-actions .spacer { flex: 1; }
 
 .params { color: var(--muted); font-size: 11px; margin-top: 8px; font-family: ui-monospace, monospace; word-break: break-all; }

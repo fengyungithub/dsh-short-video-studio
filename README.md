@@ -210,11 +210,11 @@ ComfyUI 服务端 `baseUrl`、`apiKey` 与模型名均可配置，优先级：**
 |---|---|---|---|
 | ![场景A](./examples/fox/scene_A.png) | ![场景B](./examples/fox/scene_B.png) | ![场景C](./examples/fox/scene_C.png) | ![场景D](./examples/fox/scene_D.png) |
 
-### 5. 七列镜头表（shot table）
-7 列规范与自检见 `skills/3d-animation-short-generator/references/shot-table-spec.md`。本片 6 镜摘要见下节分镜。
+### 5. 六列镜头表（shot table）
+6 列规范与七项自检见 `skills/3d-animation-short-generator/SKILL.md`（Step 5 / Step 5.5）。本片 6 镜摘要见下节分镜。
 
 ### 6. 文本分镜（text storyboards）
-每镜一节含四象限每秒内容 + Mouth State + 双重绑定 `[char:][scene:][hook:][audio_mode:][speaker:]`；规范见 `references/storyboard-guidelines.md`。
+每镜一节含四象限每秒内容 + 口型标注 + 双重绑定 `[char:][scene:][hook:][audio_mode:][speaker:]`；规范见 `SKILL.md` Step 6。
 
 ### 7. 单镜头视频（shot clips，每镜画面截图）
 | S01 | S02 | S03 |
