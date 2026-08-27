@@ -35,7 +35,8 @@ dsh-short-video-studio/
 ├── workflows/                   # 内置工作流清单（数据）
 │   ├── flux-text2image.json     # image.text2image：FLUX 2 文生图
 │   ├── minimax-h3-ref2v.json    # video.reference2video：H3 参考绑定（带声音）
-│   └── minimax-h3-i2v.json      # video.image2video：H3 首/末帧串联（带声音）
+│   ├── minimax-h3-i2v.json      # video.image2video：H3 首/末帧串联（带声音）
+│   └── extract-frame.json       # image.from_video：抽帧（末帧/首帧 → 图片）
 ├── schemas/
 │   └── workflow-manifest.schema.json  # manifest 权威 JSON Schema（外部工具/文档参照）
 ├── skills/
@@ -90,6 +91,7 @@ dsh-short-video-studio/
 | `scalar` | 任务值写到某节点字段（支持 `to[]` 多目标） | prompt / width / height / seed / steps / fps / prefix |
 | `image` `via:field` | 上传图片 → 文件名字符串写字段（dotted，`${i}` 索引展开） | H3 `ref_images.ref_image_${i}` |
 | `image` `via:node` | 上传 → 建 `LoadImage`（+ 可选 `preprocess` 链：ImageScale 等）→ 连线到字段 | `first_frame` / `last_frame` |
+| `video` `via:field` | 上传视频 → 文件名字符串写字段 | `extract-frame` 的 `LoadVideo.file` |
 
 **两个占位机制**：
 - `$assets.<key>`：图内模型文件名占位，加载期按 **env > assetOverrides > default** 解析（换模型文件只改配置）。
@@ -159,7 +161,7 @@ comfy_render / comfy_generate_* → runRender(ctx, opts)
 
 ### 3.5 集成层
 
-- **Agent 工具**（原生 ToolDefinition，parameters 直接写 JSON Schema，零 `@deepseek-ai/*` 运行时 import，全部走注入 `ctx`）：14 个工具 = 5 生成/拼接/查询（`comfy_generate_image` / `comfy_generate_video` / `comfy_render` / `video_concat` / `comfy_list_workflows`）+ 7 画布（`canvas_list_nodes` / `canvas_write_node` / `canvas_get_node` / `canvas_group_nodes` / `canvas_reorder` / `canvas_get_state` / `canvas_set_state`）+ 2 资产（`asset_list` / `asset_to_canvas`）。
+- **Agent 工具**（原生 ToolDefinition，parameters 直接写 JSON Schema，零 `@deepseek-ai/*` 运行时 import，全部走注入 `ctx`）：15 个工具 = 6 生成/抽帧/拼接/查询（`comfy_generate_image` / `comfy_generate_video` / `comfy_render` / `extract_frame` / `video_concat` / `comfy_list_workflows`）+ 7 画布（`canvas_list_nodes` / `canvas_write_node` / `canvas_get_node` / `canvas_group_nodes` / `canvas_reorder` / `canvas_get_state` / `canvas_set_state`）+ 2 资产（`asset_list` / `asset_to_canvas`）。
 - **systemPrompt GUIDANCE 段**（order 150）：基本约定 + 工具契约 + 参考图硬规则（单视图/零文字等实测结论）+ 指向流程 skill 的指针。**不含任何流程、任何片型词汇、任何具体 skill 名**——流程的唯一真相在 skill。
 - **HTTP 路由**（`/dsh-short-video-studio`）：
   - `/api/config`、`/api/workflows`：**显式 tokenless**（设置页调用；威胁模型见 §7）；
@@ -205,6 +207,7 @@ Agent 调用 comfy_generate_video(prompt, ref_nodes=[角色卡,场景卡], ...)
 | `flux-text2image` | image.text2image | UNETLoader → ModelSamplingFlux → CLIPTextEncode(flux2) → FluxGuidance → EmptyFlux2LatentImage → Flux2Scheduler → SamplerCustomAdvanced → VAEDecode → SaveImage | （无 modes，默认 20 步） | explicit，默认 1344×768 |
 | `minimax-h3-ref2v` | video.reference2video | UNETLoader → SigmaShift → **MiniMaxH3ReferenceToVideo**（ref_images dotted）→ SamplerCustomAdvanced → VAEDecode + **VAEDecodeAudio** → **CreateVideo(audio)** → SaveVideo(mp4/h264) | quality 20 步 / fast 4 步 + LoRA | aspect-ratio，longSide 1344/832 |
 | `minimax-h3-i2v` | video.image2video | 同上，但 **MiniMaxH3ImageToVideo** + first/last_frame 经 LoadImage→ImageScale preprocess 链 | quality 20 步 / fast 4 步 + LoRA | aspect-ratio，longSide 1344/832 |
+| `extract-frame` | image.from_video | LoadVideo → GetVideoComponents → **ImageFromBatch**(batch_index，负数从末尾数) → SaveImage | （无 modes，无采样） | 由源视频决定，不推导 |
 
 **H3 音视频链**是核心卖点：`MiniMaxH3ReferenceToVideo + audio_vae + VAEDecodeAudio → CreateVideo(audio)`，端到端产出**带声音**的单镜头视频（非静音）。
 
@@ -223,10 +226,10 @@ Agent 调用 comfy_generate_video(prompt, ref_nodes=[角色卡,场景卡], ...)
 | `lib/concat.js` | 视频拼接：`buildConcatGraph`（纯函数，变长左折叠图）、`detectFfmpeg`、`ffmpegConcat`（copy 失败降级重编码） |
 | `lib/client.js` | 浏览器半：`conversation.view` 画布 tab（iframe）+ `settings.section` ComfyUI 设置卡 |
 | `studio/` | 自包含画布页：节点卡渲染、编辑/重做/入库/分组/排序/删除、markdown 表格解析、自绘模态、ask-ai postMessage |
-| `workflows/` | 3 份内置 manifest（数据） |
+| `workflows/` | 4 份内置 manifest（数据） |
 | `schemas/workflow-manifest.schema.json` | manifest 权威 JSON Schema |
 | `skills/3d-animation-short-generator/` | 其中一种片型的生产流程 skill（自包含单文件 SKILL.md + meta.yaml）；插件对它零认知 |
-| `scripts/` | `mock-apply`（装配冒烟）、`smoke-manifest`（M1 图编译等价）、`smoke-render`（M2 纯逻辑）、`smoke-concat`（拼接图拓扑）、`probe-concat`（ComfyUI 后端实跑，需 ComfyUI）、`smoke-flux2` / `smoke-submit` / `e2e` / `e2e-comfy`（需 ComfyUI）、`import-comfy`（CLI 转换） |
+| `scripts/` | `mock-apply`（装配冒烟）、`smoke-manifest`（M1 图编译等价）、`smoke-render`（M2 纯逻辑）、`smoke-concat`（拼接图拓扑）、`probe-concat` / `probe-extract-frame`（实跑，需 ComfyUI）、`smoke-flux2` / `smoke-submit` / `e2e` / `e2e-comfy`（需 ComfyUI）、`import-comfy`（CLI 转换） |
 | `cordis.patch.yml` | bundle patch：插件行插入 web profile roster |
 | `docs/` | 设计文档（workflow-contract）、审查（architecture-review）、方案（consistency-optimization-plan）、实验（three-view-experiment） |
 
@@ -245,7 +248,7 @@ Agent 调用 comfy_generate_video(prompt, ref_nodes=[角色卡,场景卡], ...)
 | **P2** | `schemaVersion` 无迁移 | 只有写入无检查无 `migrate()`，为将来 shotlist 节点预留 |
 | **P2** | 设置页资产字段仍硬编码 | 应改为按 registry 动态渲染（即 M4）。入库表单化已完成（资产类型下拉 + 资产名，不再从分组名反推类型） |
 
-另外 `docs/consistency-optimization-plan.md` 指出的功能缺口中，「无拼接能力」已由 `runConcat` 解决；仍未解决：末帧串联链路断裂（无抽帧能力）、`slugifyName` 对中文标题失效导致入库堵死、无身份锁（仅参考图 + 散文约束）、七列镜头表不可机读（无 shotlist schema）。
+另外 `docs/consistency-optimization-plan.md` 指出的功能缺口中，「无拼接能力」已由 `runConcat` 解决，「末帧串联链路断裂（无抽帧能力）」已由 `extract-frame` 清单 + `extract_frame` 工具解决；仍未解决：`slugifyName` 对中文标题失效导致入库堵死、无身份锁（仅参考图 + 散文约束）、七列镜头表不可机读（无 shotlist schema）。
 
 ---
 

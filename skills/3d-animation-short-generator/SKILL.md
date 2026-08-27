@@ -27,6 +27,7 @@ whenToUse: |
 | 归组 / 排序 | `canvas_group_nodes` / `canvas_reorder` |
 | 读写项目设置 | `canvas_get_state` / `canvas_set_state` |
 | 查跨会话资产库 / 物化资产到画布 | `asset_list` / `asset_to_canvas` |
+| 抽帧（取末帧 / 首帧） | `extract_frame` |
 | 拼接全片（含音轨） | `video_concat` |
 | 所有批准 / 选择关口 | `ask_user_question`（选项卡） |
 
@@ -301,8 +302,8 @@ whenToUse: |
 ### 参考绑定策略（逐镜按镜头表 `绑定` 字段执行）
 
 - **起点镜 / 换场景镜**：`comfy_generate_video(ref_nodes=[说话人角色卡, 场景卡])` —— 走参考绑定路径。
-- **同场景续接镜**（如 S03→S04、S05→S06）：`ref_nodes=[角色卡, 场景卡]` + `first_frame_node=上一镜末帧` —— 首帧串联改善过渡。
-- **跨场景镜绝不带上一镜末帧。**
+- **同场景续接镜**（如 S03→S04、S05→S06）：先 `extract_frame(video_node=上一镜片段节点)` 抽出末帧（默认 `frame_index=-1`），再 `comfy_generate_video(ref_nodes=[角色卡, 场景卡], first_frame_node=刚抽出的末帧图片节点)` —— 首帧串联，身份与环境直接从真实画面继承。
+- **跨场景镜绝不带上一镜末帧**（跨场景的过渡交给下面的转场镜）。
 - 角色卡可以传画布节点 id，也可以直接传资产 id（如 `character:luna`）复用跨会话锚点。
 - 同一角色有多个着装状态卡时，按本镜状态选正确的那张。
 
@@ -327,6 +328,21 @@ whenToUse: |
 
 不要重复提交未改动的同一请求。
 
+### 跨场景转场镜
+
+所有正片片段出完后，为每一个**跨场景边界**生成一个转场镜。3D 动画短片不用交叉溶解（有 PPT 感），而是让镜头真的运动过去：
+
+1. `extract_frame(video_node=前一镜片段, frame_index=-1)` → 前一镜末帧。
+2. `extract_frame(video_node=后一镜片段, frame_index=0)` → 后一镜首帧。
+3. `comfy_generate_video(first_frame_node=末帧节点, last_frame_node=首帧节点, length=12~24（0.5~1s）, prompt=过渡意图, group="shot clips", title="S03→S04 转场")` —— 首末帧串联，模型自己补出中间的运动。
+4. 转场镜作为**普通片段**参与 Step 8 的拼接顺序，插在两镜之间。
+
+转场 prompt 只写镜头运动与光线变化（如「镜头快速右摇穿过门框，暖色厨房光渐变为夜晚街道冷光」），**不写角色动作、不写对白**，音频模式按 `silent` 处理。
+
+同场景续接镜不需要转场镜——首帧串联本身已经连续，插转场反而暴露剪辑点。
+
+抽出的末帧/首帧图片节点也归 `shot clips` 组，它们是中间产物，终检时不计入镜头数。
+
 ### 片段批准
 
 所有片段渲染完成后按镜头顺序放到画布（group `shot clips`），出选项卡：批准片段并进入交付（推荐）/ 重渲染选定片段 / 修复角色不一致 / 修复场景不一致 / 加强分镜清理 / 修复跨片段空间锚点漂移。
@@ -337,11 +353,11 @@ whenToUse: |
 
 ### 拼接全片
 
-所有片段批准后，用 `video_concat(nodes=[按镜头表顺序的片段节点 id], title="拼接成片", group="final delivery")` 拼成完整成片（含音轨）。后端由插件自动选择——本机有 ffmpeg 走 ffmpeg，没有就走 ComfyUI 纯节点链路，两者对本 Skill 透明。
+所有片段批准后，用 `video_concat(nodes=[按镜头表顺序的片段节点 id，含转场镜], title="拼接成片", group="final delivery")` 拼成完整成片（含音轨）。后端由插件自动选择——本机有 ffmpeg 走 ffmpeg，没有就走 ComfyUI 纯节点链路，两者对本 Skill 透明。
 
 拼接的三条限制，必须提前告知用户：
 
-- **只有硬切，没有溶解转场**。镜头表里标了「跨场景溶解」的地方，成片实际是直切。需要溶解得在外部剪辑软件补。
+- **拼接本身只做硬切，没有溶解**。跨场景过渡由 Step 7 生成的转场镜承担——把转场镜按顺序放进 `nodes` 即可。如果没做转场镜，成片就是直切。
 - **所有片段必须同分辨率**（同一档位出的片段天然满足；混用 fast/quality 出的片段要先统一重出）。
 - **无 BGM**：注册表当前没有 `audio.music` 工作流，插件不能生成配乐。片段自带的对白与音效会保留。
 

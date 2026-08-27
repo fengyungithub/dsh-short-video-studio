@@ -60,7 +60,9 @@ function assertCleanGraph(graph, label) {
 console.log('== 1) 加载 + 校验内置清单 ==')
 const report = loadBuiltinManifests(workflowsDir)
 ok(report.errors.length === 0, `无校验错误${report.errors.length ? '\n    ' + report.errors.join('\n    ') : ''}`)
-ok(report.manifests.length === 3, `加载 3 份清单（实际 ${report.manifests.length}）`)
+for (const id of ['flux-text2image', 'minimax-h3-ref2v', 'minimax-h3-i2v', 'extract-frame']) {
+  ok(Boolean(report.byId[id]), `内置清单含 ${id}`)
+}
 for (const id of ['flux-text2image', 'minimax-h3-ref2v', 'minimax-h3-i2v']) {
   ok(Boolean(report.byId[id]), `清单存在: ${id}`)
 }
@@ -125,5 +127,5 @@ if (failures) {
   console.error(`✗ 失败 ${failures} 项`)
   process.exit(1)
 } else {
-  console.log('✓ 全部通过：3 份清单校验通过，编译图与旧 builder 等价')
+  console.log(`✓ 全部通过：${report.manifests.length} 份清单校验通过，编译图与旧 builder 等价`)
 }
