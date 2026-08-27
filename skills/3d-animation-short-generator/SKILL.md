@@ -27,6 +27,7 @@ whenToUse: |
 | 归组 / 排序 | `canvas_group_nodes` / `canvas_reorder` |
 | 读写项目设置 | `canvas_get_state` / `canvas_set_state` |
 | 查跨会话资产库 / 物化资产到画布 | `asset_list` / `asset_to_canvas` |
+| 拼接全片（含音轨） | `video_concat` |
 | 所有批准 / 选择关口 | `ask_user_question`（选项卡） |
 
 不要写死模型名。默认工作流由能力注册表 `preferred` 决定；用户要换模型时先 `comfy_list_workflows` 核对能力，再用 `comfy_render` 显式指定 `workflow`。
@@ -72,7 +73,7 @@ whenToUse: |
 5. 六列标准镜头表（table，group `shot table`）
 6. 单文本分镜文档（text，group `text storyboards`；抽取节点与铅笔图同组）
 7. 单镜头视频片段（video，group `shot clips`）
-8. 交付清单与终检（text，group `final delivery`）
+8. 拼接成片（video）+ 交付清单与终检（text），均 group `final delivery`
 
 **分组名由本 Skill 定义**（插件本身不预设任何片型词汇）。在 Step 0 用 `canvas_set_state(groupOrder=["story planning","character cards","scene cards","shot table","text storyboards","shot clips","final delivery"])` 一次性声明展示顺序，画布即按此顺序渲染分组。之后所有 `group` 参数必须用这七个精确名字；未声明的分组会排在末尾。
 
@@ -332,16 +333,25 @@ whenToUse: |
 
 若片段与已批准的 `参考锚点` 漂移（门框落到错边、人物从错边离屏、光位翻转），用直接引用 `参考锚点` 块的强化提示重渲；不要在交付时静默混合修正版与未修正版。
 
-## STEP 8：交付与终检
+## STEP 8：拼接、交付与终检
 
-**当前能力边界（务必如实告知用户）**：本插件走本地 ComfyUI，**没有 ffmpeg，注册表中目前也没有 `audio.music` 工作流**，因此无法自动拼接全片或生成 BGM。不要假装已经拼好片。
+### 拼接全片
+
+所有片段批准后，用 `video_concat(nodes=[按镜头表顺序的片段节点 id], title="拼接成片", group="final delivery")` 拼成完整成片（含音轨）。后端由插件自动选择——本机有 ffmpeg 走 ffmpeg，没有就走 ComfyUI 纯节点链路，两者对本 Skill 透明。
+
+拼接的三条限制，必须提前告知用户：
+
+- **只有硬切，没有溶解转场**。镜头表里标了「跨场景溶解」的地方，成片实际是直切。需要溶解得在外部剪辑软件补。
+- **所有片段必须同分辨率**（同一档位出的片段天然满足；混用 fast/quality 出的片段要先统一重出）。
+- **无 BGM**：注册表当前没有 `audio.music` 工作流，插件不能生成配乐。片段自带的对白与音效会保留。
+
+### 交付清单
 
 在 group `final delivery` 写一个交付清单文本节点，包含：
 
-- 按镜头表顺序的片段清单（镜头号 → 画布节点 id → 媒体文件相对路径 → 时长）。
-- 转场建议：跨场景溶解 / 同场景直切。
-- BGM 建议：情绪弧、节奏、在对白与重要音效下 duck 的时间点。
-- 一条可直接执行的外部拼接说明（用户自备 ffmpeg 或剪辑软件），或提示用户：若注册表后续加入 `audio.music` 能力，可用 `comfy_render(capability="audio.music")` 生成 BGM。
+- 拼接成片的节点 id 与媒体路径、总时长。
+- 按镜头表顺序的片段清单（镜头号 → 画布节点 id → 媒体路径 → 时长）。
+- 未落地项：需要人工补的溶解转场位置、BGM 建议（情绪弧、节奏、在对白与重要音效下 duck 的时间点）。
 
 **终检清单**（逐条核对并写进交付节点）：
 
@@ -389,7 +399,7 @@ whenToUse: |
 - 镜头表修订后，分镜（文档 + 抽取节点）与片段必须用新表，**Step 5.5 自检必须重跑**才能恢复分镜。
 - 分镜某章节修订后，对应片段必须用新章节内容；已抽取的镜以独立节点为权威。
 - 铅笔图重画不强制重渲视频（它不是渲染参考）。
-- 片段重渲后，交付清单与终检必须用新片段。
+- 片段重渲后，必须用新片段重跑 `video_concat`，交付清单与终检也随之更新。
 - 换工作流重渲时，在项目简报记入新工作流，并重检该镜的参考绑定策略。
 
 任何重做后：在下一条回复中标明重做产物为当前批准版本；后续调用一律用新节点 id；画布上同时存在多版本时先指明当前选用版本再继续；不要在交付清单里静默混合新旧资产。

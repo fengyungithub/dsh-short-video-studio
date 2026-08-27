@@ -27,6 +27,7 @@ dsh-short-video-studio/
 ├── lib/
 │   ├── index.js                 # 宿主半：ComfyUI 引擎、渲染编排、画布存储、HTTP 路由、Agent 工具、GUIDANCE（约 1905 行）
 │   ├── manifest.js              # 工作流绑定契约引擎：校验 / 资产解析 / 图编译 / 注册表加载（M1）
+│   ├── concat.js                # 视频拼接（ffmpeg 优先 / ComfyUI 纯节点退化）
 │   ├── convert.js               # ComfyUI「导出 API」JSON → workflow manifest 转换器
 │   └── assets.js                # 跨会话资产库（角色卡 / 场景卡 / 风格锚点）
 ├── client.js → lib/client.js    # 浏览器半：conversation.view「画布」tab + settings.section「ComfyUI」设置
@@ -122,6 +123,19 @@ comfy_render / comfy_generate_* → runRender(ctx, opts)
 
 > 注：`runImageGeneration` / `runVideoGeneration` 与三个 legacy builder（`buildFluxImageWorkflow` / `buildH3VideoWorkflow` / `buildH3ImageToVideoWorkflow`）已无生产调用点，仅经 `_internals` 供 `smoke-manifest.mjs` 做「manifest 编译 vs legacy 构造」节点类别等价性比对（见 §7 架构债）。
 
+#### 视频拼接（`runConcat` + `lib/concat.js`）
+
+拼接是 **delivery 层的确定性操作，不是模型能力**，因此刻意不进 manifest 注册表：拼接图的节点数与连线拓扑随片段数变化（变长左折叠），超出 manifest「静态 graph 模板 + 定点注入」的表达能力，为一个确定性后处理扩展契约层不划算。
+
+两条后端，`runConcat` 按环境自动选择，对 skill 透明：
+
+| 后端 | 条件 | 链路 | 代价 |
+|---|---|---|---|
+| ffmpeg | 本机 `ffmpeg -version` 成功 | concat demuxer + `-c copy`；copy 失败自动降级 libx264/aac 重编码 | 零重编码、零显存、秒级 |
+| ComfyUI | 无 ffmpeg（本机实测即此路径） | 逐段 `POST /upload/image` 进 input（该端点同时接受 mp4）→ `LoadVideo → GetVideoComponents` → `ImageBatch` / `AudioConcat` 左折叠 → `CreateVideo(images, fps, audio)` → `SaveVideo(mp4/h264)` | 整段素材作为 IMAGE 张量进内存（N×帧×W×H×3×4 字节） |
+
+`runConcat` 解析素材时强校验 `kind === 'video'` + `media` 存在 + 文件在盘（顺带堵住了「视频被当图上传」那条老路径）。已实测：3 段片段 7.6s 出片，总时长 14.085s → 产物 14.084s，`vide` + `soun` 双轨完整。限制：**只有硬切无溶解**、片段需同分辨率、不产 BGM（注册表无 `audio.music` 工作流）。
+
 #### 分辨率策略
 - fast 档长边 832 / quality 档长边 1344，按画布 `settings.aspectRatio`（16:9 / 9:16 / 1:1 等任意比例）推导宽高，snap 到 32 倍数；显式传 `width`/`height` 优先。
 
@@ -145,8 +159,8 @@ comfy_render / comfy_generate_* → runRender(ctx, opts)
 
 ### 3.5 集成层
 
-- **Agent 工具**（原生 ToolDefinition，parameters 直接写 JSON Schema，零 `@deepseek-ai/*` 运行时 import，全部走注入 `ctx`）：13 个工具 = 4 生成/查询（`comfy_generate_image` / `comfy_generate_video` / `comfy_render` / `comfy_list_workflows`）+ 7 画布（`canvas_list_nodes` / `canvas_write_node` / `canvas_get_node` / `canvas_group_nodes` / `canvas_reorder` / `canvas_get_state` / `canvas_set_state`）+ 2 资产（`asset_list` / `asset_to_canvas`）。
-- **systemPrompt GUIDANCE 段**（order 150）：工具契约 + 固定流水线 Step 0-8 + 门控纪律（选项卡确认）+ 默认与失败梯度 + 实战要点（单视图/零文字参考图等实测硬规则）+ 边界。与 `SKILL.md` 大面积重复（架构债 P0）。
+- **Agent 工具**（原生 ToolDefinition，parameters 直接写 JSON Schema，零 `@deepseek-ai/*` 运行时 import，全部走注入 `ctx`）：14 个工具 = 5 生成/拼接/查询（`comfy_generate_image` / `comfy_generate_video` / `comfy_render` / `video_concat` / `comfy_list_workflows`）+ 7 画布（`canvas_list_nodes` / `canvas_write_node` / `canvas_get_node` / `canvas_group_nodes` / `canvas_reorder` / `canvas_get_state` / `canvas_set_state`）+ 2 资产（`asset_list` / `asset_to_canvas`）。
+- **systemPrompt GUIDANCE 段**（order 150）：基本约定 + 工具契约 + 参考图硬规则（单视图/零文字等实测结论）+ 指向流程 skill 的指针。**不含任何流程、任何片型词汇、任何具体 skill 名**——流程的唯一真相在 skill。
 - **HTTP 路由**（`/dsh-short-video-studio`）：
   - `/api/config`、`/api/workflows`：**显式 tokenless**（设置页调用；威胁模型见 §7）；
   - `/api/canvas`、`/api/canvas/node`、`/api/canvas/group`、`/api/canvas/reorder`、`DELETE /api/canvas/node`、`/api/assets`（含「入库」）、`/api/generate/image|video`：需 `x-dsh-svs-token` 头；
@@ -206,12 +220,13 @@ Agent 调用 comfy_generate_video(prompt, ref_nodes=[角色卡,场景卡], ...)
 | `lib/manifest.js` | 契约引擎：`CAPABILITIES` 词汇、`validateManifest`、`resolveAssets`、`buildGraphFromManifest`（注入引擎）、`loadBuiltinManifests` |
 | `lib/convert.js` | ComfyUI 导出 → manifest 机械转换（资产抽取、标量注入点、todos 交人工的语义绑定清单） |
 | `lib/assets.js` | 资产库：load/save/register、id 规范化（`normalizeAssetId`）、`isAssetRef` / `canonicalAssetId`、`resolveAssetImagePath`、`slugifyName` |
+| `lib/concat.js` | 视频拼接：`buildConcatGraph`（纯函数，变长左折叠图）、`detectFfmpeg`、`ffmpegConcat`（copy 失败降级重编码） |
 | `lib/client.js` | 浏览器半：`conversation.view` 画布 tab（iframe）+ `settings.section` ComfyUI 设置卡 |
 | `studio/` | 自包含画布页：节点卡渲染、编辑/重做/入库/分组/排序/删除、markdown 表格解析、自绘模态、ask-ai postMessage |
 | `workflows/` | 3 份内置 manifest（数据） |
 | `schemas/workflow-manifest.schema.json` | manifest 权威 JSON Schema |
-| `skills/3d-animation-short-generator/` | 生产流水线 skill（SKILL.md + 5 份 references + meta.yaml） |
-| `scripts/` | `mock-apply`（装配冒烟）、`smoke-manifest`（M1 图编译等价）、`smoke-render`（M2 纯逻辑）、`smoke-flux2` / `smoke-submit` / `e2e` / `e2e-comfy`（需 ComfyUI）、`import-comfy`（CLI 转换） |
+| `skills/3d-animation-short-generator/` | 其中一种片型的生产流程 skill（自包含单文件 SKILL.md + meta.yaml）；插件对它零认知 |
+| `scripts/` | `mock-apply`（装配冒烟）、`smoke-manifest`（M1 图编译等价）、`smoke-render`（M2 纯逻辑）、`smoke-concat`（拼接图拓扑）、`probe-concat`（ComfyUI 后端实跑，需 ComfyUI）、`smoke-flux2` / `smoke-submit` / `e2e` / `e2e-comfy`（需 ComfyUI）、`import-comfy`（CLI 转换） |
 | `cordis.patch.yml` | bundle patch：插件行插入 web profile roster |
 | `docs/` | 设计文档（workflow-contract）、审查（architecture-review）、方案（consistency-optimization-plan）、实验（three-view-experiment） |
 
@@ -230,7 +245,7 @@ Agent 调用 comfy_generate_video(prompt, ref_nodes=[角色卡,场景卡], ...)
 | **P2** | `schemaVersion` 无迁移 | 只有写入无检查无 `migrate()`，为将来 shotlist 节点预留 |
 | **P2** | 设置页资产字段仍硬编码 | 应改为按 registry 动态渲染（即 M4）。入库表单化已完成（资产类型下拉 + 资产名，不再从分组名反推类型） |
 
-另外 `docs/consistency-optimization-plan.md` 指出四类功能缺口：末帧串联链路断裂（无抽帧能力）、`slugifyName` 对中文标题失效导致入库堵死、无身份锁（仅参考图 + 散文约束）、七列镜头表不可机读（无 shotlist schema）。
+另外 `docs/consistency-optimization-plan.md` 指出的功能缺口中，「无拼接能力」已由 `runConcat` 解决；仍未解决：末帧串联链路断裂（无抽帧能力）、`slugifyName` 对中文标题失效导致入库堵死、无身份锁（仅参考图 + 散文约束）、七列镜头表不可机读（无 shotlist schema）。
 
 ---
 
