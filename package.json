@@ -1,12 +1,13 @@
 {
   "name": "dsh-short-video-studio",
   "version": "0.1.1",
-  "description": "MiniMax-Design 风格的短剧/动画画布工作室：会话「画布」视图页 + ComfyUI 生成服务（图片 FLUX / 视频 MiniMax H3 音视频，带声音/参考绑定/原生字幕/fast质量两档）+ Agent 画布工具 + 自带 skill。双面 DSH 插件。",
+  "description": "基于deepseek harness的短剧/动画画布工作室：会话「画布」视图页 + ComfyUI 生成服务（图片 FLUX / 视频 MiniMax H3 音视频，带声音/参考绑定/原生字幕/fast质量两档）+ Agent 画布工具 + 自带 skill。双面 DSH 插件。",
   "keywords": [
     "dsh",
     "deepseek-harness",
     "comfyui",
     "minimax-h3",
+    "dsh-plugin",
     "flux",
     "short-video",
     "animation",
@@ -59,6 +60,22 @@
     "LICENSE"
   ],
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fengyungithub/dsh-short-video-studio.git"
+  },
+  "homepage": "https://github.com/fengyungithub/dsh-short-video-studio#readme",
+  "bugs": {
+    "url": "https://github.com/fengyungithub/dsh-short-video-studio/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "smoke": "node scripts/smoke-manifest.mjs && node scripts/smoke-preask-deliver.mjs && node scripts/smoke-pdf.mjs",
+    "prepublishOnly": "npm run smoke"
+  },
   "dependencies": {
     "puppeteer-core": "^25.9.0"
   }
