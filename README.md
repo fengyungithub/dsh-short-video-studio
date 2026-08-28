@@ -1,79 +1,220 @@
 # dsh-short-video-studio
 
-**完全本地 · 免费 · 零云端依赖** 的 类MiniMax-Design 风格**短剧 / 动画画布工作室**，作为 [DeepSeek Harness](https://github.com/deepseek-ai) 双面插件。所有生成（图片 FLUX / 视频 MiniMax H3）都跑在**本地 ComfyUI** 上，无需任何付费云 API/额度，一次生成、无限出片：
+**完全本地 · 免费 · 零云端依赖**的**短剧 / 动画画布工作室**，作为 [DeepSeek Harness](https://github.com/deepseek-ai) 双面插件运行。所有生成都跑在**本地 ComfyUI** 上——不需要任何付费云 API、不消耗额度，装好即用，一次生成、无限出片。
 
-- **画布页**：每个会话多一个「画布」视图 tab，按生产顺序预览/编辑各步骤产物。
-- **生成服务**：统一走**本地 ComfyUI API**——图片用本地 FLUX（`flux2_dev`），视频用本地 MiniMax H3（**音视频 AV 模型，默认带声音**，支持参考图绑定与原生字幕），**完全本地、免费**。
-- **Agent 工具**：`comfy_generate_image` / `comfy_generate_video` / `canvas_*`，Agent 与画布页读写同一份持久状态 `<workspace>/canvas/<sessionId>/project.json`。
-- **自带 skill**：安装插件时自动把 `skills/` 下的 skill 安装到 `~/.dsh/skills/`，供模型/技能中心发现；skill 可扩展。
+> 一句话：**Agent 按你定义的 skill 编排流程，把生成请求派发到本地 ComfyUI 执行，产物落进可视化画布，还能通过飞书远程操控创作。**
 
-## 对话体验与配置
+> **🌟 模型无关**：FLUX 2 / MiniMax H3 只是插件随附的**内置默认工作流**，不是产品边界。本插件是通用的 ComfyUI 工作流执行器 + 能力注册表——**任何 ComfyUI 能跑的模型**（SDXL / SD3.5 / Qwen-Image / Wan / CogVideoX / LTX / 本地 Kling 等，图片或视频、带不带声音都可以）都能通过[导入一份工作流清单](#导入你自己的-comfyui-workflow)接入，skill 与工具契约无需任何改动。换模型 = 加一份 JSON。
 
-在 DeepSeek Harness 会话里，Agent 用**流程叙述 + 任务看板**驱动整条流水线，关键节点用选项卡确认；并在「设置」页提供 **ComfyUI** 配置菜单。下图：两张会话截图 + 一张 ComfyUI 设置页（三图一行）：
+## 功能亮点
 
-| 对话截图 1 | 对话截图 2 | ComfyUI 设置 |
-|---|---|---|
-| ![会话截图1](./examples/harness-dialogue-1.png) | ![会话截图2](./examples/harness-dialogue-2.png) | ![ComfyUI设置](./examples/harness-dialogue-3.png) |
+### 🖥️ 本地化、0 成本的视频工作流
 
-**对话呈现**：
+- **零云端依赖**：默认图片用 FLUX 2、视频用 MiniMax H3 **音视频 AV 模型**（**带声音**、支持**参考图绑定**与**画面内原生字幕**，对白直接写进 prompt，无需后期叠加）——两者都只是内置默认，可整体替换为你自己的任何 ComfyUI 模型/工作流。
+- **画质/速度两档**：`fast`（4 步 + LoRA，调试快 5×+）与 `quality`（20 步，成片），分辨率按画布比例自动推导，支持 16:9 / 9:16 / 1:1 等任意画幅，snap32。
+- **完整后处理**：同场景末帧串联（连续性过渡）、生成式转场镜、抽帧、拼接合成（本机有 ffmpeg 走零重编码，否则 ComfyUI 纯节点链路）——一条龙出片。
 
-> 我把《一只想当宇航员的小狐狸》做成 30 秒 3D 动画短片。先说清楚一点，然后进入流程：
->
-> - 本插件管线用 FLUX（图片/角色卡/场景卡）+ MiniMax H3（视频）生成，"3D 动画"我用 3D CG / Pixar 风格渲染来实现。
-> - 按固定流水线推进：项目简报 → 故事大纲 → 角色卡 → 场景卡 → 七列镜头表 → 文本分镜 → 逐镜生成 → 拼接合成。
-> - 按照门控纪律，第一步先用选项卡确认关键设定。
+### 🎨 可视化画布
 
-**任务看板**（Agent 自动维护，逐项推进，对应画布分组）：
+- 每个会话多一个「**画布**」tab，按生产顺序预览 / 编辑 / 重做每一步产物：简报、大纲、角色卡、场景卡、镜头表、分镜、逐镜片段、成片。
+- 文本节点**实时渲染 markdown**（标题/表格/列表/代码块），媒体节点直接内嵌预览；分组、排序、删除、**入库**（一键登记为跨会话资产）都在画布上完成。
+- Agent 工具与画布页读写**同一份持久状态**，对话推进的每一步产物都实时可见。
 
-- [x] 项目简报 + 故事大纲（含音频脊柱图）
-- [ ] 故事大纲选项卡批准
-- [ ] 角色卡：小狐狸（不穿 / 穿宇航服）+ 小兔子（单视图，选项卡锁定）
-- [ ] 场景卡：夜晚森林 / 工作台 / 森林小径 / 山顶（选项卡锁定）
-- [ ] 七列镜头表 + 自检
-- [ ] 文本分镜文档 + 选项卡批准
-- [ ] 逐镜生成视频（shot clips，fast 迭代 → quality 成片）
+### 🧩 自由扩展：skill 与 workflow
 
-每个「选项卡批准 / 锁定」节点，Agent 都会弹出**选择卡片**（推荐项置首）；任务完成、产物落画布后可逐镜预览/重做。
+- **skill 可扩展**：生产流程完全由 skill 定义（安装时自动复制到 `~/.dsh/skills/`，可热扫描、可被用户覆盖）。写一个 `SKILL.md` 就能定义你自己的片型流程——**插件本体不认识任何流程、任何片型词汇**。
+- **workflow 可扩展**：插件退化为「通用 ComfyUI 工作流执行器 + 能力注册表」。**换模型、换工作流 = 增删一份 JSON**，不动 JS、不动工具、不动系统提示。FLUX 2 / MiniMax H3 只是内置默认，你的任何 ComfyUI 工作流（SDXL / Qwen-Image / Wan / CogVideoX / LTX…）都可以**直接导入**并设为默认（见[导入你的 workflow](#导入你自己的-comfyui-workflow)）。
 
-**ComfyUI 设置**：设置页新增 **ComfyUI** 菜单，可配置 baseUrl / apiKey / 模型 / 轮询 / 超时，保存后即时生效（写入 `~/.dsh/dsh-short-video-studio.json`）。详细配置见下文「配置」。
+### 🎬 多场景创作：一套引擎，任意场景
 
-👉 [查看下方完整画布展示（项目简报 / 角色卡 / 场景卡 / 每镜截图）](#展示30-秒-3d-动画短片一只想当宇航员的小狐狸)
+- 默认内置 **3D 动画短片**场景（故事创意 → 角色/场景/镜头/分镜/逐镜/合成），但**场景不是插件边界**。
+- **电商宣传视频**（商品/卖点 → 展示分镜 + 口播）、**教育课件讲解**（知识点 → 图解 + 讲解）、品牌故事、纪念短片、Vlog 解说……任何「输入 X → 产出视频」的创作场景，都通过**扩展一个 skill** 覆盖——复用同一套画布、生成工具、资产库与飞书交付，只换编排规则（见[开发你自己的场景 skill](#扩展开发你自己的场景-skill)）。
+- **场景与模型双解耦**：场景由 skill 定义、模型由注册表定义，两者互不绑定——电商场景也可以随时切换到你想用的任何 ComfyUI 模型。
 
-## 特性
+### 📱 飞书集成：远程操控工作台创作
 
-- **H3 音视频工作流**：`MiniMaxH3ReferenceToVideo` + `audio_vae` + `VAEDecodeAudio` → `CreateVideo(audio)`，端到端生成**带声音**的单镜头视频（非静音）。
-- **参考图绑定**：`ref_nodes` 传角色卡/场景卡，经 `ref_images.ref_image_N`（dotted）绑定身份/环境，避免角色/服装漂移。
-- **快速/质量两档**：`mode=fast`（4步·Lightning LoRA，调试快 5×+，默认 832×480）与 `mode=quality`（20步，成片，默认 1344×768）。**分辨率按画布 `aspectRatio` 推导，两档均支持 16:9/9:16/1:1 等任意比例**，显式传 `width`/`height` 可覆盖。
-- **末帧串联**：同场景续接镜用 `first_frame_node=上一镜末帧` 做连续性过渡。
-- **H3 原生字幕**：对白字幕直接写进 prompt，由 H3 端到端渲染（含中文）。
-- **项目设置持久化**：`canvas_set_state` 写入画幅/时长/音频模式/生成模式。
+- 会话可以跑在**飞书聊天**里（配合 [dsh-lark](https://github.com/deepseek-ai) 飞书渠道）——你在飞书里说一句话，Agent 就在本地工作台上按 skill 走完整条流水线。
+- 每次提问前，插件**自动把画布产物送达飞书**：图片/视频直接发原文件，简报/大纲/镜头表/分镜等文本自动导出为 **PDF**（飞书可直接预览）——无需登录任何后台，聊天里就能收片、审片、下指令重做。
 
-## 安装
-
-**从 GitHub 安装**（发布到 GitHub 后）：
+**安装说明**：dsh-lark 飞书渠道是 **web profile 的插件**，安装时必须带 `--profile web`；若希望**飞书与 dsh web 共用同一个 profile**（同一份插件、会话与工作区，Web 画布与飞书聊天看到同一块画布）：
 
 ```bash
-# 方式 A：GitHub shorthand
-dsh plugin --profile web add github:fengyungithub/dsh-short-video-studio
-
-# 方式 B：完整 git URL
-dsh plugin --profile web add git+https://github.com/fengyungithub/dsh-short-video-studio.git
-
-dsh web   # 重启后会话出现「画布」tab；自带 skill 已自动安装到 ~/.dsh/skills/
+dsh plugin --profile web add dsh-lark-channel@latest
 ```
 
-**从本地源码安装**（开发用）：
+装好后在飞书里把 bot 拉进群即可开始远程创作；群聊会先弹审批卡、再出选项卡。
+
+## 快速开始
+
+前置条件：本机已运行 [ComfyUI](http://localhost:8188)，并已下载你计划使用的模型——内置默认（FLUX 2 / MiniMax H3）或你自己导入的模型（见[配置](#配置)与[导入 workflow](#导入你自己的-comfyui-workflow)）。
 
 ```bash
+# 安装插件（本地源码 / GitHub 二选一）
 dsh plugin --profile web add file:/path/to/dsh-short-video-studio
-dsh web
+# 或 dsh plugin --profile web add github:fengyungithub/dsh-short-video-studio
+
+dsh web   # 重启后会话出现「画布」tab；自带 skill 已自动装到 ~/.dsh/skills/
 ```
 
-> 安装后会自动把 `skills/` 下的 skill 复制到 `~/.dsh/skills/`，并在 Web 设置页新增 **ComfyUI** 配置菜单。
+安装后自动完成三件事：`skills/` 下 skill 复制到 `~/.dsh/skills/`（幂等，不覆盖你的修改）；Web 设置页新增 **ComfyUI** 配置菜单；会话多出「画布」视图 tab。
 
-## 配置
+开始创作：在会话里说
 
-ComfyUI 服务端 `baseUrl`、`apiKey` 与模型名均可配置，优先级：**环境变量 > 配置文件 > 默认值**。GUI 配置菜单见文首「对话体验与配置」。
+> 把「一只想当宇航员的小狐狸」做成 30 秒 3D 动画短片
+
+Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角色卡 → 场景卡 → 镜头表 → 分镜 → 逐镜生成 → 拼接合成，关键节点用选项卡确认。产品界面（真实会话截图）：
+
+| 对话体验：流程叙述 + 任务看板 | 对话体验：可视化画布 |
+|---|---|
+| ![会话截图1](./examples/harness-dialogue-1.png) | ![会话截图2](./examples/harness-dialogue-2.png) |
+
+## 架构概览
+
+完整设计文档见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) 与 [`docs/workflow-contract.md`](docs/workflow-contract.md)。核心分层：
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ 展示层（浏览器半）  lib/client.js + studio/                     │
+│  「画布」会话 tab + 「ComfyUI」设置页（配置 / 注册表 / 导入）      │
+├──────────────────────────────────────────────────────────────┤
+│ 契约层（纯数据 + 校验）  workflows/*.json + lib/manifest.js      │
+│  能力词汇表 · 注入原语 · $assets 占位 · $model 哨兵 · 强校验     │
+├──────────────────────────────────────────────────────────────┤
+│ 执行层（宿主半）  lib/index.js                                 │
+│  ComfyUI 客户端 · 渲染编排 · 分辨率策略 · 注册表解析 · 画布存储  │
+├──────────────────────────────────────────────────────────────┤
+│ 集成层                                                        │
+│  Agent 工具注册 · GUIDANCE · HTTP 路由 · skill 安装 · 渠道送达  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**设计主张：插件不认识「FLUX」「H3」这些名字，只认识能力（capability）与工作流清单（manifest，数据而非代码）**——FLUX 2 / MiniMax H3 只是注册表里「恰好是默认」的两条记录，任何模型接入后享有同等地位。三层正交契约：
+
+| 层 | 内容 | 载体 |
+|---|---|---|
+| ① 任务契约 | Agent 只描述「要什么」：capability + 类型化输入 | Agent 工具参数 |
+| ② 能力契约 | 抽象作业词汇表：`image.text2image` / `video.reference2video` / `audio.tts`…（开放集合） | `CAPABILITIES` |
+| ③ 工作流绑定契约 | 一份清单 = 一个 capability → 一个 ComfyUI 图 + 注入点 + 资产 + 质量档（**JSON 数据**） | `workflows/*.json` |
+
+清单里的 `$assets.<key>` 占位让「换模型文件只改配置」；`["$model", 0]` 哨兵让「按质量档插 LoRA 链」由编译期自动完成。**注册表来源优先级**：内置 `workflows/` < 用户 `~/.dsh/dsh-short-video-studio/workflows/`（同名遮蔽）< `assetOverrides` / 环境变量（换模型文件名，不动图结构）。
+
+## 目录结构
+
+```
+├── lib/
+│   ├── index.js          # 宿主半：ComfyUI 客户端、渲染编排、画布存储、路由、Agent 工具、GUIDANCE
+│   ├── manifest.js       # 契约引擎：能力词汇、manifest 校验、图编译、注册表加载
+│   ├── concat.js         # 视频拼接（ffmpeg 优先 / ComfyUI 纯节点退化）
+│   ├── convert.js        # ComfyUI「导出 API」JSON → workflow manifest 转换器
+│   ├── assets.js         # 跨会话资产库（角色卡 / 场景卡 / 风格锚点）
+│   ├── pdf.js            # 文本节点 → PDF（puppeteer-core 优先，CLI 兜底）
+│   └── client.js         # 浏览器半：画布 tab + ComfyUI 设置页
+├── studio/               # 画布页（自包含 HTML/CSS/JS，无构建）
+├── workflows/            # 内置工作流清单（数据，非代码）
+├── schemas/              # workflow-manifest 权威 JSON Schema
+├── skills/               # 自带 skill（安装时复制到 ~/.dsh/skills/）
+├── docs/                 # 架构 / 契约 / 实验报告
+└── scripts/              # 冒烟 / e2e / 导入转换脚本
+```
+
+## 内置工作流清单（默认，可替换）
+
+> 下表是插件随附的**内置默认**。导入你自己的清单后即可通过 `preferred` 把它设为某能力的默认工作流——内置清单可以不用、可以遮蔽、可以删除。
+
+| 清单 | 能力 | 说明 |
+|---|---|---|
+| `flux-text2image` | `image.text2image` | FLUX 2 文生图（角色卡 / 场景卡 / 分镜图） |
+| `minimax-h3-ref2v` | `video.reference2video` | H3 参考绑定，`ref_nodes` 绑定身份/环境，**带声音** |
+| `minimax-h3-i2v` | `video.image2video` | H3 首/末帧串联（同场景续接镜 / 转场镜），带声音 |
+| `extract-frame` | `image.from_video` | 抽帧（末帧 / 首帧 → 图片节点） |
+
+## Agent 工具契约
+
+| 组 | 工具 |
+|---|---|
+| 生成 | `comfy_generate_image` · `comfy_generate_video` · `comfy_render`（通用入口，模型无关）· `comfy_list_workflows`（查能力/工作流） |
+| 后处理 | `extract_frame`（抽帧）· `video_concat`（拼接成片） |
+| 画布 | `canvas_list_nodes` · `canvas_write_node` · `canvas_get_node` · `canvas_group_nodes` · `canvas_reorder` · `canvas_get_state` · `canvas_set_state` |
+| 资产 | `asset_list` · `asset_to_canvas` |
+
+> 全部工具**模型无关**：capability 由注册表 `preferred` 解析到具体工作流，prompt 与流程里不硬编码模型名。
+
+## 扩展：开发你自己的场景 skill
+
+**适配场景**：插件默认内置的 skill 是 **3D 动画短片**这一种场景（故事创意 → 角色/场景/镜头/分镜/逐镜/合成）。但**场景不是插件边界**——任何「输入 X → 产出视频内容」的创作场景，都能通过扩展 skill 覆盖，复用同一套执行层工具（生成 / 画布 / 资产 / 拼接 / 飞书交付），只换编排规则：
+
+| 场景 | 输入 | skill 定义的编排重点 |
+|---|---|---|
+| 3D 动画短片（内置默认） | 一句话故事创意 | 角色一致、场景连续、镜头表自检、H3 原生字幕 |
+| **电商宣传视频** | 商品 / 卖点文案 | 产品展示分镜、口播逐字稿、卖点高光镜、BGM 与节奏 |
+| **教育课件讲解** | 知识点 / 讲义 | 图解卡片、讲解分镜、字幕与口型绑定、节奏控制 |
+| 品牌故事 / 纪念短片 / Vlog 解说… | 素材与主题 | 按你的业务规范自定义 |
+
+每个场景 skill 就是一个 `SKILL.md`（纯文本编排规则），插件对它零认知——触发哪个 skill 就完全按它执行。三步即可定义一种新场景：
+
+1. **在 `~/.dsh/skills/` 下新建目录**（或本仓库 `skills/` 下），写 `SKILL.md`，frontmatter 声明触发条件：
+
+```markdown
+---
+name: my-niche-skill
+description: 把 X 素材做成 Y 风格短片的完整流程。当用户提到「X 转 Y 短片」时使用。
+whenToUse: 适用于……不适用于……
+---
+
+## 生产流程
+1. 开场：用 canvas_set_state 声明画幅/时长/音频模式与分组展示顺序
+2. 用 comfy_generate_image 建角色卡/场景卡（单视图、零文字）
+3. 用 comfy_generate_video 逐镜生成（mode=fast 调试 → quality 成片）
+4. 用 video_concat 拼接，交付前把文本要点写进回复（飞书自动送达产物）
+```
+
+2. **用能力词汇而非模型名**：skill 里只写 `comfy_render(capability=video.reference2video)` 这类调用；具体工作流由注册表 `preferred` 决定，用户换模型时你的 skill 不用改。
+
+3. **关键节点用选项卡确认**（`ask_user_question`），把耐用产物全部落画布。
+
+## 扩展：导入你自己的 ComfyUI workflow
+
+三种途径，任选其一：
+
+**方式 A · 设置页粘贴（推荐）**：Web 设置页 → ComfyUI → 工作流导入。粘贴你的工作流清单 JSON，或直接粘贴 ComfyUI「**Export (API)**」导出的原始 JSON（`{nodeId:{class_type,inputs}}` 格式）——插件会自动转换：抽取模型资产、识别可注入的标量字段，并输出「待人工确认的语义绑定」清单（哪些字段对应 prompt / 宽高 / 参考图）。
+
+**方式 B · CLI 转换**：
+
+```bash
+node scripts/import-comfy.mjs exported.json \
+  --id sdxl-text2image --capability image.text2image --name "SDXL 文生图"
+```
+
+**方式 C · 手写 manifest**：参照 [`schemas/workflow-manifest.schema.json`](schemas/workflow-manifest.schema.json) 与内置 `workflows/` 示例，写一份清单放到 `~/.dsh/dsh-short-video-studio/workflows/<id>.json`（重启或设置页刷新后即入注册表）。**强校验**保证错误清单被拒绝而不是静默降级：
+
+```json
+{
+  "id": "my-video",
+  "version": 1,
+  "capability": "video.reference2video",
+  "runner": "comfyui",
+  "displayName": "我的视频工作流",
+  "output": { "mediaType": "video", "hasAudio": true },
+  "assets": { "unet": { "kind": "checkpoint", "default": "my_model.safetensors" } },
+  "graph": {
+    "1": { "class_type": "UNETLoader", "inputs": { "unet_name": "$assets.unet" } }
+  },
+  "params": [
+    { "name": "prompt", "inject": { "type": "scalar", "to": [["5", "prompt"]] } },
+    { "name": "width",  "inject": { "type": "scalar", "to": [["5", "width"]] } }
+  ]
+}
+```
+
+导入后即可用 `comfy_render` / `comfy_list_workflows` 按能力调用；同名清单遮蔽内置版本；`preferred` 决定默认工作流。
+
+## 配置（个性化）
+
+优先级：**环境变量 > 配置文件 > 默认值**。Web 设置页的 **ComfyUI** 菜单提供可视化编辑，保存即生效：
+
+| ComfyUI 设置页 |
+|---|
+| ![ComfyUI 设置](./examples/harness-dialogue-3.png) |
 
 配置文件：`~/.dsh/dsh-short-video-studio.json`（或 `DSH_SVS_CONFIG` 指定路径）：
 
@@ -83,164 +224,60 @@ ComfyUI 服务端 `baseUrl`、`apiKey` 与模型名均可配置，优先级：**
   "apiKey": "",
   "pollMs": 2000,
   "timeoutMs": 900000,
-  "models": {
-    "fluxUnet": "flux2_dev_fp8mixed.safetensors",
-    "fluxClip": "mistral_3_small_flux2_bf16.safetensors",
-    "fluxVae": "flux2-vae.safetensors",
-    "h3RefUnet": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
-    "h3Clip": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
-    "h3VideoVae": "minimax_h3_video_vae_fp16.safetensors",
-    "h3AudioVae": "minimax_h3_audio_vae_fp32.safetensors",
-    "h3FastLora": "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
-    "h3Fps": 24
-  }
+  "models": { "fluxUnet": "flux2_dev_fp8mixed.safetensors", "h3Fps": 24, "…": "…" },
+  "preferred": { "video.reference2video": ["minimax-h3-ref2v"] },
+  "assetOverrides": { "minimax-h3-ref2v": { "unet": "my_custom.safetensors" } }
 }
 ```
 
-等价环境变量：`DSH_SVS_COMFY_URL` / `DSH_SVS_COMFY_KEY` / `DSH_SVS_POLL_MS` / `DSH_SVS_TIMEOUT_MS` / `DSH_SVS_FLUX_MODEL` / `DSH_SVS_FLUX_CLIP` / `DSH_SVS_FLUX_VAE` / `DSH_SVS_H3_MODEL_REF` / `DSH_SVS_H3_CLIP` / `DSH_SVS_H3_VAE` / `DSH_SVS_H3_AUDIO_VAE` / `DSH_SVS_H3_LORA_FAST` / `DSH_SVS_H3_FPS`。
+- `models.*` / 环境变量（`DSH_SVS_COMFY_URL` / `DSH_SVS_FLUX_MODEL` / `DSH_SVS_H3_MODEL_REF` 等）：换模型文件不改图结构；
+- `preferred`：每个能力默认用哪个工作流（设置页「设为默认」写回这里）——**把你导入的工作流设为某能力的默认，即完成「换模型」，内置清单可保留可遮蔽可删除**；
+- `assetOverrides`：按清单粒度覆盖资产文件（同 `$assets` 机制，优先级最高）；
+- `apiKey` 非空时请求带 `Authorization: Bearer`（适配需鉴权的 ComfyUI 网关）。
 
-`apiKey` 非空时，请求会带 `Authorization: Bearer <apiKey>`（适配需要鉴权的 ComfyUI 网关）。
+## 渠道交付（飞书 / TUI）
 
-## 目录
+> 前置：飞书渠道 dsh-lark 是 **web profile 插件**，需 `dsh plugin --profile web add dsh-lark-channel@latest`（与 dsh web 共用同一 profile，见[飞书集成](#-飞书集成远程操控工作台创作)）。
 
-- `lib/index.js` — 宿主半（ComfyUI 引擎、工作流模板、画布存储、HTTP 路由、Agent 工具、systemPrompt 段、skill 自动安装）
-- `lib/client.js` — 浏览器半（注册 `conversation.view` 槽，渲染画布 iframe）
-- `studio/` — 画布页（自包含 HTML/CSS/JS，无构建）
-- `skills/` — 自带 skill（安装时自动复制到 `~/.dsh/skills/`）
-- `cordis.patch.yml` — bundle 补丁
-
-## Skills
-
-- 插件自带 `skills/3d-animation-short-generator`（把一句话创意做成 3D 动画短片的完整流程），安装时自动复制到 `~/.dsh/skills/`（幂等，不覆盖已有）。
-- **扩展方式**：在 `skills/` 下新增 `<name>/SKILL.md`，或直接在 `~/.dsh/skills/` 放置自己的 skill（skill-filesystem 热扫描）。每个 skill 就是一个目录，含 `SKILL.md`（frontmatter 含 `name`/`description`/`whenToUse`）。
-
-## 流水线（固定顺序）
-
-0 接收创意 → 选项卡确认【画面比例/总时长/音频模式/生成模式】→ 1 项目简报 → 2 故事大纲 → 3 角色卡 → 4 场景卡 → 5 七列镜头表（+自检）→ 6 文本分镜 → 7 单镜头视频（逐镜）→ 8 拼接 + 终检。
-
-详见 `skills/3d-animation-short-generator/SKILL.md` 与 `skills/3d-animation-short-generator/references/`。
-
-## 工具契约
-
-- `comfy_generate_image(prompt, width?, height?, seed?, steps?, guidance?, count?, title?, group?, nodeId?)`：FLUX 生成图片，写入画布。
-- `comfy_generate_video(prompt, mode?, ref_nodes?, first_frame_node?, last_frame_node?, width?, height?, length?, seed?, steps?, title?, group?, nodeId?)`：MiniMax H3 音视频模型生成单镜头视频（带声音）。`mode`=quality/fast；`ref_nodes`=参考绑定；`first/last_frame_node`=末帧串联。
-- `canvas_list_nodes / canvas_write_node(kind:text|table, title, content, group) / canvas_get_node / canvas_group_nodes / canvas_reorder / canvas_get_state / canvas_set_state`：读写画布与项目设置。
+「画布」tab 只在 Web 可见；跑在 **TUI / 飞书**时，插件在每次提问（`ask_user_question`）前自动把画布未送达产物发到飞书：**媒体文件直接发，文本/表格节点自动导出 PDF**（文件名取节点标题，如 `主角卡.png` / `简报.pdf`）。群聊会先弹审批卡、再出选项卡。Web / TUI 无此通道，产物在画布/工作区，按工具返回的绝对路径自取。详见 [`docs/channel-delivery.md`](docs/channel-delivery.md)。
 
 ## 实战要点（沉淀自真实生产）
 
-1. **参考图必须用单视图**：参考图里有几个身体，画面就倾向出现几个角色。三视图（正/侧/背）拼图作参考必然产生多个角色副本，**且在 prompt 里声明「同一角色多角度、只出现一只」经实测完全无效**（见 [三视图实验报告](./docs/three-view-experiment.md)），不要依赖这个说法。只用单视图角色卡。
-2. **参考图内不得有任何文字**：参考图上的角色名、"正面/侧面/背面"、`FRONT VIEW` 之类标注会被 H3 当作应出现在画面里的内容直接渲进成片，标注越清晰烙印越清晰。角色名只写在画布节点标题与资产库元数据里。
-3. **不必为多角度提供额外参考**：H3 自带 3D 理解，单张正面卡足以支撑转身/走远镜头。确有需要时把多张单视图分别放进不同 `ref_nodes` 槽位，绝不拼成一张图。
-4. **H3 原生字幕**：对白字幕写进 prompt 末尾「画面底部居中显示一条清晰的中文对白字幕：『台词』」。
-5. **末帧串联仅用于同场景续接**；跨场景只放「角色+场景」参考。
+1. **参考图必须用单视图**：参考图里有几个身体，画面就倾向出现几个角色；三视图拼图必然产生角色副本，且 prompt 声明无效（[实验报告](docs/three-view-experiment.md)）。只用单视图卡。
+2. **参考图内不得有任何文字**：角色名、FRONT VIEW 之类标注会被视频模型渲进成片。名字只写画布标题与资产元数据。
+3. **多角度对模型无增量价值**：单张正面卡足以支撑转身/走远镜头；多角度时把多张单视图分别放进不同 `ref_nodes` 槽位，绝不拼成一张图。
+4. **原生字幕**：使用带原生字幕能力的视频模型（如内置默认 H3）时，对白字幕写进 prompt 末尾即可端到端渲染（含中文）；换成不带该能力的模型后，此条不适用，字幕需走其它方式。
+5. **末帧串联仅用于同场景续接**；跨场景只放「角色 + 场景」参考。
 6. **角色分状态建卡**：同一角色不同着装分别建单视图卡。
 
----
+## 示例：《一只想当宇航员的小狐狸》
 
-## 展示：30 秒 3D 动画短片《一只想当宇航员的小狐狸》
+一个完整走完流水线的 30 秒 3D 动画短片（6 镜、quality 档、H3 原生字幕），展示画布各步骤的**真实产物**。
 
-一个完整走完流水线的示例：6 镜、quality 档、H3 原生字幕。下面按**画布顺序**展示其 markdown 产物、图片产物与每镜画面（截图）。
+### 角色卡与场景卡
 
-画布结构：`story planning → character cards → scene cards → shot table → text storyboards → shot clips → final delivery`
+> ⚠️ 以下角色卡为**历史三视图拼图 + 带标注文字**，属**反面示例**（实测会导致多角色副本与文字烙印）；正确做法见上文实战要点——单视图、零文字。
 
-### 1. 项目简报（story planning）
-
-**片名与规格**：`一只想当宇航员的小狐狸`（The Little Fox Who Wants to Be an Astronaut）· 3D 卡通渲染（暖色调 Pixar 风）· 16:9 横屏（1344×768）· 30 秒（24fps）· dialogue-led（对白主导）。
-
-**一句话立意**：一只小狐狸怀揣"飞向星星"的梦想，用纸箱造宇航服、用勇气当翅膀，最终在星空下起飞——梦想不需要翅膀，只需要勇气。
-
-**角色**：
-
-| 角色 | 设定 | 声音角色 |
+| 小狐狸（不穿） | 小狐狸（穿宇航服） | 小兔子 |
 |---|---|---|
-| 小狐狸（主角） | 橙红毛色、蓬松大尾巴、自制纸盒宇航服+头盔，眼睛圆亮有神 | 主说话人，元气坚定 |
-| 小兔子（朋友） | 白色短毛、长耳朵，天真直率 | 次说话人，质疑→被感染 |
+| ![小狐狸不穿](./examples/fox/char_fox_no_suit.png) | ![小狐狸穿](./examples/fox/char_fox_with_suit.png) | ![小兔子](./examples/fox/char_rabbit.png) |
 
-**视觉基调**：夜晚星空蓝紫冷调 × 小狐狸暖橙暖调；3D 卡通渲染，毛茸茸质感，纸箱宇航服粗粝手作感。
-
-**叙事节奏**：梦想开场（仰星）→ 手作筹备（做宇航服）→ 被质疑（低落）→ 坚定回应（上扬）→ 想象起飞（高光）→ 星空入梦（温暖收尾）。
-
-**台词（对白主导，一镜一人）**：
-1. 小狐狸：总有一天，我要飞到星星上去！
-2. 小狐狸：我要做一件宇航服！
-3. 小兔子：狐狸怎么能当宇航员呀？
-4. 小狐狸：梦想又不需要翅膀，只需要勇气！
-5. 小狐狸：看，我就要起飞啦！
-6. 小狐狸（梦呓）：星星……我来啦……
-
-### 2. 故事大纲（story planning，含音频脊柱图）
-
-**主题**：梦想不需要翅膀，只需要勇气。
-
-**三幕结构（30s / 6 镜）**：
-
-- **第一幕·梦想（0–11s）**
-  - S01（5s）森林夜空下，小狐狸独自仰头望星空，瞳孔倒映星光，说出梦想。
-  - S02（6s）白天，小狐狸在工作台用废纸箱裁剪、组装**纸箱宇航服**，满头大汗、满脸骄傲。
-- **第二幕·质疑与坚定（11–21s）**
-  - S03（5s）小狐狸穿纸箱宇航服（背影）走过，小兔子捂着嘴笑出道质疑。
-  - S04（5s）小狐狸回头，眼神坚定、嘴角上扬，说出金句回应（反应切镜）。
-- **第三幕·起飞与入梦（21–30s）**
-  - S05（5s）小狐狸爬上山顶，张开双臂迎风，夜空流星划过、星光洒落，想象中"起飞"。
-  - S06（4s）镜头缓缓拉远——小狐狸抱着纸盒头盔（头上无头盔）在草地上睡着，星光化作火箭尾焰轨迹，温暖收尾。
-
-**音频脊柱图（dialogue-led）**：
-
-| 时间 | 镜 | 说话人 | 台词 | 口型状态 | 非说话人嘴 |
-|---|---|---|---|---|---|
-| 0–5s | S01 | 小狐狸 | 总有一天，我要飞到星星上去！ | 开合（清楚） | 无 |
-| 5–11s | S02 | 小狐狸 | 我要做一件宇航服！ | 制作时说话 | 无 |
-| 11–16s | S03 | 小兔子 | 狐狸怎么能当宇航员呀？ | 开合（轻笑） | 小狐狸闭嘴 |
-| 16–21s | S04 | 小狐狸 | 梦想又不需要翅膀，只需要勇气！ | 坚定开合 | 小兔子闭嘴 |
-| 21–26s | S05 | 小狐狸 | 看，我就要起飞啦！ | 大笑开合 | 无 |
-| 26–30s | S06 | 小狐狸（梦呓） | 星星……我来啦…… | 轻语微动 | 无 |
-
-**音频模式安全约束**：一镜一人；说话人绑定 `[speaker:]`，非说话人强制闭嘴 `[non_speakers_mouth:closed]`；无旁白。
-
-### 3. 角色卡（character cards）
-
-> ⚠️ **下面三张是历史产物，为三视图拼图 + 带失败的中文标注文字，属于「反面示例」，请勿照此制作。** 它们已被实测确认会导致多角色副本与文字烙印（见 [三视图实验报告](./docs/three-view-experiment.md)）。保留它们是为了与下方各镜成片保持真实对应关系。**正确做法：单视图正面全身、画面内零文字。**
-
-| 小狐狸·不穿宇航服 | 小狐狸·穿宇航服 | 小兔子 |
-|---|---|---|
-| ![小狐狸不穿宇航服](./examples/fox/char_fox_no_suit.png) | ![小狐狸穿宇航服](./examples/fox/char_fox_with_suit.png) | ![小兔子](./examples/fox/char_rabbit.png) |
-
-### 4. 场景卡（scene cards，只环境不出现人物）
-| A·夜晚森林空地 | B·白天工作台 | C·森林小径 | D·夜晚山顶星空 |
+| 夜晚森林 | 白天工作台 | 森林小径 | 山顶星空 |
 |---|---|---|---|
 | ![场景A](./examples/fox/scene_A.png) | ![场景B](./examples/fox/scene_B.png) | ![场景C](./examples/fox/scene_C.png) | ![场景D](./examples/fox/scene_D.png) |
 
-### 5. 六列镜头表（shot table）
-6 列规范与七项自检见 `skills/3d-animation-short-generator/SKILL.md`（Step 5 / Step 5.5）。本片 6 镜摘要见下节分镜。
+### 逐镜成片截图
 
-### 6. 文本分镜（text storyboards）
-每镜一节含四象限每秒内容 + 口型标注 + 双重绑定 `[char:][scene:][hook:][audio_mode:][speaker:]`；规范见 `SKILL.md` Step 6。
-
-### 7. 单镜头视频（shot clips，每镜画面截图）
 | S01 | S02 | S03 |
 |---|---|---|
 | ![S01](./examples/fox/shot_S01.png) | ![S02](./examples/fox/shot_S02.png) | ![S03](./examples/fox/shot_S03.png) |
 | S04 | S05 | S06 |
 | ![S04](./examples/fox/shot_S04.png) | ![S05](./examples/fox/shot_S05.png) | ![S06](./examples/fox/shot_S06.png) |
 
-每镜对白 / H3 原生字幕：
+成片 1344×768 · 24fps · 29.6s · H.264 + AAC（H3 声音）· H3 原生中文字幕。对白（含字幕）：S01「总有一天，我要飞到星星上去！」→ S02「我要做一件宇航服！」→ S03 小兔子「狐狸怎么能当宇航员呀？」→ S04「梦想又不需要翅膀，只需要勇气！」→ S05「看，我就要起飞啦！」→ S06「星星……我来啦……」。
 
-| 镜 | 说话人 | 字幕 |
-|---|---|---|
-| S01 | 小狐狸(不穿) | 总有一天，我要飞到星星上去！ |
-| S02 | 小狐狸(不穿) | 我要做一件宇航服！ |
-| S03 | 小兔子 | 狐狸怎么能当宇航员呀？ |
-| S04 | 小狐狸(穿) | 梦想又不需要翅膀，只需要勇气！ |
-| S05 | 小狐狸(穿) | 看，我就要起飞啦！ |
-| S06 | 小狐狸(穿) | 星星……我来啦…… |
+> 复现：在会话里说「把『一只想当宇航员的小狐狸』做成 30 秒 3D 动画短片」，Agent 会按 skill 的 Step 0→8 逐步落画布并逐镜生成。
 
-### 8. 最终合成（final delivery）
-- 成片：1344×768（16:9）· 24fps · 29.6s · H.264 + AAC（H3 声音）· **H3 原生中文字幕** → 在播放器查看完整视频。
+---
 
-**关键实现**：
-- 狐狸**分状态建卡**（不穿/穿宇航服两张），按镜头状态作 `ref_nodes` 参考。注意本示例的卡片是历史三视图拼图，属反面示例；分状态建卡这一点仍然正确，但每张卡都应是单视图、零文字。
-- 同场景续接镜（S03→S04、S05→S06）用上一镜**末帧**做 `first_frame_node` 串联；跨场景用 0.4s 溶解、同场景 0.2s。
-- 每镜 prompt 加 `[AUDIO_MODE][SPEAKER][NON_SPEAKERS_MOUTH][SHOT_DURATION]` 前缀 + 末尾 H3 原生字幕指令，端到端产出声音与字幕。
-- 全片用 ffmpeg `xfade` + `acrossfade` 拼接，保留 H3 声轨。
-
-> 复现：在会话里说「把『一只想当宇航员的小狐狸』做成 30 秒 3D 动画短片」，Agent 会按流水线 Step 0→8 逐步落画布并逐镜生成。
+更多设计细节：架构 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · 工作流契约 [`docs/workflow-contract.md`](docs/workflow-contract.md) · 渠道交付 [`docs/channel-delivery.md`](docs/channel-delivery.md)。

@@ -58,5 +58,8 @@
     "README.md",
     "LICENSE"
   ],
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "dependencies": {
+    "puppeteer-core": "^25.9.0"
+  }
 }

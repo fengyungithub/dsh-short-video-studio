@@ -1,3 +1,5 @@
+import { markdownToHtml } from './markdown.js'
+
 (function () {
   'use strict'
 
@@ -19,8 +21,9 @@
   }
 
   function apiUrl(action) {
+    // action 可能自带 query（如 '/canvas/node?id=…'），此时用 & 拼接，避免第二个 ? 把 sessionId 吞进参数值
     const u = new URLSearchParams({ sessionId, workspaceId })
-    return ROUTE_ROOT + '/api' + action + '?' + u.toString()
+    return ROUTE_ROOT + '/api' + action + (action.includes('?') ? '&' : '?') + u.toString()
   }
 
   async function api(action, init) {
@@ -49,31 +52,9 @@
     return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
   }
 
-  function renderMarkdownTable(content) {
-    const lines = content.split('\n')
-    const tableLines = lines.filter((l) => l.trim().startsWith('|') && l.trim().endsWith('|'))
-    if (tableLines.length < 2) return null
-    const parse = (l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
-    const header = parse(tableLines[0])
-    const body = tableLines.slice(2).filter((l) => l.trim().startsWith('|'))
-    if (body.length === 0) return null
-    let html = '<table class="node-table"><thead><tr>'
-    for (const h of header) html += '<th>' + escapeHtml(h) + '</th>'
-    html += '</tr></thead><tbody>'
-    for (const line of body) {
-      const cells = parse(line)
-      html += '<tr>'
-      for (let i = 0; i < header.length; i++) html += '<td>' + escapeHtml(cells[i] ?? '') + '</td>'
-      html += '</tr>'
-    }
-    html += '</tbody></table>'
-    return html
-  }
-
   function renderTextContent(content) {
-    const table = renderMarkdownTable(content)
-    if (table) return table
-    return '<div class="text-content">' + escapeHtml(content) + '</div>'
+    // 完整 markdown 渲染（与 lib/index.js 共享 studio/markdown.js）：标题/表格/列表/引用/代码块/粗体等
+    return '<div class="text-content">' + markdownToHtml(content) + '</div>'
   }
 
   // 分组名由流程 skill 自由定义，画布不做任何领域词汇映射，原样展示

@@ -8,8 +8,12 @@
 ## 0. 最终结论（先看这个）
 
 - 产物送达飞书，**只有一条路**：模型调用 dsh-lark 给每个 agent 注册的 `send_file(path)` 工具。dsh-lark 不向 host 提供任何「出站服务」（全仓搜不到 `channelOutbound`），所以**插件 hook 无法主动推文件**。
-- 因此方案是「**hook 备路径 + GUIDANCE 让模型推**」：插件工具结果已带 `media`（相对路径）/ `absPath` / `mediaType` / `bytes`；GUIDANCE 告诉模型——媒体产物先 `send_file` 送达、再 `ask_user_question` 提问，文本产物只写进回复。
-- 本方案**不改 dsh-lark、不改 SKILL.md（流程 skill）、只改 GUIDANCE**。
+- **现状（ask 前钩子自动送达，文本转 .pdf）**：插件在 `tools/pre-execute` waterfall 上注册监听器——每次 `ask_user_question` 执行前，自动把画布中未送达的产物程序化调 `ctx.tools.execute('send_file')` 送达：
+  - **媒体**（图片/视频/音频）直接发原文件；
+  - **文本/表格节点**（简报/大纲/镜头表/分镜）在 `canvas_write_node` 落盘时自动导出为 **.pdf**（零依赖 markdown→HTML 转换 → puppeteer-core 复用本机 Chrome `page.pdf()`，`printBackground` 保留表格样式；puppeteer 未装/失败时降级 Chrome CLI `--print-to-pdf` → soffice → cupsfilter，全无则兜底 .html），随钩子一并送达——飞书可直接预览 PDF。
+  - 成功打 `params.deliveredAt` 去重、失败记 `params.deliveryError` 下次重试；模型不再手动 `send_file`（GUIDANCE 已改为"不要手动调"）。Web/TUI 无 `send_file` 时钩子自动跳过。
+  - **文件名**：`send_file` 没有 name 参数（`fileName = basename(path)`），钩子把产物以**节点标题**命名的副本放到 workspace 内 `.delivery/<sid>/` 再发送（硬链接零拷贝，如 主角卡.png / 简报.pdf；title 清理非法字符、空标题回退 `kind-id`、重名加 -2 后缀），发完即删；副本建不出来退回原路径发送。
+- 本轮动 `lib/index.js`、`lib/pdf.js`（新）、`package.json`（+puppeteer-core 可选依赖）与 SKILL.md 交付条款对齐，不改 dsh-lark。
 
 ---
 
