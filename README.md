@@ -46,7 +46,7 @@ dsh plugin --profile web add dsh-lark-channel@latest
 
 ## 快速开始
 
-前置条件：本机已运行 [ComfyUI](http://localhost:8188)，并已下载你计划使用的模型——内置默认（FLUX 2 / MiniMax H3）或你自己导入的模型（见[配置](#配置)与[导入 workflow](#导入你自己的-comfyui-workflow)）。
+前置条件：本机或者远程主机已运行 [ComfyUI](http://localhost:8188)，并已下载你计划使用的模型——内置默认（FLUX 2 / MiniMax H3）或你自己导入的模型（见[配置](#配置)与[导入 workflow](#导入你自己的-comfyui-workflow)）。
 
 ```bash
 # 安装插件（三种来源任选其一；npm 为正式发布渠道，推荐）
