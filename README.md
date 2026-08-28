@@ -49,9 +49,14 @@ dsh plugin --profile web add dsh-lark-channel@latest
 前置条件：本机已运行 [ComfyUI](http://localhost:8188)，并已下载你计划使用的模型——内置默认（FLUX 2 / MiniMax H3）或你自己导入的模型（见[配置](#配置)与[导入 workflow](#导入你自己的-comfyui-workflow)）。
 
 ```bash
-# 安装插件（本地源码 / GitHub 二选一）
-dsh plugin --profile web add file:/path/to/dsh-short-video-studio
-# 或 dsh plugin --profile web add github:fengyungithub/dsh-short-video-studio
+# 安装插件（三种来源任选其一；npm 为正式发布渠道，推荐）
+
+# ① npm（正式发布，随版本自动更新安装源）
+dsh plugin --profile web add dsh-short-video-studio
+# ② GitHub（最新源码）
+# dsh plugin --profile web add github:fengyungithub/dsh-short-video-studio
+# ③ 本地源码（开发用）
+# dsh plugin --profile web add file:/path/to/dsh-short-video-studio
 
 dsh web   # 重启后会话出现「画布」tab；自带 skill 已自动装到 ~/.dsh/skills/
 ```
@@ -277,6 +282,19 @@ node scripts/import-comfy.mjs exported.json \
 成片 1344×768 · 24fps · 29.6s · H.264 + AAC（H3 声音）· H3 原生中文字幕。对白（含字幕）：S01「总有一天，我要飞到星星上去！」→ S02「我要做一件宇航服！」→ S03 小兔子「狐狸怎么能当宇航员呀？」→ S04「梦想又不需要翅膀，只需要勇气！」→ S05「看，我就要起飞啦！」→ S06「星星……我来啦……」。
 
 > 复现：在会话里说「把『一只想当宇航员的小狐狸』做成 30 秒 3D 动画短片」，Agent 会按 skill 的 Step 0→8 逐步落画布并逐镜生成。
+
+---
+
+## 发布新版本（维护者）
+
+npm 包由 GitHub Actions 自动发布（推送 `v*` tag 触发，见 `.github/workflows/npm-publish.yml`；发布前自动跑冒烟自检并带 provenance 供应链签名）。前提：仓库已配置 `NPM_TOKEN` secret（npmjs.com → Access Tokens → Automation 类型）。
+
+```bash
+npm version patch        # bump 版本并打 vX.Y.Z tag（minor / major 同理）
+git push origin main --follow-tags   # 推送即触发自动发布
+```
+
+发布后安装方式：`dsh plugin --profile web add dsh-short-video-studio`。
 
 ---
 
