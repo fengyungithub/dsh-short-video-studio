@@ -22,6 +22,7 @@ whenToUse: |
 | 生成单镜头视频（自带声音 + 原生字幕） | `comfy_generate_video` |
 | 查可用能力与工作流 | `comfy_list_workflows` |
 | 通用渲染（指定 capability / workflow） | `comfy_render` |
+| 生成 H3 结构化 prompt（分镜 → Ref2VA 六段式 / I2VA·FL2VA 三段式） | 调用 skill 工具加载 `h3-prompt-writing`，按其 `references/` 规范重写 |
 | 写简报 / 大纲 / 镜头表 / 分镜 | `canvas_write_node`（kind=text\|table） |
 | 读画布节点 | `canvas_get_node` / `canvas_list_nodes` |
 | 归组 / 排序 | `canvas_group_nodes` / `canvas_reorder` |
@@ -310,18 +311,23 @@ whenToUse: |
 
 ### prompt 组装（逐镜）
 
-按顺序拼接：
+按以下顺序组装：
 
-1. **音频前缀**：`[AUDIO_MODE:dialogue|silent][SPEAKER:角色名|none][NON_SPEAKERS_MOUTH:closed][SHOT_DURATION:<n>s]`
-2. **分镜正文**：从单文本分镜文档对应章节（已抽取的镜从独立节点）取每面板四象限内容，逐秒展开成自然语言镜头描述。**剥离所有双绑定标签**（`[char:…] [scene:…] [hook:…] [audio_mode:…] [speaker:…]`）与 `[BEAT]` / `[HANDOFF …]` 标记——这些是分镜专用参考标记，不能出现在渲染 prompt 里。
-3. **风格锁后缀**：全局视觉风格锁的关键词串。
-4. **字幕指令（仅 dialogue 镜）**：末尾追加「画面底部居中显示一条清晰的中文对白字幕，字幕内容即台词文字本身（不加引号、书名号或括号）」，由视频模型端到端渲染。`silent` 镜不加。
+1. **H3 结构化重写（委托 `h3-prompt-writing` skill，主路径）**：调用 skill 工具加载 `h3-prompt-writing`，按它的规范（官方 `base-en.txt` / `ref-en.txt` + `references/studio-mapping.md` 映射表）把本镜「分镜章节 + 镜头表 `参考锚点` / `音频与对白轨` 行」重写为 H3 结构化 prompt：
+   - **参考绑定镜**（`ref_nodes`，无首末帧）→ **Ref2VA 六段式**：`subject_definitions` → `summary` → `retention_analysis` → `detailed_description` → `overall_soundscape` → `non_diegetic_music`；
+   - **首末帧串联镜 / 转场镜**（`first_frame_node` / `last_frame_node`）→ **I2VA / FL2VA 三段式**：对齐指令（首行）+ `integrated_multimodal_description` + `overall_soundscape` + `non_diegetic_music`；
+   - **条件启用**：仅当解析到的工作流 id 前缀为 `minimax-h3-` 时走本路径；其他工作流跳过，直接走 2 的自由格式组装（模型无关，不写死模型名）。
+   - 交给重写前先剥离分镜专用标记：**双绑定标签**（`[char:…] [scene:…] [hook:…] [audio_mode:…] [speaker:…]`）与 `[BEAT]` / `[HANDOFF …]`——不能出现在渲染 prompt 里。
+2. **自由格式兜底（仅非 H3 工作流）**：从单文本分镜文档对应章节（已抽取的镜从独立节点）取每面板四象限内容，逐秒展开成自然语言镜头描述。
+3. **风格锁后缀**：全局视觉风格锁的关键词串（两种路径都追加）。
+4. **字幕（dialogue 镜）**：H3 结构化路径下，字幕声明由 h3-prompt-writing **内嵌在 `detailed_description` 对白处**（英文 on-screen text 格式，逐字匹配台词），片型侧**不再追加末尾中文指令**（实验定稿，见 h3-prompt-writing 适配节「字幕」）；仅自由格式兜底路径（非 H3 工作流）保留末尾中文指令：「画面底部居中显示一条清晰的中文对白字幕，字幕内容即台词文字本身（不加引号、书名号或括号）」。`silent` 镜不加字幕。
 5. **负向意图**：不要分镜线稿、不要手绘草图质感、不要面板边框、不要标签水印、不要真人写实。
 
 `length` 为 24fps 帧数（124 ≈ 5s），按镜头表时长换算。片段写入 group `shot clips`，标题带镜头号。
 
 ### 逐镜失败回退阶梯
 
+0. **（仅 H3 结构化路径）先检查重写本身**：若本镜走了 `h3-prompt-writing` 结构化重写且质量倒退（字幕 / 口型 / 一致性 / 音频任一指标），先回退该镜为自由格式 prompt 重渲（见 h3-prompt-writing 适配节「失败回退」），再走下面的重试阶梯。**回退时 prompt 首行加 `[PROMPT_FALLBACK]` 标记**（质检门据此放行，否则会被 H3 结构化校验拦截）。
 1. **第一次重试**：强化 prompt——直接引用镜头表 `参考锚点` 块的地标与人物位置，缩短冗余措辞。
 2. **第二次重试**：缩到 ≤6s，砍掉的秒拆成 Step 5 的新相邻行，重跑 Step 5.5 自检再重渲。
 3. **第三次重试**：降档（quality → fast）验证是 prompt 问题还是采样问题；或简化动作、去掉一个道具、降低 hook 强度。

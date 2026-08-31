@@ -255,6 +255,17 @@ node scripts/import-comfy.mjs exported.json \
 5. **末帧串联仅用于同场景续接**；跨场景只放「角色 + 场景」参考。
 6. **角色分状态建卡**：同一角色不同着装分别建单视图卡。
 
+## H3 结构化 prompt（本地版 H3-Context-IR 替代）
+
+本地 H3 工作流（`minimax-h3-*`）的逐镜 prompt 默认走 **H3 结构化格式**，用「本地 agent + skill」复刻官方云端 H3-Context-IR 的核心产物，提升成片质量（官方明言 Context-IR 直接决定输出质量）：
+
+- **`h3-prompt-writing` skill（插件适配版）**：官方 MiniMax 规范（`references/base-en.txt` / `ref-en.txt` 只读引用）+ 插件映射表 `references/studio-mapping.md`。参考绑定镜输出 **Ref2VA 六段式**（subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music）；首末帧串联镜 / 转场镜输出 **I2VA / FL2VA 三段式**（对齐指令 + integrated_multimodal_description + overall_soundscape + non_diegetic_music）。仅当解析工作流 id 前缀为 `minimax-h3-` 时启用，其他模型自动回退自由格式（模型无关）。
+- **片型 skill 委托**：3D 动画等片型 skill 的 Step 7 只写「加载 h3-prompt-writing 重写」，不内置任何 H3 字段细节（职能单一）。
+- **hook 门兜底**：`tools/pre-execute` 校验 H3 系工作流的 prompt 是否携带结构化字段，缺失时 deny 并引导 agent 加载 skill 重写（同一 agent 连续 2 次后降级放行，不会死循环）。
+- **关闭方式**：覆盖 / 删除 `~/.dsh/skills/h3-prompt-writing` 的「插件对接」适配节（或整体删目录）即回到自由格式组装；`lib/index.js` 的 `H3_PROMPT_GATE` 常量可单独关掉 hook 门。
+
+> ✅ 字幕兼容已实测定稿（A/B 六变体，见画布「A/B 实验结论」）：六段式下字幕**必须**以英文双引号 on-screen text 声明内嵌 `detailed_description` 对白处（中文措辞指令任何位置不生效），dialogue 镜成片用 quality 档保证字准；口型安全 / 一致性 / 音频与旧格式同级，动作执行略优。
+
 ## 示例：《一只想当宇航员的小狐狸》
 
 一个完整走完流水线的 30 秒 3D 动画短片（6 镜、quality 档、H3 原生字幕），展示画布各步骤的**真实产物**。
