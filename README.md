@@ -146,11 +146,12 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 
 ## 扩展：开发你自己的场景 skill
 
-**适配场景**：插件默认内置的 skill 是 **3D 动画短片**这一种场景（故事创意 → 角色/场景/镜头/分镜/逐镜/合成）。但**场景不是插件边界**——任何「输入 X → 产出视频内容」的创作场景，都能通过扩展 skill 覆盖，复用同一套执行层工具（生成 / 画布 / 资产 / 拼接 / 飞书交付），只换编排规则：
+**适配场景**：插件默认内置两种场景 skill——**3D 动画短片**（故事创意 → 角色/场景/镜头/分镜/逐镜/合成）与**品牌宣传短片**（品牌素材 → 事实核验/创意方向/镜头表/逐镜/合成）。但**场景不是插件边界**——任何「输入 X → 产出视频内容」的创作场景，都能通过扩展 skill 覆盖，复用同一套执行层工具（生成 / 画布 / 资产 / 拼接 / 飞书交付），只换编排规则：
 
 | 场景 | 输入 | skill 定义的编排重点 |
 |---|---|---|
-| 3D 动画短片（内置默认） | 一句话故事创意 | 角色一致、场景连续、镜头表自检、H3 原生字幕 |
+| 3D 动画短片（内置） | 一句话故事创意 | 角色一致、场景连续、镜头表自检、H3 原生字幕 |
+| 品牌宣传短片（内置） | 品牌素材 / 推广目标 | 身份核验、来源清单、LOGO 首帧锁定、H3 原生画面文案 |
 | **电商宣传视频** | 商品 / 卖点文案 | 产品展示分镜、口播逐字稿、卖点高光镜、BGM 与节奏 |
 | **教育课件讲解** | 知识点 / 讲义 | 图解卡片、讲解分镜、字幕与口型绑定、节奏控制 |
 | 品牌故事 / 纪念短片 / Vlog 解说… | 素材与主题 | 按你的业务规范自定义 |
@@ -260,7 +261,7 @@ node scripts/import-comfy.mjs exported.json \
 本地 H3 工作流（`minimax-h3-*`）的逐镜 prompt 默认走 **H3 结构化格式**，用「本地 agent + skill」复刻官方云端 H3-Context-IR 的核心产物，提升成片质量（官方明言 Context-IR 直接决定输出质量）：
 
 - **`h3-prompt-writing` skill（插件适配版）**：官方 MiniMax 规范（`references/base-en.txt` / `ref-en.txt` 只读引用）+ 插件映射表 `references/studio-mapping.md`。参考绑定镜输出 **Ref2VA 六段式**（subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music）；首末帧串联镜 / 转场镜输出 **I2VA / FL2VA 三段式**（对齐指令 + integrated_multimodal_description + overall_soundscape + non_diegetic_music）。仅当解析工作流 id 前缀为 `minimax-h3-` 时启用，其他模型自动回退自由格式（模型无关）。
-- **片型 skill 委托**：3D 动画等片型 skill 的 Step 7 只写「加载 h3-prompt-writing 重写」，不内置任何 H3 字段细节（职能单一）。
+- **片型 skill 委托**：3D 动画、品牌宣传等片型 skill 的逐镜生成步骤只写「加载 h3-prompt-writing 重写」，不内置任何 H3 字段细节（职能单一）。
 - **hook 门兜底**：`tools/pre-execute` 校验 H3 系工作流的 prompt 是否携带结构化字段，缺失时 deny 并引导 agent 加载 skill 重写（同一 agent 连续 2 次后降级放行，不会死循环）。
 - **关闭方式**：覆盖 / 删除 `~/.dsh/skills/h3-prompt-writing` 的「插件对接」适配节（或整体删目录）即回到自由格式组装；`lib/index.js` 的 `H3_PROMPT_GATE` 常量可单独关掉 hook 门。
 

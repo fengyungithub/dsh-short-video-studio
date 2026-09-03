@@ -1,0 +1,20 @@
+display-name-zh: 品牌宣传短片
+version: 1.0.0
+tag-en: Commercial Ad
+tag-cn: 商业广告
+complete-tags-en:
+  - Commercial Ad / Planning
+  - Commercial Ad / Creative Generation
+  - Commercial Ad / Post-production
+complete-tags-cn:
+  - 商业广告 / 计划制定
+  - 商业广告 / 创作生成
+  - 商业广告 / 后期处理
+summary-en: Turn verified brand assets and a campaign goal into a promotional short: brand truth sheet, provenance manifest, story spine, beat shot table, per-shot clips, and final assembly.
+summary-cn: 基于可核验的品牌素材与推广目标，完成事实核验、来源清单、创意方向、镜头表、逐镜生成与成片合成，输出品牌宣传短片。
+desc-en: dsh-short-video-studio adapted version of the official brand-promo-video-generator. For brands, products, websites, apps, shops, or personal projects: intake verified assets, build the brand truth sheet and provenance manifest, pick a story spine, plan a six-column beat shot table with a self-check gate, hard-confirm the pre-production package, then generate per-shot clips through the local ComfyUI capability registry (video-native audio, on-screen copy via H3 on-screen text), assemble with video_concat, and deliver with a final review. Identity-bearing assets (logo / UI / packaging) are never redrawn: on-canvas originals are first-frame locked, otherwise precise description anchors are used. Not for imitating real brand marks without authorized assets, inventing product claims, or long-form narrative films.
+desc-cn: dsh-short-video-studio 适配版官方 brand-promo-video-generator。面向品牌 / 产品 / 网站 / App / 小店 / 个人项目宣传：先收集可核验素材并确认生产规格，再产出品牌事实表、来源清单、创意方向与六列镜头表（含自检门），硬确认前期方案后逐镜生成（本地 ComfyUI 能力注册表，视频原生音频 + 画面内原生文案），拼接成片并完成终检交付。带身份识别素材（LOGO / 界面 / 包装）绝不重绘：画布原件可用时首帧锁定，否则降级为精确描述锚点。适用于新品发布、官网展示与社媒推广，不适用于缺少授权素材时仿造真实品牌标识、虚构产品功能或长篇剧情影片。
+author-en: MiniMax Hub / dsh-short-video-studio
+author-cn: MiniMax Hub / dsh-short-video-studio
+source: official-adapted
+source-original: https://github.com/MiniMax-AI/MiniMax-H3/tree/main/skills/brand-promo-video-generator
