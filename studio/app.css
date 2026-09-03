@@ -50,6 +50,30 @@ body { display: flex; flex-direction: column; }
 .btn:hover { border-color: var(--accent); }
 .btn:disabled { opacity: .5; cursor: default; }
 
+/* 跟随最新模式 checkbox */
+.follow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s, box-shadow .15s;
+}
+.follow input { margin: 0; accent-color: var(--accent); cursor: pointer; }
+.follow:hover { border-color: var(--accent); color: var(--text); }
+.follow.on {
+  color: var(--ok, #3ddc97);
+  border-color: rgba(61, 220, 151, .55);
+  box-shadow: 0 0 0 1px rgba(61, 220, 151, .25);
+}
+
 .canvas {
   flex: 1;
   overflow-y: auto;
@@ -198,3 +222,81 @@ table.node-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .empty code { background: var(--panel-2); padding: 2px 6px; border-radius: 4px; }
 
 .error-line { color: var(--danger); font-size: 12px; }
+
+/* ---- 主线优先：页尾折叠收纳区（作废/否定 · 抽帧/检查帧） ---- */
+.lane {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(27, 30, 39, .45);
+  overflow: hidden;
+}
+.lane > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+.lane > summary::-webkit-details-marker { display: none; }
+.lane > summary:hover { color: var(--text); background: var(--panel-2); }
+.lane[open] > summary {
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  background: linear-gradient(90deg, rgba(91, 140, 255, .08), transparent);
+}
+.lane-icon { font-size: 13px; }
+.lane-count {
+  margin-left: auto;
+  font-size: 11px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  padding: 1px 8px;
+  border-radius: 20px;
+  color: var(--muted);
+}
+.lane-body { padding: 10px 12px 2px; }
+.lane-body .node { margin-bottom: 10px; }
+.lane-discard > summary { color: var(--warn); }
+.lane-frames > summary { color: var(--accent); }
+
+/* 作废卡片：整体降噪，标题划线，chip 琥珀色 */
+.node.deprecated { opacity: .6; filter: saturate(.4); }
+.node.deprecated .node-title { text-decoration: line-through; text-decoration-color: var(--muted); }
+.status.deprecated { color: var(--warn); background: rgba(255, 180, 84, .14); }
+
+/* ---- 悬浮 top/bottom 按钮 ---- */
+.jump-btn {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  display: none;
+  appearance: none;
+  border: 1px solid var(--accent);
+  background: linear-gradient(180deg, rgba(91, 140, 255, .28), rgba(124, 92, 255, .24));
+  color: var(--text);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: .03em;
+  border-radius: 999px;
+  padding: 9px 15px;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .4);
+  backdrop-filter: blur(4px);
+}
+.jump-btn.show { display: inline-block; }
+.jump-btn:hover { border-color: #fff; }
+
+/* 定位最新主线节点时的卡片闪烁 */
+@keyframes node-flash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(91, 140, 255, 0); }
+  25% { box-shadow: 0 0 0 4px rgba(91, 140, 255, .5); border-color: var(--accent); }
+  70% { box-shadow: 0 0 0 0 rgba(91, 140, 255, .12); border-color: var(--accent); }
+}
+.node.flash { animation: node-flash 1.3s ease; }

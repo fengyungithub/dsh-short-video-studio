@@ -18,7 +18,20 @@ import { markdownToHtml } from './markdown.js'
     canvas: document.getElementById('canvas'),
     meta: document.getElementById('meta'),
     refresh: document.getElementById('refresh'),
+    locate: document.getElementById('locate'),
+    jump: document.getElementById('jump'),
+    autofollow: document.getElementById('autofollow'),
+    followToggle: document.getElementById('follow-toggle'),
   }
+
+  // 最新主线节点 id（渲染时记录，供空白点击 / 顶部按钮 / 跟随模式定位）
+  let latestMainNodeId = null
+  // 跟随最新模式（checkbox）：勾选后进入画布自动定位 + 停留在画布时轮询新主线节点自动跟随
+  const FOLLOW_KEY = 'dsh-svs-autofollow:' + sessionId
+  let followEnabled = false
+  let followInited = false
+  let followTimer = null
+  let lastMainIds = new Set()
 
   function apiUrl(action) {
     // action 可能自带 query（如 '/canvas/node?id=…'），此时用 & 拼接，避免第二个 ? 把 sessionId 吞进参数值
@@ -76,6 +89,26 @@ import { markdownToHtml } from './markdown.js'
       opt.value = g
       dl.appendChild(opt)
     }
+  }
+
+  // ---- 节点分区（主线优先预览）----
+  // 主线：确认通过 / 等待确认的现行资产（默认，即非作废、非抽帧）。
+  // 抽帧：extract_frame 抽出的末帧/首帧/检查帧（params.capability=image.from_video 或标题含 检查帧/抽帧/帧检查）。
+  // 作废：用户在卡片上点的「作废」（params.deprecated），或流程里被替换/否定的旧版（标题含 废弃/作废/已弃用 等）。
+  const FRAME_TITLE_RE = /(检查帧|抽帧|帧检查)/
+  const DEPRECATED_TITLE_RE = /(废弃|作废|已弃用|superseded|obsolete)/i
+  const TRUTHY = new Set([true, 1, 'true', '1', 'yes'])
+
+  function nodeLane(node) {
+    const p = node.params || {}
+    const title = node.title || ''
+    if (p.capability === 'image.from_video' || FRAME_TITLE_RE.test(title)) return 'frames'
+    if (TRUTHY.has(p.deprecated) || node.status === 'deprecated' || node.status === 'rejected' || DEPRECATED_TITLE_RE.test(title)) return 'discard'
+    return 'main'
+  }
+
+  function isFrameNode(node) {
+    return nodeLane(node) === 'frames'
   }
 
   function askAi(text) {
@@ -193,6 +226,9 @@ import { markdownToHtml } from './markdown.js'
     const card = document.createElement('div')
     card.className = 'node'
     card.dataset.nodeId = node.id
+    const lane = nodeLane(node)
+    if (lane === 'discard') card.classList.add('deprecated')
+    else if (lane === 'frames') card.classList.add('frame-node')
 
     const head = document.createElement('div')
     head.className = 'node-head'
@@ -203,8 +239,8 @@ import { markdownToHtml } from './markdown.js'
     title.className = 'node-title'
     title.textContent = node.title || '(无标题)'
     const status = document.createElement('span')
-    status.className = 'status ' + (node.status || 'ready')
-    status.textContent = node.status || 'ready'
+    status.className = 'status ' + (lane === 'discard' ? 'deprecated' : (node.status || 'ready'))
+    status.textContent = lane === 'discard' ? '作废' : (node.status || 'ready')
     const id = document.createElement('span')
     id.className = 'node-id'
     id.textContent = (node.id || '').slice(0, 8)
@@ -298,6 +334,25 @@ import { markdownToHtml } from './markdown.js'
         regBtn.onclick = () => registerAssetToLibrary(node)
       }
       actions.appendChild(regBtn)
+    }
+
+    // 作废 / 还原：把用户否定的、被替换的旧版移出主线预览（可随时还原）；抽帧中间产物不用此按钮
+    if (!isFrameNode(node)) {
+      const depBtn = document.createElement('button')
+      depBtn.className = 'btn'
+      const isDep = nodeLane(node) === 'discard'
+      depBtn.textContent = isDep ? '还原' : '作废'
+      depBtn.title = isDep ? '恢复到主线分组（作废标记会清除）' : '移出主线预览（作废/否定，可随时还原）'
+      depBtn.onclick = async () => {
+        depBtn.disabled = true
+        try {
+          await toggleDeprecated(node.id, !isDep)
+        } catch (e) {
+          alertBox('操作失败：' + (e.message || String(e)))
+        }
+        await load()
+      }
+      actions.appendChild(depBtn)
     }
 
     // 分组是自由字符串：用输入框 + datalist 候选（候选来自本项目已出现的分组），允许任意新分组名
@@ -404,26 +459,43 @@ import { markdownToHtml } from './markdown.js'
 
   function render(project) {
     el.canvas.innerHTML = ''
+    const nodes = [...(project.nodes || [])].sort((a, b) => (a.order || 0) - (b.order || 0))
+
+    // 分区：主线（确认/待确认的现行资产）优先；抽帧与作废各自收纳到页尾折叠区
+    const main = []
+    const frames = []
+    const discards = []
+    for (const n of nodes) {
+      const lane = nodeLane(n)
+      if (lane === 'frames') frames.push(n)
+      else if (lane === 'discard') discards.push(n)
+      else main.push(n)
+    }
+
     el.meta.textContent = '画幅 ' + (project.settings?.aspectRatio || '16:9')
       + (project.settings?.duration ? ' · 时长 ' + project.settings.duration : '')
       + ' · 音频 ' + (project.settings?.audioMode || 'silent')
       + ' · 模式 ' + (project.settings?.mode || 'quality')
-      + ' · 节点 ' + (project.nodes || []).length
+      + ' · 节点 ' + nodes.length
+      + (nodes.length ? '（主线 ' + main.length + (frames.length ? ' · 抽帧 ' + frames.length : '') + (discards.length ? ' · 作废 ' + discards.length : '') + '）' : '')
 
-    const nodes = [...(project.nodes || [])].sort((a, b) => (a.order || 0) - (b.order || 0))
     if (nodes.length === 0) {
       const empty = document.createElement('div')
       empty.className = 'empty'
       empty.innerHTML = '<h2>画布为空</h2><p>在对话里让 Agent 走生产流程（由流程 skill 定义），各步骤产物会落到这里。</p><p>快速开始：<code>把「一只想当宇航员的小狐狸」做成 30 秒静音 3D 动画短片</code></p>'
       el.canvas.appendChild(empty)
+      latestMainNodeId = null
+      lastMainIds = new Set()
+      syncLocateButton()
+      syncJump()
       return
     }
 
-    // 分组展示顺序：settings.groupOrder 声明的在前，未声明的按首次出现顺序排在其后
+    // 主线分组展示顺序：settings.groupOrder 声明的在前，未声明的按首次出现顺序排在其后
     const declared = (project.settings?.groupOrder || []).filter((g) => typeof g === 'string' && g.trim())
     const groups = new Map()
     for (const g of declared) groups.set(g, [])
-    for (const n of nodes) {
+    for (const n of main) {
       const g = n.group || DEFAULT_GROUP
       if (!groups.has(g)) groups.set(g, [])
       groups.get(g).push(n)
@@ -442,6 +514,186 @@ import { markdownToHtml } from './markdown.js'
       for (const n of groupNodes) section.appendChild(nodeCard(n))
       el.canvas.appendChild(section)
     }
+
+    // 页尾收纳区：作废/否定（可还原）与抽帧/检查帧（中间产物），默认折叠，不打断主线预览
+    if (discards.length) el.canvas.appendChild(laneSection('discard', discards))
+    if (frames.length) el.canvas.appendChild(laneSection('frames', frames))
+
+    // 最新主线节点 = 主线里 createdAt / order 最大者（点画布空白或「最新主线」定位到它）
+    let latestMain = null
+    for (const n of main) {
+      if (!latestMain || ((n.createdAt || n.order || 0) >= (latestMain.createdAt || latestMain.order || 0))) latestMain = n
+    }
+    latestMainNodeId = latestMain ? latestMain.id : null
+    lastMainIds = new Set(main.map((n) => n.id)) // 跟随模式轮询用：比对主线节点集合，发现新增才刷新
+    syncLocateButton()
+    syncJump()
+  }
+
+  /** 页尾折叠收纳区（作废 / 抽帧各一个）。 */
+  function laneSection(lane, list) {
+    const det = document.createElement('details')
+    det.className = 'lane lane-' + lane
+    const sum = document.createElement('summary')
+    const isDiscard = lane === 'discard'
+    const icon = isDiscard ? '♻️' : '🎞'
+    const label = isDiscard ? '作废 / 否定（可还原）' : '抽帧 / 检查帧（中间产物）'
+    sum.title = isDiscard
+      ? '被替换的旧版 / 用户否定的资产，折叠保存历史，点卡片「还原」可回到主线'
+      : '末帧串联、转场首末帧、AI 自检检查帧等抽帧产物，默认折叠不影响主线预览，确认无用后可删除'
+    sum.innerHTML = '<span class="lane-icon">' + icon + '</span><span class="lane-label">' + label + '</span><span class="lane-count">' + list.length + '</span>'
+    det.appendChild(sum)
+    const body = document.createElement('div')
+    body.className = 'lane-body'
+    for (const n of list) body.appendChild(nodeCard(n))
+    det.appendChild(body)
+    return det
+  }
+
+  async function toggleDeprecated(id, deprecated) {
+    const project = await api('/canvas')
+    const n = project.nodes.find((x) => x.id === id)
+    if (!n) return
+    const params = { ...(n.params || {}) }
+    if (deprecated) params.deprecated = true
+    else delete params.deprecated
+    await updateNode(id, { params })
+  }
+
+  /** 悬浮 top/bottom 按钮：在顶端显示 BOTTOM（到达底部），离开顶端显示 TOP（返回顶端）。 */
+  function syncJump() {
+    const c = el.canvas
+    const canScroll = c.scrollHeight > c.clientHeight + 4
+    if (!canScroll) {
+      el.jump.classList.remove('show')
+      return
+    }
+    el.jump.classList.add('show')
+    const atTop = c.scrollTop <= 24
+    if (atTop) {
+      el.jump.textContent = '↓ BOTTOM'
+      el.jump.title = '到达底部'
+    } else {
+      el.jump.textContent = '↑ TOP'
+      el.jump.title = '返回顶端'
+    }
+  }
+
+  function syncLocateButton() {
+    if (el.locate) el.locate.disabled = !latestMainNodeId
+  }
+
+  /** 平滑滚动到指定节点并在卡片上闪一下。 */
+  function locateNode(nodeId) {
+    const card = el.canvas.querySelector('.node[data-node-id="' + nodeId + '"]')
+    if (!card) return
+    const c = el.canvas
+    const rect = card.getBoundingClientRect()
+    const top = rect.top - c.getBoundingClientRect().top + c.scrollTop
+    const target = Math.max(0, top - (c.clientHeight - rect.height) / 2)
+    c.scrollTo({ top: target, behavior: 'smooth' })
+    card.classList.remove('flash')
+    void card.offsetWidth // 重启动画
+    card.classList.add('flash')
+  }
+
+  /** 定位到最新主线节点（手动：空白点击 / 📍 按钮 / 跟随模式共用）。 */
+  function locateLatest() {
+    if (latestMainNodeId) locateNode(latestMainNodeId)
+  }
+
+  // ---- 跟随最新模式（checkbox）----
+  // 勾选后：立即定位到最新主线；之后每次「切回画布 tab」都定位到当前最新主线；
+  // 停留在画布期间每 2.5s 轮询一次，发现新增主线节点就自动滚动跟随。
+  // 未勾选 = 纯手动（点空白 / 📍 才定位）。状态按 sessionId 记在 localStorage，会话内跨 tab 切换 / 刷新保持。
+  function initAutoFollow() {
+    if (followInited) return
+    followInited = true
+
+    if (sessionId) {
+      try { followEnabled = localStorage.getItem(FOLLOW_KEY) === '1' } catch { followEnabled = false }
+    }
+    if (el.autofollow) {
+      el.autofollow.checked = followEnabled
+      el.autofollow.addEventListener('change', () => {
+        followEnabled = el.autofollow.checked
+        try { localStorage.setItem(FOLLOW_KEY, followEnabled ? '1' : '0') } catch {}
+        syncFollowUi()
+        if (followEnabled) {
+          scheduleLocate() // 勾选当下立即定位
+          startFollowTimer()
+        } else {
+          stopFollowTimer()
+        }
+      })
+    }
+    syncFollowUi()
+
+    // 切回画布 tab（iframe 由隐藏变可见 / 重挂载可见）→ 跟随模式下定位到最新主线
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        if (followEnabled) {
+          scheduleLocate()
+          startFollowTimer()
+        }
+      } else {
+        stopFollowTimer()
+      }
+    })
+    if (document.visibilityState === 'visible' && followEnabled) {
+      scheduleLocate()
+      startFollowTimer()
+    }
+  }
+
+  function syncFollowUi() {
+    if (el.followToggle) el.followToggle.classList.toggle('on', followEnabled)
+  }
+
+  function scheduleLocate() {
+    setTimeout(() => locateLatest(), 150)
+  }
+
+  function startFollowTimer() {
+    if (followTimer) return
+    followTimer = setInterval(pollFollow, 2500)
+  }
+
+  function stopFollowTimer() {
+    if (followTimer) {
+      clearInterval(followTimer)
+      followTimer = null
+    }
+  }
+
+  /** 用户正在编辑/弹窗时跳过轮询，避免打断输入。 */
+  function isBusyEditing() {
+    const ae = document.activeElement
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT')) return true
+    const modalHost = document.getElementById('dsh-svs-modal')
+    if (modalHost && modalHost.childElementCount) return true
+    return !!document.querySelector('textarea.edit')
+  }
+
+  /** 轮询：Agent 对话期间新增了主线节点 → 重渲染（保留已展开的收纳区）并滚动到新节点。 */
+  async function pollFollow() {
+    if (!followEnabled || document.visibilityState !== 'visible' || isBusyEditing()) return
+    try {
+      const project = await api('/canvas')
+      const mains = (project.nodes || []).filter((n) => nodeLane(n) === 'main')
+      const fresh = mains.filter((n) => !lastMainIds.has(n.id))
+      if (fresh.length === 0) return
+      const target = [...fresh].sort((a, b) => (Number(b.order) || b.createdAt || 0) - (Number(a.order) || a.createdAt || 0))[0]
+      const openLanes = [...el.canvas.querySelectorAll('details.lane[open]')]
+        .map((d) => [...d.classList].find((c) => c.startsWith('lane-')))
+        .filter(Boolean)
+      render(project)
+      for (const name of openLanes) {
+        const d = el.canvas.querySelector('details.' + name)
+        if (d) d.open = true
+      }
+      locateNode(target.id)
+    } catch { /* 单轮轮询失败静默，下轮重试 */ }
   }
 
   async function load() {
@@ -449,6 +701,7 @@ import { markdownToHtml } from './markdown.js'
     try {
       const project = await api('/canvas')
       render(project)
+      initAutoFollow()
     } catch (err) {
       el.canvas.innerHTML = '<div class="empty"><h2>加载失败</h2><p class="error-line">' + escapeHtml(err.message || String(err)) + '</p></div>'
     } finally {
@@ -458,8 +711,25 @@ import { markdownToHtml } from './markdown.js'
 
   el.refresh.addEventListener('click', load)
 
+  // 点击画布空白处 → 定位到最新主线节点（点卡片/按钮等交互元素不触发）
+  el.canvas.addEventListener('click', (e) => {
+    if (e.target === el.canvas && latestMainNodeId) locateLatest()
+  })
+  if (el.locate) el.locate.addEventListener('click', () => locateLatest())
+  if (el.jump) {
+    el.jump.addEventListener('click', () => {
+      const c = el.canvas
+      const atTop = c.scrollTop <= 24
+      c.scrollTo({ top: atTop ? c.scrollHeight : 0, behavior: 'smooth' })
+    })
+  }
+  el.canvas.addEventListener('scroll', syncJump, { passive: true })
+  window.addEventListener('resize', syncJump)
+
   if (!sessionId) {
     el.canvas.innerHTML = '<div class="empty"><h2>缺少会话</h2><p>请从工作区打开本会话后重试。</p></div>'
+    syncLocateButton()
+    syncJump()
   } else {
     load()
   }

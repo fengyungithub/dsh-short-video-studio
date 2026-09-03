@@ -4,16 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>短剧画布</title>
-  <link rel="stylesheet" href="./app.css?v=4">
+  <link rel="stylesheet" href="./app.css?v=5">
 </head>
 <body>
   <script>window.__DSH_SVS_TOKEN__ = "__DSH_SVS_TOKEN_VALUE__";</script>
   <header class="topbar">
     <div class="brand">🎬 短剧画布</div>
     <div class="meta" id="meta"></div>
+    <label class="follow" id="follow-toggle" title="勾选后：进入画布自动定位到最新主线节点；Agent 对话期间新增主线节点会自动滚动跟随（按会话记忆勾选状态）">
+      <input type="checkbox" id="autofollow">
+      <span>跟随最新</span>
+    </label>
+    <button class="btn" id="locate" type="button" title="定位到最新主线节点（主线资产优先展示）">📍 最新主线</button>
     <button class="btn" id="refresh" type="button">刷新</button>
   </header>
   <main id="canvas" class="canvas"></main>
-  <script type="module" src="./app.js?v=4"></script>
+  <button id="jump" class="jump-btn" type="button" title="返回顶端">↑ TOP</button>
+  <script type="module" src="./app.js?v=5"></script>
 </body>
 </html>
