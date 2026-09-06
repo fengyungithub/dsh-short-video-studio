@@ -75,7 +75,7 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 
 | 对话体验：流程叙述 + 任务看板 | 对话体验：可视化画布 |
 |---|---|
-| ![会话截图1](./examples/harness-dialogue-1.png) | ![会话截图2](./examples/harness-dialogue-2.png) |
+| ![会话截图1](./examples/harness-dialogue-1.png) | ![画布真实截图](./examples/ui/ui-canvas.png) |
 
 ### 输入框生成条（真实 UI 截图）
 
