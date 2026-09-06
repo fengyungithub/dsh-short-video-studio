@@ -21,6 +21,7 @@ whenToUse: |
 | 品牌事实调研（官网 / 新闻中心 / 媒体包检索） | `web_search` |
 | 核验用户素材（LOGO / 产品图 / 截图的识别与描述） | 默认用当前模型自身视觉直接读图；当前模型不支持图片输入时回退 `describe_image` |
 | 静帧生成（抽象动效层 / 氛围底板 / 概念场景板） | `comfy_generate_image` |
+| 参考图改绘（授权素材的抽象化 / 氛围版迭代，非品牌标识） | `comfy_render`（capability=`image.image2image` + `ref_nodes`） |
 | 单镜头视频生成（自带原生音频，支持画面内文案） | `comfy_generate_video` |
 | 查可用能力与工作流 | `comfy_list_workflows` |
 | 通用渲染（指定 capability / workflow） | `comfy_render` |
@@ -41,6 +42,7 @@ whenToUse: |
 本 Skill 的生成承诺依赖以下能力，开场先 `comfy_list_workflows` 核对一遍：
 
 - `image.text2image` — 静帧板（概念帧 / 氛围底板 / 抽象动效层）。
+- `image.image2image`（参考图生图）— 仅用于**授权素材的抽象化 / 氛围版迭代**（如把产品照片转为抽象动效层的底板），**绝不用于重绘或近似 LOGO / 产品界面 / 包装 / 吉祥物等身份识别素材**——品牌素材不可重绘规则优先于本能力。
 - `video.reference2video` / `video.image2video` — 单镜头视频（AV 模型，自带原生音频）。
 - `image.from_video`（抽帧）与 `video_concat`（拼接）。
 

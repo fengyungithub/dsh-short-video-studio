@@ -1,0 +1,48 @@
+{
+  "id": "flux2-img2img",
+  "version": 1,
+  "capability": "image.image2image",
+  "runner": "comfyui",
+  "displayName": "FLUX.2 图生图（参考图）",
+  "description": "本地 FLUX.2 dev 参考图生图：参考图经 ReferenceLatent 作为图像条件（尺寸跟随参考图，缩到 ≤1MP），prompt 描述改动。fast 档自动挂 FLUX.2-Turbo LoRA（8 步）。等价于用户导入的官方 img2img 工作流（Switch 由 modes 表达）。",
+  "output": { "mediaType": "image", "hasAudio": false },
+  "modelNode": "1",
+  "assets": {
+    "unet": { "kind": "checkpoint", "default": "flux2_dev_fp8mixed.safetensors", "env": "DSH_SVS_FLUX_MODEL", "label": "FLUX.2 UNet" },
+    "clip": { "kind": "clip", "default": "mistral_3_small_flux2_bf16.safetensors", "env": "DSH_SVS_FLUX_CLIP", "label": "FLUX.2 CLIP" },
+    "vae": { "kind": "vae", "default": "full_encoder_small_decoder.safetensors", "env": "DSH_SVS_FLUX2_II_VAE", "label": "FLUX.2 图生图 VAE" },
+    "turbo_lora": { "kind": "lora", "default": "Flux_2-Turbo-LoRA_comfyui.safetensors", "env": "DSH_SVS_FLUX2_TURBO_LORA", "label": "FLUX.2 Turbo LoRA（fast 档）" }
+  },
+  "graph": {
+    "1": { "class_type": "UNETLoader", "inputs": { "unet_name": "$assets.unet", "weight_dtype": "default" } },
+    "2": { "class_type": "CLIPLoader", "inputs": { "clip_name": "$assets.clip", "type": "flux2", "device": "default" } },
+    "3": { "class_type": "VAELoader", "inputs": { "vae_name": "$assets.vae" } },
+    "scale": { "class_type": "ImageScaleToTotalPixels", "inputs": { "upscale_method": "lanczos", "megapixels": 1, "resolution_steps": 1, "image": null } },
+    "dim": { "class_type": "GetImageSize", "inputs": { "image": ["scale", 0] } },
+    "sched": { "class_type": "Flux2Scheduler", "inputs": { "steps": null, "width": ["dim", 0], "height": ["dim", 1] } },
+    "lat": { "class_type": "EmptyFlux2LatentImage", "inputs": { "width": ["dim", 0], "height": ["dim", 1], "batch_size": 1 } },
+    "enc": { "class_type": "VAEEncode", "inputs": { "pixels": ["scale", 0], "vae": ["3", 0] } },
+    "pos": { "class_type": "CLIPTextEncode", "inputs": { "text": null, "clip": ["2", 0] } },
+    "fg": { "class_type": "FluxGuidance", "inputs": { "conditioning": ["pos", 0], "guidance": 4.0 } },
+    "reflat": { "class_type": "ReferenceLatent", "inputs": { "conditioning": ["fg", 0], "latent": ["enc", 0] } },
+    "guider": { "class_type": "BasicGuider", "inputs": { "model": ["$model", 0], "conditioning": ["reflat", 0] } },
+    "noise": { "class_type": "RandomNoise", "inputs": { "noise_seed": null } },
+    "ks": { "class_type": "KSamplerSelect", "inputs": { "sampler_name": "euler" } },
+    "sampler": { "class_type": "SamplerCustomAdvanced", "inputs": { "noise": ["noise", 0], "guider": ["guider", 0], "sampler": ["ks", 0], "sigmas": ["sched", 0], "latent_image": ["lat", 0] } },
+    "decode": { "class_type": "VAEDecode", "inputs": { "samples": ["sampler", 0], "vae": ["3", 0] } },
+    "save": { "class_type": "SaveImage", "inputs": { "images": ["decode", 0], "filename_prefix": null } }
+  },
+  "params": {
+    "prompt": { "inject": "scalar", "to": { "node": "pos", "field": "text" } },
+    "seed": { "inject": "scalar", "to": { "node": "noise", "field": "noise_seed" } },
+    "steps": { "inject": "scalar", "to": { "node": "sched", "field": "steps" } },
+    "prefix": { "inject": "scalar", "to": { "node": "save", "field": "filename_prefix" } },
+    "refs": { "inject": "image", "via": "node", "node": "LoadImage", "to": { "node": "scale", "field": "image" }, "max": 1 }
+  },
+  "modes": {
+    "quality": { "steps": 20, "loras": [] },
+    "fast": { "steps": 8, "loras": [ { "asset": "turbo_lora", "strength": 1.0 } ] }
+  },
+  "resolution": { "policy": "explicit", "default": [1344, 768] },
+  "constraints": {}
+}

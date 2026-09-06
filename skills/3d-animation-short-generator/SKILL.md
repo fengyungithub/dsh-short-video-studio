@@ -19,6 +19,7 @@ whenToUse: |
 | 用途 | 用这个工具 |
 |---|---|
 | 生成角色卡 / 场景卡 / 铅笔分镜图 | `comfy_generate_image` |
+| 参考图改绘（换装 / 改背景 / 风格迁移 / 角色卡微调） | `comfy_render`（capability=`image.image2image` + `ref_nodes=[原卡节点/资产 id]`） |
 | 生成单镜头视频（自带声音 + 原生字幕） | `comfy_generate_video` |
 | 查可用能力与工作流 | `comfy_list_workflows` |
 | 通用渲染（指定 capability / workflow） | `comfy_render` |
@@ -33,6 +34,8 @@ whenToUse: |
 | 所有批准 / 选择关口 | `ask_user_question`（选项卡） |
 
 不要写死模型名。默认工作流由能力注册表 `preferred` 决定；用户要换模型时先 `comfy_list_workflows` 核对能力，再用 `comfy_render` 显式指定 `workflow`。
+
+**参考图生图（`image.image2image`）**：基于已有卡片做改绘（换装 / 改背景 / 风格迁移 / 构图微调）时用 `comfy_render(capability='image.image2image', ref_nodes=[单张参考卡], prompt='保留 X、改动 Y')`；尺寸跟随参考图（≤1MP）。仍遵守参考图硬规则：单视图、卡面零文字、不拼三视图；prompt 里写明哪些特征必须保留、哪些要移除，避免模型增删角色。
 
 ## 全局视觉风格锁
 
