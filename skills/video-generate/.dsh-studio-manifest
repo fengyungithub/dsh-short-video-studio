@@ -1,0 +1,5 @@
+# dsh-short-video-studio 安装标记
+# 本目录由插件安装逻辑复制（幂等，不覆盖用户修改）。
+# 来源：dsh-short-video-studio bundled skill（参考视频生成 video-generate 适配版）
+name: video-generate
+source: bundled

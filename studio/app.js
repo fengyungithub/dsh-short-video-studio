@@ -22,6 +22,8 @@ import { markdownToHtml } from './markdown.js'
     jump: document.getElementById('jump'),
     autofollow: document.getElementById('autofollow'),
     followToggle: document.getElementById('follow-toggle'),
+    addUpload: document.getElementById('add-upload'),
+    addAssets: document.getElementById('add-assets'),
   }
 
   // 最新主线节点 id（渲染时记录，供空白点击 / 顶部按钮 / 跟随模式定位）
@@ -56,6 +58,17 @@ import { markdownToHtml } from './markdown.js'
     const u = new URLSearchParams({ token: TOKEN, sessionId, workspaceId, path: media })
     return ROUTE_ROOT + '/media?' + u.toString()
   }
+
+  /** 资产库缩略图地址（asset=<id> 由服务端从 .dsh-assets 解析伺服）。 */
+  function assetMediaUrl(assetId) {
+    const u = new URLSearchParams({ token: TOKEN, sessionId, workspaceId, asset: assetId })
+    return ROUTE_ROOT + '/media?' + u.toString()
+  }
+
+  const ASSET_TYPE_LABEL = { character: '角色', scene: '场景', style: '风格锚点' }
+  const ASSET_TYPE_ORDER = ['character', 'scene', 'style']
+  const UPLOAD_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif'
+  const UPLOAD_MAX_BYTES = 24 * 1024 * 1024
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -160,6 +173,285 @@ import { markdownToHtml } from './markdown.js'
 
   const confirmBox = (message) => modal(message, { okText: '删除', cancel: true })
   const alertBox = (message) => modal(message, { okText: '知道了' })
+
+  // ---- 自绘大对话框（上传分组 / 资产库取用），返回 body / 底部按钮栏 / close ----
+  function openDialog(titleText) {
+    const host = document.createElement('div')
+    host.className = 'dialog-host'
+    const box = document.createElement('div')
+    box.className = 'dialog'
+    const head = document.createElement('div')
+    head.className = 'dialog-title'
+    const t = document.createElement('span')
+    t.textContent = titleText
+    const x = document.createElement('button')
+    x.className = 'btn dialog-x'
+    x.textContent = '✕'
+    x.title = '关闭'
+    const body = document.createElement('div')
+    body.className = 'dialog-body'
+    const foot = document.createElement('div')
+    foot.className = 'dialog-actions'
+    head.appendChild(t)
+    head.appendChild(x)
+    box.appendChild(head)
+    box.appendChild(body)
+    box.appendChild(foot)
+    host.appendChild(box)
+    document.body.appendChild(host)
+    const close = () => host.remove()
+    x.addEventListener('click', close)
+    return { body, foot, close }
+  }
+
+  function dialogBtn(text, onClick, cls) {
+    const b = document.createElement('button')
+    b.className = 'btn' + (cls ? ' ' + cls : '')
+    b.type = 'button'
+    b.textContent = text
+    b.addEventListener('click', onClick)
+    return b
+  }
+
+  /** 读取本地文件为 base64 dataURL。 */
+  function readFileDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader()
+      fr.onload = () => resolve(fr.result)
+      fr.onerror = () => reject(new Error('读取失败：' + file.name))
+      fr.readAsDataURL(file)
+    })
+  }
+
+  /**
+   * 手动添加资产 ①：从本机选图上传 → 画布资产卡。
+   * 先选文件，再弹「分组」框（可留空 = 未分组，之后每张卡仍可单独改分组）；
+   * 入库保持可选——需要跨会话复用再点卡片上的「入库」。
+   */
+  async function chooseFilesAndUpload() {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = UPLOAD_ACCEPT
+    input.multiple = true
+    input.addEventListener('change', async () => {
+      const files = Array.from(input.files || [])
+      if (!files.length) return
+      const okFiles = files.filter((f) => f.size <= UPLOAD_MAX_BYTES)
+      const skipped = files.filter((f) => f.size > UPLOAD_MAX_BYTES).map((f) => f.name)
+      if (!okFiles.length) {
+        alertBox('所选图片均超过 24MB，无法上传。')
+        return
+      }
+      const picked = await pickGroupForUpload(okFiles.map((f) => f.name))
+      if (!picked) return // 用户取消
+
+      let reading = []
+      for (const f of okFiles) {
+        try {
+          reading.push({ filename: f.name, dataUrl: await readFileDataUrl(f) })
+        } catch (e) {
+          skipped.push(f.name + '（' + e.message + '）')
+        }
+      }
+      if (!reading.length) {
+        alertBox('没有可上传的图片。')
+        return
+      }
+      try {
+        const d = await api('/canvas/upload', {
+          method: 'POST',
+          body: JSON.stringify({ files: reading, group: picked.group }),
+        })
+        let msg = '已添加 ' + d.added.length + ' 张资产卡'
+        if (d.added.length) msg += '：' + d.added.map((x) => x.title).join('、')
+        const problems = (d.errors || []).map((e) => (e.filename || '?') + '（' + e.message + '）').concat(skipped)
+        if (problems.length) msg += '\n失败 ' + problems.length + ' 项：' + problems.join('；')
+        alertBox(msg)
+      } catch (e) {
+        alertBox('上传失败：' + (e.message || String(e)))
+      }
+      await load()
+    })
+    input.click()
+  }
+
+  /** 上传前选分组的小对话框：resolve(null)=取消，否则 { group }（''=未分组）。 */
+  function pickGroupForUpload(fileNames) {
+    return new Promise((resolve) => {
+      const dlg = openDialog('上传 ' + fileNames.length + ' 张图片到画布')
+      const list = document.createElement('ul')
+      list.className = 'file-list'
+      for (const n of fileNames.slice(0, 20)) {
+        const li = document.createElement('li')
+        li.textContent = n
+        list.appendChild(li)
+      }
+      if (fileNames.length > 20) {
+        const li = document.createElement('li')
+        li.textContent = '…等共 ' + fileNames.length + ' 张'
+        list.appendChild(li)
+      }
+      dlg.body.appendChild(list)
+
+      const lbl = document.createElement('label')
+      lbl.className = 'field-label'
+      lbl.textContent = '分组（可留空 = 未分组；如「角色卡 / 场景卡」等，之后每张卡仍可单独改分组）'
+      const groupInput = document.createElement('input')
+      groupInput.type = 'text'
+      groupInput.setAttribute('list', 'dsh-svs-groups')
+      groupInput.placeholder = '未分组'
+      dlg.body.appendChild(lbl)
+      dlg.body.appendChild(groupInput)
+      const note = document.createElement('p')
+      note.className = 'form-note'
+      note.textContent = '上传即成为画布上的图片资产卡，可作 ref 参考直接生成视频；需要跨会话复用时可再点卡上的「入库」。'
+      dlg.body.appendChild(note)
+
+      const cancel = dialogBtn('取消', () => { dlg.close(); resolve(null) })
+      dlg.foot.appendChild(cancel)
+      const go = dialogBtn('上传', () => { dlg.close(); resolve({ group: groupInput.value.trim() }) }, 'btn-accent')
+      dlg.foot.appendChild(go)
+      groupInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); go.click() }
+        if (e.key === 'Escape') cancel.click()
+      })
+      groupInput.focus()
+    })
+  }
+
+  /** 编辑 image 资产卡：选一张本地图片替换该节点图片（保留节点 id / 标题 / 分组）。 */
+  function replaceImageByUpload(node) {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = UPLOAD_ACCEPT
+    input.addEventListener('change', async () => {
+      const f = (input.files || [])[0]
+      if (!f) return
+      if (f.size > UPLOAD_MAX_BYTES) {
+        alertBox('图片超过 24MB 上限，请压缩后再试。')
+        return
+      }
+      let dataUrl
+      try {
+        dataUrl = await readFileDataUrl(f)
+      } catch (e) {
+        alertBox('读取失败：' + (e.message || String(e)))
+        return
+      }
+      try {
+        const d = await api('/canvas/node/replace-image', {
+          method: 'POST',
+          body: JSON.stringify({ nodeId: node.id, filename: f.name, dataUrl }),
+        })
+        let msg = '已用本地上传替换「' + (node.title || node.id) + '」的图片'
+        if (d.assetIdCleared) {
+          msg += '\n该卡此前已入库（' + d.prevAssetId + '），替换后已解除绑定；需要继续跨会话复用请重新点「入库」登记为新版本。'
+        }
+        alertBox(msg)
+      } catch (e) {
+        alertBox('替换失败：' + (e.message || String(e)))
+      }
+      await load()
+    })
+    input.click()
+  }
+
+  /** 手动添加资产 ②：从跨会话资产库（角色/场景/风格锚点）带缩略图取用。 */
+  async function openAssetLibrary() {
+    let assets = []
+    try {
+      const d = await api('/assets')
+      assets = (d && d.assets) || []
+    } catch (e) {
+      alertBox('读取资产库失败：' + (e.message || String(e)))
+      return
+    }
+    const dlg = openDialog('跨会话资产库 · 点卡片加入画布')
+    if (!assets.length) {
+      const p = document.createElement('p')
+      p.className = 'lib-empty-hint'
+      p.innerHTML = '资产库还是空的。<br>把图片上传成画布资产卡后，点卡上的「入库」登记（类型 + 小写英文名），<br>之后任意会话都能从这里直接取用到画布。'
+      dlg.body.appendChild(p)
+      dlg.foot.appendChild(dialogBtn('完成', () => dlg.close()))
+      return
+    }
+
+    const grid = document.createElement('div')
+    grid.className = 'asset-grid'
+    const sorted = [...assets].sort((a, b) => {
+      const ta = ASSET_TYPE_ORDER.indexOf(a.type)
+      const tb = ASSET_TYPE_ORDER.indexOf(b.type)
+      return (ta < 0 ? 99 : ta) - (tb < 0 ? 99 : tb) || String(a.name || '').localeCompare(String(b.name || ''), 'zh')
+    })
+    let lastType = ''
+    for (const a of sorted) {
+      if (a.type !== lastType) {
+        lastType = a.type
+        const h = document.createElement('div')
+        h.className = 'asset-group-title'
+        h.textContent = (ASSET_TYPE_LABEL[a.type] || a.type) + ' · ' + (a.state && a.state !== 'default' ? a.state + ' ' : '') + sorted.filter((x) => x.type === a.type).length
+        grid.appendChild(h)
+      }
+      const card = document.createElement('div')
+      card.className = 'asset-card'
+
+      const thumb = document.createElement('div')
+      thumb.className = 'thumb'
+      const img = document.createElement('img')
+      img.loading = 'lazy'
+      img.alt = a.id || ''
+      img.src = assetMediaUrl(a.id)
+      img.onerror = () => {
+        img.remove()
+        const m = document.createElement('span')
+        m.className = 'missing'
+        m.textContent = '🖼 图缺失'
+        thumb.appendChild(m)
+      }
+      thumb.appendChild(img)
+      card.appendChild(thumb)
+
+      const info = document.createElement('div')
+      info.className = 'info'
+      const tag = document.createElement('span')
+      tag.className = 'asset-tag ' + (a.type || '')
+      tag.textContent = ASSET_TYPE_LABEL[a.type] || a.type || 'asset'
+      info.appendChild(tag)
+      const name = document.createElement('div')
+      name.className = 'name'
+      name.textContent = a.name || a.id
+      info.appendChild(name)
+      const idLine = document.createElement('div')
+      idLine.className = 'id'
+      idLine.textContent = a.id
+      info.appendChild(idLine)
+      card.appendChild(info)
+
+      const acts = document.createElement('div')
+      acts.className = 'actions'
+      const addBtn = dialogBtn('＋ 加入画布', async () => {
+        addBtn.disabled = true
+        addBtn.textContent = '添加中…'
+        try {
+          await api('/assets/to-canvas', { method: 'POST', body: JSON.stringify({ id: a.id }) })
+          addBtn.textContent = '已添加 ✓'
+        } catch (e) {
+          addBtn.textContent = '重试'
+          addBtn.disabled = false
+          alertBox('添加失败：' + (e.message || String(e)))
+        }
+      }, 'btn-accent')
+      acts.appendChild(addBtn)
+      card.appendChild(acts)
+      grid.appendChild(card)
+    }
+    dlg.body.appendChild(grid)
+    const done = dialogBtn('完成（刷新画布）', () => {
+      dlg.close()
+      load()
+    }, 'btn-accent')
+    dlg.foot.appendChild(done)
+  }
 
   /** 入库表单：资产类型（下拉）+ 资产名（文本）。取消返回 null。 */
   function assetRegisterBox(defaultName) {
@@ -312,6 +604,14 @@ import { markdownToHtml } from './markdown.js'
       editBtn.className = 'btn'
       editBtn.textContent = '编辑'
       editBtn.onclick = () => startEdit(node, card, body)
+      actions.appendChild(editBtn)
+    } else if (node.kind === 'image') {
+      // image 节点「编辑」= 用本地上传图替换本卡（保留节点/标题/分组；原图留在磁盘）
+      const editBtn = document.createElement('button')
+      editBtn.className = 'btn'
+      editBtn.textContent = '编辑'
+      editBtn.title = '上传本地图片替换本卡图片（若已入库会解除绑定，替换后可重新「入库」）'
+      editBtn.onclick = () => replaceImageByUpload(node)
       actions.appendChild(editBtn)
     }
 
@@ -482,7 +782,18 @@ import { markdownToHtml } from './markdown.js'
     if (nodes.length === 0) {
       const empty = document.createElement('div')
       empty.className = 'empty'
-      empty.innerHTML = '<h2>画布为空</h2><p>在对话里让 Agent 走生产流程（由流程 skill 定义），各步骤产物会落到这里。</p><p>快速开始：<code>把「一只想当宇航员的小狐狸」做成 30 秒静音 3D 动画短片</code></p>'
+      empty.innerHTML =
+        '<h2>画布为空</h2>' +
+        '<p>在对话里让 Agent 走生产流程（由流程 skill 定义），各步骤产物会落到这里；也可以先把自己的素材放上画布：</p>' +
+        '<p class="empty-actions">' +
+        '<button class="btn btn-accent" id="empty-upload" type="button">＋ 上传图片</button>' +
+        '<button class="btn" id="empty-library" type="button">📚 从资产库添加</button>' +
+        '</p>' +
+        '<p>快速开始：<code>把「一只想当宇航员的小狐狸」做成 30 秒静音 3D 动画短片</code></p>'
+      const eu = empty.querySelector('#empty-upload')
+      if (eu) eu.onclick = () => chooseFilesAndUpload()
+      const elb = empty.querySelector('#empty-library')
+      if (elb) elb.onclick = () => openAssetLibrary()
       el.canvas.appendChild(empty)
       latestMainNodeId = null
       lastMainIds = new Set()
@@ -710,6 +1021,10 @@ import { markdownToHtml } from './markdown.js'
   }
 
   el.refresh.addEventListener('click', load)
+
+  // 手动添加资产：顶栏按钮（空画布空态的 CTA 在 render 里单独绑定）
+  if (el.addUpload) el.addUpload.addEventListener('click', () => chooseFilesAndUpload())
+  if (el.addAssets) el.addAssets.addEventListener('click', () => openAssetLibrary())
 
   // 点击画布空白处 → 定位到最新主线节点（点卡片/按钮等交互元素不触发）
   el.canvas.addEventListener('click', (e) => {

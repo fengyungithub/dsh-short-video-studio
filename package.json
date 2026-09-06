@@ -73,7 +73,7 @@
     "provenance": true
   },
   "scripts": {
-    "smoke": "node scripts/smoke-manifest.mjs && node scripts/smoke-preask-deliver.mjs && node scripts/smoke-pdf.mjs",
+    "smoke": "node scripts/smoke-manifest.mjs && node scripts/smoke-upload-assets.mjs && node scripts/smoke-preask-deliver.mjs && node scripts/smoke-pdf.mjs",
     "prepublishOnly": "npm run smoke"
   },
   "dependencies": {
