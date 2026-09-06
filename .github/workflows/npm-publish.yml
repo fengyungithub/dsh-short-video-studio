@@ -1,7 +1,8 @@
 name: npm publish
 
-# 方案 A（tag 触发）：推送 vX.Y.Z 标签即自动发布到公共 npm registry；
-# workflow_dispatch 提供手动兜底。版本管理：npm version patch/minor/major + 打 tag。
+# tag 触发：推送 vX.Y.Z 标签即自动发布到公共 npm registry，并为同一 tag 生成
+# GitHub Release（changelog 自动取自上一个 tag 以来的提交）；workflow_dispatch
+# 提供手动兜底（不生成 Release）。版本管理：npm version patch/minor/major + 打 tag。
 on:
   push:
     tags:
@@ -35,3 +36,85 @@ jobs:
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # GitHub Release：npm 发版成功后再为同一个 v* tag 生成 Release 页，
+  # changelog 自动汇总「上一个 tag → 本 tag」的提交（按 新增/修复/文档 分组）。
+  release:
+    needs: publish
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout full history (with tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Build changelog body
+        run: |
+          CURRENT="${{ github.ref_name }}"
+          PREV="$(git tag --sort=-v:refname | grep -v "^${CURRENT}$" | head -1 || true)"
+          echo "current=$CURRENT previous=${PREV:-<none>}"
+
+          if [ -n "${PREV}" ]; then
+            RANGE="${PREV}..${CURRENT}"
+          else
+            RANGE=""
+          fi
+
+          git log --no-merges --pretty=format:'%h%x1f%s' ${RANGE} > /tmp/commits.txt || true
+
+          python3 - <<'PY'
+          import re
+          commits = []
+          try:
+              with open('/tmp/commits.txt', encoding='utf-8') as f:
+                  for line in f:
+                      line = line.rstrip('\n')
+                      if not line:
+                          continue
+                      h, _, subject = line.partition('\x1f')
+                      if h and subject:
+                          commits.append((h[:7], subject))
+          except FileNotFoundError:
+              pass
+
+          cats = {'✨ 新增 / 改进': [], '🐛 修复': [], '📝 文档 / 其它': []}
+          for h, subject in commits:
+              s = subject.lower()
+              if any(k in s for k in ('修复', 'bug', 'fix', '修正')):
+                  cats['🐛 修复'].append((h, subject))
+              elif any(k in s for k in ('readme', '文档', 'doc', '配图', 'changelog')):
+                  cats['📝 文档 / 其它'].append((h, subject))
+              else:
+                  cats['✨ 新增 / 改进'].append((h, subject))
+
+          lines = ['## 变更摘要（自动生成，按提交归类）', '']
+          empty = True
+          for cat, items in cats.items():
+              if not items:
+                  continue
+              empty = False
+              lines.append(f'### {cat}')
+              for h, subject in items:
+                  lines.append(f'- `{h}` {subject}')
+              lines.append('')
+          if empty:
+              lines.append('_（本版本无提交级摘要，详见 npm 包说明。）_')
+              lines.append('')
+
+          with open('.release-body.md', 'w', encoding='utf-8') as f:
+              f.write('\n'.join(lines))
+          print('body bytes:', len('\n'.join(lines).encode('utf-8')))
+          PY
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body_path: .release-body.md
+          draft: false
+          prerelease: false

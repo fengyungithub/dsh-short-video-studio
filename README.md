@@ -314,11 +314,11 @@ node scripts/import-comfy.mjs exported.json \
 
 ## 发布新版本（维护者）
 
-npm 包由 GitHub Actions 自动发布（推送 `v*` tag 触发，见 `.github/workflows/npm-publish.yml`；发布前自动跑冒烟自检并带 provenance 供应链签名）。前提：仓库已配置 `NPM_TOKEN` secret（npmjs.com → Access Tokens → Automation 类型）。
+npm 包由 GitHub Actions 自动发布（推送 `v*` tag 触发，见 `.github/workflows/npm-publish.yml`；发布前自动跑冒烟自检并带 provenance 供应链签名），并在 npm 发版成功后**自动为同一 tag 生成 GitHub Release**——变更摘要取「上一个 tag → 本 tag」的提交，按 **✨ 新增/改进 · 🐛 修复 · 📝 文档/其它** 自动归类，打开 Releases 页即可看到每版新增的功能。前提：仓库已配置 `NPM_TOKEN` secret（npmjs.com → Access Tokens → Automation 类型）与 `GITHUB_TOKEN`（Actions 内置，无需配置）。
 
 ```bash
 npm version patch        # bump 版本并打 vX.Y.Z tag（minor / major 同理）
-git push origin main --follow-tags   # 推送即触发自动发布
+git push origin main --follow-tags   # 推送即触发自动发布（npm + GitHub Release）
 ```
 
 发布后安装方式：`dsh plugin --profile web add dsh-short-video-studio`。
