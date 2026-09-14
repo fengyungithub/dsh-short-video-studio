@@ -161,14 +161,16 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 - **加速不暴露到产品层**：设置页每个能力默认只放**一条内置默认策略**（跟随注册表首选 = 各档非加速首选实现）。**技能与文档只写 `tier`，不写加速实现 id 或节点名。**
 - **策略由你自己命名与组合**：点「＋ 新增策略（命名 + 逐档组合）」→ 起名 + 逐档从现有清单里挑（可按家族跨清单组合，例如 balanced 用 PDD+Sol、quality 用标准），保存即选用；之后可重命名/删除。**只挑一个或两个档位也行**（≥1 即可）——**没挑的档位不属于这条策略**：配置页的逐档区与工具条档位下拉都会跟着收敛（没这个档位就连行都不显示），**显式**请求那个档位会报错（不会回退到别的实现），**不写档位**时则按这条策略提供的最靠前那档走（并给提示）——所以「只把 balanced 换成 PDD」得到的是一条"只有 balanced"的策略，想三档都能出就用策略行的「编辑档位」把三档都挑上。Sol / PDD 都只是**可选清单**，不会被自动包装成"官方策略"。逐档下拉也随时可用（不保存为策略时显示为「自定义」）。
   - ⚠️ Sol 清单**需自装第三方节点** [ComfyUI-SolAttn-Ampere](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere)（注册名 `SolAttnMiniMaxH3`，没装会报 node type not found）；缺节点时该实现**置灰不可用**（不静默回退到标准实现）。
-  - **A800 实测**（同 seed 关/开对照）：成片档 20 步 768p 收益最大——ref2v 396.6s→311.2s（**1.27×**）、i2v 394.8s→314.7s（**1.25×**），高频细节持平（±2.5%）；`balanced` 8 步 166.3s→136.3s（1.23×）；**480p / fast 档只有 1.03× 且高频细节 −13.8%，不要开**。⚠️ 本插件栈**必须 `dense_first_percent: 0`**（默认 0.2 会让节点把每次调用判为"去噪早期"而**完全不稀疏**）；诊断清单可复核 `sol_attn>0`。⚠️ **同 seed 不再复现同像素**（注意力内核换了，即使不稀疏也差 15.1/255）→ 一部片子里要一致地全用或全不用，不能逐镜混用。由 `node scripts/make-h3-variants.mjs` 从 `scripts/h3-templates/` 生成，详见 `docs/minimax-h3-acceleration-lora.md` §9.8 与 `docs/tier-strategy-design.md`。
+  - **同 seed 关/开对照实测**：成片档 20 步 768p 收益最大——ref2v 396.6s→311.2s（**1.27×**）、i2v 394.8s→314.7s（**1.25×**），高频细节持平（±2.5%）；`balanced` 8 步 166.3s→136.3s（1.23×）；**480p / fast 档只有 1.03× 且高频细节 −13.8%，不要开**。⚠️ 本插件栈**必须 `dense_first_percent: 0`**（默认 0.2 会让节点把每次调用判为"去噪早期"而**完全不稀疏**）；诊断清单可复核 `sol_attn>0`。⚠️ **同 seed 不再复现同像素**（注意力内核换了，即使不稀疏也差 15.1/255）→ 一部片子里要一致地全用或全不用，不能逐镜混用。由 `node scripts/make-h3-variants.mjs` 从 `scripts/h3-templates/` 生成，详见 `docs/minimax-h3-acceleration-lora.md` §9.8 与 `docs/tier-strategy-design.md`。
 
-### 实测耗时（16:9 · 124 帧 ≈ 5.17s，A800 80GB）
+### 实测耗时（16:9 · 124 帧 ≈ 5.17s）
 
 | 能力 | `fast` | `balanced` | `balanced` 带加速 | `quality` | `quality` 带加速 |
 |---|---|---|---|---|---|
 | ref2v（832×480 / 1344×768） | 24.6s | 166.3s | 136.3s | 396.6s | 311.2s |
 | i2v（832×480 / 1344×768） | 26.1s | 177.3s | 130.5s | 394.8s | 314.7s |
+
+> 耗时随硬件、驱动、模型文件版本而变，上表只作**量级参考**（决定选哪一档、加速值不值得开）。
 
 **PDD 清单**（长边 1344，需自己在设置页组进策略）：ref2v **184.7s** / 叠加 Sol **137.3s**；i2v **178.8s** / 叠加 Sol **134.1s**。同条件下的 20 步成片档为 394.4s / 392.4s（PDD 的锐度还高 +10.3% / +7.9%）→ **PDD 相当于用 8 步的钱买 20 步的画质**。
 
@@ -312,13 +314,13 @@ node scripts/import-comfy.mjs exported.json \
 
 ### 可选的加速件（非内置默认，按需开启）
 
-| 项 | 开启方式 | 实测收益（A800 80GB / ComfyUI 0.33.3 / 124 帧） |
+| 项 | 开启方式 | 实测收益（ComfyUI 0.33.3 / 124 帧 / 同 seed 关开对照） |
 |---|---|---|
 | **fl2v 8 步 768p LoRA**（`minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors`，i2v `balanced` 档） | `models.h3FlBalancedLora` 或各清单的 `assetOverrides.<id>.lora_8step` | [lightx2v/Minimax-h3-Turbo](https://huggingface.co/lightx2v/Minimax-h3-Turbo)（Apache-2.0，1.82GB）。**必须与 shift 6/3 配对**：768p 系 LoRA 配 544p 系的 shift 12/3 会结构性崩坏，而不是「略糊」——这就是该档单列一份模板（`scripts/h3-templates/minimax-h3-i2v-8step.json`）而非改现有 i2v 清单的原因 |
 | **int8_convrot 视频 VAE**（需自行下载 `minimax_h3_video_vae_int8_convrot.safetensors`，[Kijai/MiniMax-H3-experimental](https://huggingface.co/Kijai/MiniMax-H3-experimental)） | `models.h3VideoVae` 或各清单的 `assetOverrides.<id>.vae`（不设则用内置 fp16） | 解码 ~1.2–1.5×、**常驻显存 2.7GB vs 5.0GB**；同 seed 抽帧像素均值差 1.88/255（视觉等价）。端到端仅省 ~2s/镜（480p）～~5s/镜（768p） |
 | **日常档** `balanced`（组「MiniMax H3 参考生成视频」，清单 `minimax-h3-ref2v-balanced` / `-balanced-sol`） | 显式传 `tier="balanced"`（或在设置页把该档选成带加速实现） | 166.3s/镜（带加速 136.3s）vs 成片档 396.6s/镜（**省 58%**），画质明显优于 4 步 fast 档，帧锐度比 quality 还高约 13% |
 | **PDD 8 步蒸馏**（需自装第三方节点包 [ComfyUI-MiniMax-H3-PDD-Acc](https://github.com/Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc) + 权重 [aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI](https://huggingface.co/aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI)，Apache-2.0，Ref2VA/FL2VA 各 1.54GB） | **权重必须放 `ComfyUI/models/pdd_acc/`**；配置键 `models.h3PddRef2v` / `models.h3PddFl2v`（env `DSH_SVS_H3_PDD_REF2V` / `DSH_SVS_H3_PDD_FL2VA`）或 `assetOverrides.<id>.pdd`；在设置页「＋ 新增策略」里把该档选成 `…-balanced-pdd[-sol]`（**不做隐式默认**，`priority<0`） | **184.7s / i2v 178.8s 即达 20 步成片档以上细节**（锐度 +10.3% / +7.9%；噪声地板比 20 步更低）；叠加 Sol 后 137.3s / 134.1s。⚠️ 不能与 lightx2v 叠加、不能超 8 步、shift 固定 12/3、采样器必须 euler。详见 [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md) §9.9 |
-| **Sol-Attn 块稀疏注意力**（需自装第三方节点 [ComfyUI-SolAttn-Ampere](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere)，sm_80+，纯 `torch.compile(flex_attention)`，**不需要 nvcc**） | **不需要手动生成清单**：内置已带各档 `-sol` 实现（`node scripts/make-h3-variants.mjs` 从 `scripts/h3-templates/` 生成）；在设置页把它选进你自己的策略（「＋ 新增策略」），或逐档下拉指定 | **A800 实测**：成片档收益最大（ref2v 1.27× / i2v 1.25×），balanced 1.23×；**fast / 480p 仅 1.03× 且高频细节 −13.8%，不要开**。详见 [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md) §9.8 |
+| **Sol-Attn 块稀疏注意力**（需自装第三方节点 [ComfyUI-SolAttn-Ampere](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere)，sm_80+，纯 `torch.compile(flex_attention)`，**不需要 nvcc**） | **不需要手动生成清单**：内置已带各档 `-sol` 实现（`node scripts/make-h3-variants.mjs` 从 `scripts/h3-templates/` 生成）；在设置页把它选进你自己的策略（「＋ 新增策略」），或逐档下拉指定 | **实测**：成片档收益最大（ref2v 1.27× / i2v 1.25×），balanced 1.23×；**fast / 480p 仅 1.03× 且高频细节 −13.8%，不要开**。详见 [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md) §9.8 |
 
 > **档位契约全文**：见 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md)（三层模型、受控三档、清单字段契约、**策略＝内置默认 + 用户命名组合**、解析与错误语义、实施阶段与验收脚本）。
 
