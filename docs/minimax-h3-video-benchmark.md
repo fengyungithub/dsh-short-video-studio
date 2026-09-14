@@ -3,7 +3,7 @@
 > **⚠️ 历史实测记录（保留原文 id）**：本报告的 `minimax-h3-ref2v` 对应拆分后的 `minimax-h3-ref2v-fast`（同图 fast 档）与 `minimax-h3-ref2v-quality`（同图 quality 档），`minimax-h3-ref2v-8step` → `minimax-h3-ref2v-balanced`，`minimax-h3-ref2v-sol` → `minimax-h3-ref2v-quality-sol`，`minimax-h3-ref2v-8step-sol` → `minimax-h3-ref2v-balanced-sol`，`minimax-h3-i2v` → `minimax-h3-i2v-fast` / `minimax-h3-i2v-quality`，`minimax-h3-i2v-sol` → `minimax-h3-i2v-quality-sol`（**P2 拆分，图形等价**——同一张图，只是「一个 json = 一个档位」。当时一个 json 用 `modes` 覆盖多档）。`mode=` 参数现为 `tier=` 的兼容别名。档位契约见 [`docs/tier-strategy-design.md`](tier-strategy-design.md)。
 
 > 本机实测汇总：**分辨率 × 档位 × LoRA × Sol-Attn 加速** 四个维度的成本与画质。
-> 数据来自 A800 80GB（服务器）上的本地 ComfyUI，全部由 `dsh-short-video-studio` 插件的**能力注册表**提交，可用 `node e2e-out/bench.mjs` 从 `/history` 一键重取。
+> 数据来自 单卡 Ampere（sm_80）服务器上的本地 ComfyUI，全部由 `dsh-short-video-studio` 插件的**能力注册表**提交，可用 `node e2e-out/bench.mjs` 从 `/history` 一键重取。
 >
 > 配套文档：`docs/minimax-h3-acceleration-lora.md`（加速方案研究，§9 为实测记录）、`README.md`（工作流清单与配置）。
 
@@ -32,7 +32,7 @@
 
 | 项 | 取值 |
 |---|---|
-| 硬件/环境 | A800 80GB（服务器）；ComfyUI 0.33.3；torch 2.15.0.dev+cu132；py3.14；FFmpeg 可用 |
+| 硬件/环境 | 单卡 Ampere（sm_80）服务器；ComfyUI 0.33.3；torch 2.15.0.dev+cu132；py3.14；FFmpeg 可用 |
 | 时长 | `length=124` @24fps = **5.17s**（H3 帧数步进 17，24fps） |
 | seed | 全部 **42424242**（早期对比臂用 66660003 / 55550001，已标注） |
 | prompt | 同一份 H3 结构化 prompt（ref2v 6 段 / i2v 3 段+对齐行） |
@@ -134,7 +134,7 @@
 
 ### 5.3 PDD 8 步（2026-09-09 晚复测）
 
-条件：同参考图 / 同 prompt / 同 seed 42424242 / 1344×768 / 124 帧 / A800 80GB；PDD 走专用节点
+条件：同参考图 / 同 prompt / 同 seed 42424242 / 1344×768 / 124 帧 / 单卡 Ampere（sm_80）；PDD 走专用节点
 （`MiniMaxH3PDDAccApply`，权重放 `models/pdd_acc/`），baseline = 20 步无蒸馏（同条件）。
 
 | 臂 | 配方 | 端到端 | 帧锐度 mean\|∇\| | 噪声地板 p05 |

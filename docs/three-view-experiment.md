@@ -2,7 +2,7 @@
 
 **结论先行：三视图对 H3 参考绑定没有必要性，拼成一张图是重复角色的直接原因。修复应在 workflow 层做，且零 JS 改动即可。**
 
-实验环境：本机 ComfyUI 0.33.3 / A800 80GB / `minimax_h3_ref2va_pruned_int8_convrot`，`mode=fast`（4 步 Lightning LoRA），832×480，`length=124`（5.17s），每臂约 28s。
+实验环境：本机 ComfyUI 0.33.3 / 单卡 Ampere（sm_80）/ `minimax_h3_ref2va_pruned_int8_convrot`，`mode=fast`（4 步 Lightning LoRA），832×480，`length=124`（5.17s），每臂约 28s。
 
 方法：复用项目自身的 `lib/manifest.js` `buildGraphFromManifest()`，跑的就是生产路径。所有臂固定 `seed=42424242`、固定 prompt（J/K 组换 seed 与 prompt，组内固定），只变参考图与参数。额外在 `VAEDecode` 后挂 `ImageFromBatch → SaveImage` 抽帧用于逐帧目视比对。
 
