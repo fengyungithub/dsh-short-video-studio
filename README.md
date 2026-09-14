@@ -147,6 +147,8 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 | `flux2-img2img` | `image.image2image` | FLUX 2 参考图改绘（ReferenceLatent，尺寸跟随参考图）。**未分档**：走 `mode` 轴（`quality` 20 步 / `fast` 8 步 Turbo LoRA） |
 | `minimax-h3-ref2v-fast` · `-balanced` · `-balanced-sol` · `-quality` · `-quality-sol` | `video.reference2video` | **组「MiniMax H3 参考生成视频」**：H3 参考绑定，`ref_nodes` 绑定身份/环境，**带声音**。一个 json = 一个档位实现；`fast` 长边 832，`balanced`/`quality` 长边 1344 |
 | `minimax-h3-i2v-fast` · `-balanced` · `-balanced-sol` · `-quality` · `-quality-sol` | `video.image2video` | **组「MiniMax H3 首末帧生成视频」**：H3 首/末帧串联（同场景续接镜 / 转场镜），带声音，**base = FL2VA 变体**。一个 json = 一个档位实现；`fast` 长边 832，`balanced`/`quality` 长边 1344（`balanced` = 8 步 + fl2v 768p LoRA，shift 6/3） |
+| `minimax-h3-ref2v-pdd-balanced` · `-pdd-balanced-sol` | `video.reference2video` | **组「MiniMax H3 参考生成视频 · PDD 蒸馏」**：PDD 8 步蒸馏（`nfe=8`），**8 步拿到成片档以上细节**。组内两条策略 = 不带 Sol / 带 Sol。**不做隐式默认**（`priority<0`）：依赖第三方节点，须在设置页显式选择；缺节点则置灰 |
+| `minimax-h3-i2v-pdd-balanced` · `-pdd-balanced-sol` | `video.image2video` | **组「MiniMax H3 首末帧生成视频 · PDD 蒸馏」**：同上（FL2VA 权重，base 必须 fl2va）。i2v 侧相对现有 balanced 只 +1.5% 细节，定位是**成片档的廉价替代**（392.4s → 178.8s） |
 | `extract-frame` | `image.from_video` | 抽帧（末帧 / 首帧 → 图片节点） |
 | `minimax-h3-ref2v-sol-stats` | `video.reference2video` | **内部诊断清单**（`internal: true`）：跑 Sol 时输出统计用于复核。**不参与档位解析、不进 UI 与技能选项**，只能显式 `workflow=` 调用 |
 
@@ -167,7 +169,9 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 | ref2v（832×480 / 1344×768） | 24.6s | 166.3s | 136.3s | 396.6s | 311.2s |
 | i2v（832×480 / 1344×768） | 26.1s | 177.3s | 130.5s | 394.8s | 314.7s |
 
-画质：`balanced`（8 步）帧锐度比 `quality`（20 步）高约 13%；`fast` 档细节最弱、适合调构图 / 走位。
+**PDD 策略**（独立组，长边 1344）：ref2v **184.7s** / 叠加 Sol **137.3s**；i2v **178.8s** / 叠加 Sol **134.1s**。同条件下的 20 步成片档为 394.4s / 392.4s（PDD 的锐度还高 +10.3% / +7.9%）→ **PDD 相当于用 8 步的钱买 20 步的画质**。
+
+画质：`balanced`（8 步）帧锐度比 `quality`（20 步）高约 13%；`fast` 档细节最弱、适合调构图 / 走位；PDD 8 步则**高于**成片档。
 
 
 > **⚠️ 版本兼容（v0.1.x → 现在）**：组 `minimax-h3-i2v`（拆分后为 `minimax-h3-i2v-fast` / `-quality` / `-quality-sol`）的 base 已从 `minimax_h3_ref2va_pruned_int8_convrot` 换成 **`minimax_h3_fl2va_pruned_int8_convrot`（+21GB 下载）**，LoRA 换成 `minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy`（+2GB）。原因是原先 i2v 用 Ref2VA base 跑 `MiniMaxH3ImageToVideo` 属**跨变体错配**（拿不到 fl2v 系迭代红利）。这两个资产现在由**独立配置键**驱动（`models.h3FlUnet` / `models.h3FlFastLora`，或 env `DSH_SVS_H3_MODEL_FL` / `DSH_SVS_H3_LORA_FL_FAST`）——旧键 `h3RefUnet` / `h3FastLora` **只作用于 ref2v 档**，不再被 i2v 复用。若不想多下 21GB，用配置把它按旧组合钉回去即可（i2v 会退回旧行为）：
@@ -243,7 +247,7 @@ node scripts/import-comfy.mjs exported.json \
   --id sdxl-text2image --capability image.text2image --name "SDXL 文生图"
 ```
 
-**方式 C · 手写 manifest**：参照 [`schemas/workflow-manifest.schema.json`](schemas/workflow-manifest.schema.json) 与内置 `workflows/` 示例，写一份清单放到 `~/.dsh/dsh-short-video-studio/workflows/<id>.json`（重启或设置页刷新后即入注册表）。**强校验**保证错误清单被拒绝而不是静默降级：
+**方式 C · 手写 manifest**：参照 [`schemas/workflow-manifest.schema.json`](schemas/workflow-manifest.schema.json) 与内置 `workflows/` 示例，写一份清单放到 `~/.dsh/dsh-short-video-studio/workflows/<id>.json`（**入注册表的触发条件**：重启插件进程，或在设置页导入/删除任意一份清单——注册表只在写入后重载，纯刷新不会重读磁盘）。**强校验**保证错误清单被拒绝而不是静默降级：
 
 ```json
 {
@@ -310,13 +314,14 @@ node scripts/import-comfy.mjs exported.json \
 | **fl2v 8 步 768p LoRA**（`minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors`，i2v `balanced` 档） | `models.h3FlBalancedLora` 或各清单的 `assetOverrides.<id>.lora_8step` | [lightx2v/Minimax-h3-Turbo](https://huggingface.co/lightx2v/Minimax-h3-Turbo)（Apache-2.0，1.82GB）。**必须与 shift 6/3 配对**：768p 系 LoRA 配 544p 系的 shift 12/3 会结构性崩坏，而不是「略糊」——这就是该档单列一份模板（`scripts/h3-templates/minimax-h3-i2v-8step.json`）而非改现有 i2v 清单的原因 |
 | **int8_convrot 视频 VAE**（需自行下载 `minimax_h3_video_vae_int8_convrot.safetensors`，[Kijai/MiniMax-H3-experimental](https://huggingface.co/Kijai/MiniMax-H3-experimental)） | `models.h3VideoVae` 或各清单的 `assetOverrides.<id>.vae`（不设则用内置 fp16） | 解码 ~1.2–1.5×、**常驻显存 2.7GB vs 5.0GB**；同 seed 抽帧像素均值差 1.88/255（视觉等价）。端到端仅省 ~2s/镜（480p）～~5s/镜（768p） |
 | **日常档** `balanced`（组「MiniMax H3 参考生成视频」，清单 `minimax-h3-ref2v-balanced` / `-balanced-sol`） | 显式传 `tier="balanced"`（或在设置页把该档选成带加速实现） | 166.3s/镜（带加速 136.3s）vs 成片档 396.6s/镜（**省 58%**），画质明显优于 4 步 fast 档，帧锐度比 quality 还高约 13% |
+| **PDD 8 步蒸馏**（需自装第三方节点包 [ComfyUI-MiniMax-H3-PDD-Acc](https://github.com/Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc) + 权重 [aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI](https://huggingface.co/aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI)，Apache-2.0，Ref2VA/FL2VA 各 1.54GB） | **权重必须放 `ComfyUI/models/pdd_acc/`**；配置键 `models.h3PddRef2v` / `models.h3PddFl2v`（env `DSH_SVS_H3_PDD_REF2V` / `DSH_SVS_H3_PDD_FL2VA`）或 `assetOverrides.<id>.pdd`；在设置页选 PDD 组的策略条目（**默认不选**，`priority<0`） | **184.7s / i2v 178.8s 即达 20 步成片档以上细节**（锐度 +10.3% / +7.9%；噪声地板比 20 步更低）；叠加 Sol 后 137.3s / 134.1s。⚠️ 不能与 lightx2v 叠加、不能超 8 步、shift 固定 12/3、采样器必须 euler。详见 [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md) §9.9 |
 | **Sol-Attn 块稀疏注意力**（需自装第三方节点 [ComfyUI-SolAttn-Ampere](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere)，sm_80+，纯 `torch.compile(flex_attention)`，**不需要 nvcc**） | **不需要手动生成清单**：内置已带各档 `-sol` 实现（`node scripts/make-h3-variants.mjs` 从 `scripts/h3-templates/` 生成）；在设置页选「（有加速）」策略条目，或逐档下拉指定 | **A800 实测**：成片档收益最大（ref2v 1.27× / i2v 1.25×），balanced 1.23×；**fast / 480p 仅 1.03× 且高频细节 −13.8%，不要开**。详见 [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md) §9.8 |
 
 > **档位契约全文**：见 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md)（三层模型、受控三档、清单字段契约、策略投影、解析与错误语义、实施阶段与验收脚本）。
 
 > 内置清单**不**默认使用第三方 int8 VAE：它是社区实验件，通过配置或 `assetOverrides` 开启，符合"换模型=改配置/加清单"的设计。**`balanced`（8 步）与加速实现（`-sol`）已改为内置**：前者是正式档位之一；后者需自装第三方节点，**缺节点时该实现置灰不可用（不静默回退）**，并按上面「有加速」策略条目选用。
 
-**H3 加速选型与实测数据**：见 [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md)（LoRA 全家福、shift/steps/分辨率/base 四条硬约束、三档成本阶梯、PDD 不可用结论、剩余杠杆排序）。
+**H3 加速选型与实测数据**：见 [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md)（LoRA 全家福、shift/steps/分辨率/base 四条硬约束、三档成本阶梯、**PDD 复测与落地（§9.9）**、Sol-Attn 细则、剩余杠杆排序）。
 
 **全工作流 Benchmark（分辨率 × 档位 × LoRA × Sol 加速）**：见 [`docs/minimax-h3-video-benchmark.md`](docs/minimax-h3-video-benchmark.md) —— 速查结论表、token/成本模型（分辨率超线性 tokens^1.5、步数线性 `t≈19s+18.9s×步数`）、Sol 交叉点（768p 才值得，1.25–1.38×）、一条 60 镜短片的时间换算、陷阱与未测清单。取数脚本：`node e2e-out/bench.mjs`、`node e2e-out/inventory.mjs`。
 

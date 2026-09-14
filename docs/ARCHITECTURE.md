@@ -241,6 +241,8 @@ Agent 调用 comfy_generate_video(prompt, ref_nodes=[角色卡,场景卡], tier=
 | `schemas/workflow-manifest.schema.json` | manifest 权威 JSON Schema |
 | `skills/3d-animation-short-generator/` | 其中一种片型的生产流程 skill（自包含单文件 SKILL.md + meta.yaml）；插件对它零认知 |
 | `scripts/` | `mock-apply`（装配冒烟）、`smoke-manifest`（M1 图编译等价）、`smoke-render`（M2 纯逻辑）、`smoke-concat`（拼接图拓扑）、`probe-concat` / `probe-extract-frame`（实跑，需 ComfyUI）、`smoke-flux2` / `smoke-submit` / `e2e` / `e2e-comfy`（需 ComfyUI）、`import-comfy`（CLI 转换） |
+| `scripts/` 模板层（H3 一个 json = 一个档位实现） | `h3-templates/`（手写源）→ 三个生成器 → `workflows/`（产物，勿手改）：`make-h3-variants.mjs`（模板 → 单档清单，自动填 `requiresNodes`/`estSeconds`/`note`）、`make-pdd-template.mjs`（从同族 base 生成 PDD 模板，固定 6 处改动：model 直连 UNETLoader 不走 `$model` 哨兵、插 `MiniMaxH3PDDAccApply`、guider 改用其输出、删 `BasicScheduler`、`sigmas` 接该节点的 1 号输出、采样器强制 euler；shift 固定 12/3，`requiresNodes=['MiniMaxH3PDDAccApply']`，`priority=-30` 不做隐式默认）、`make-sol-attn-variant.mjs`（插 Sol 节点；`--after=<锚点>`，遇到 PDD 模板会自动锚定 PDD 节点、Sol id 改用 `2b`，避免与 Apply 节点的 `2a` 撞号） |
+| `scripts/bench-h3.mjs` + `e2e-out/{sharpness,noise-floor,frame-check,crop}.mjs` | 实测工具链：`bench-h3` 由**模板**直接组图跑真机并计时（两条臂只要 ref/seed/length/prompt 一致，差异即只来自配方；`--dry` 先核对配方）；`frame-check` 抽某帧、`sharpness` 比高频能量、`noise-floor` 比 16×16 分块梯度的低分位（**跨臂内容无关的噪声地板判据**：干净渲染里应有接近零的平坦块）。PDD 的"锐度高是细节还是颗粒"就是靠这一对指标判定的 |
 | `cordis.patch.yml` | bundle patch：插件行插入 web profile roster |
 | `docs/` | 设计文档（workflow-contract）、审查（architecture-review）、方案（consistency-optimization-plan）、实验（three-view-experiment） |
 

@@ -17,12 +17,12 @@
 |---|---|---|
 | fast 档 LoRA（ref2v） | **保持** `minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16`（shift 12/3） | 4 步、544p 训练域与 832×480 匹配、shift 与训练一致，实测 ~3.4× 加速 |
 | 成片档（quality） | **继续不挂 LoRA**，20 步纯 base（可选提到 25 步） | 4 步蒸馏在运动/音频上明确降质；成片不该用 4 步 |
-| 新增"平衡档"（可选） | **采用 lightx2v `ref2v_turbo_8step_v1.0_768p`（shift 6/3 + 分辨率上 768p）**；~~Alibaba PDD Acc-8Step~~ **实测不可用，已下架**（见 §9.4） | 8 步是官方 Studio 的可用配置；实测 175.8s/镜 vs 成片档 396.6s/镜（省 55.7%，2.25×） |
+| 新增"平衡档"（可选） | **采用 lightx2v `ref2v_turbo_8step_v1.0_768p`（shift 6/3 + 分辨率上 768p）**；~~Alibaba PDD Acc-8Step~~ 当时判为不可用（§9.4），**2026-09-09 晚已复测推翻 → PDD 可用且已落地为独立策略，见 §9.9** | 8 步是官方 Studio 的可用配置；实测 175.8s/镜 vs 成片档 396.6s/镜（省 55.7%，2.25×）。**PDD 8 步 184.7s/镜即可达到成片档以上细节量（§9.9）** |
 | i2v 路径 | **二选一**：保守（不动 base，fast 档沿用现有 LoRA）/ 正确（新增 fl2va pruned base + fl2v 系 LoRA，flush shift 6/3） | 现在 i2v 用 `ref2va` base 跑 `MiniMaxH3ImageToVideo`，属跨变体组合，拿不到 fl2v 系（v1.1/v1.2）的迭代红利 |
 | 明确不采用 | SLA 版 LoRA、w4a8、FP8 权重、t8star int8-convrot 变体、larryvrh 系 | SLA 依赖 sage2 稀疏算子；A800(sm_80) 无 FP8 硬件；后两者需专用 loader/采样器节点 |
 | 非 LoRA 加速优先级 | P0 int8_convrot VAE ✅已落地 → P1 Sol-Attn(Ampère) ✅**已实测：768p 1.23–1.33×，480p 1.03×**（§9.8） → P2 Sage Attention / First Block Cache → P3 TE-Speed / VDN | A800 无 nvcc，Sage 需 CUDA Toolkit 编译；Sol-Attn 纯 Triton JIT，实测可用但**只有 1.2–1.3×，不是翻倍** |
 
-**实测已完成（2026-09-09，A800 80GB，详见 §9）**：① int8 VAE ✅ 可用、与 fp16 像素等价、省 ~2s/镜且省 2.3GB 常驻；② i2v 换 `fl2va + fl2v LoRA` ✅ 可用、结构正常（+21GB 磁盘）；③ 新增平衡档 8 步 ✅ 175.8s/镜（成片档的 44.3%）；④ PDD Acc-8Step ❌ **在本机 ComfyUI 0.33.3 上不可用**（无 PDD loader，前向张量尺寸崩坏，与 shift 无关）；⑤ **Sol-Attn 块稀疏 ✅ 跑通**：**成片档 20 步 768p 最快**——ref2v 396.6s→311.2s（**1.27×**）、i2v 394.8s→314.7s（**1.25×**），高频细节持平（±2.5%）；8 步档 1.23×（tau1.2）～1.38×（tau2.0，已饱和）；**480p 仅 1.03× 且偏软（−13.8% 高频），不要开**。两个前提：**必须 `dense_first_percent=0`**（默认 0.2 在本栈上等于完全没开）、节点注册名是 `SolAttnMiniMaxH3`。已落地改动清单见 §9.6。
+**实测已完成（2026-09-09，A800 80GB，详见 §9）**：① int8 VAE ✅ 可用、与 fp16 像素等价、省 ~2s/镜且省 2.3GB 常驻；② i2v 换 `fl2va + fl2v LoRA` ✅ 可用、结构正常（+21GB 磁盘）；③ 新增平衡档 8 步 ✅ 175.8s/镜（成片档的 44.3%）；④ PDD Acc-8Step ❌ 当时结论：**在本机 ComfyUI 0.33.3 上不可用**（无 PDD loader，前向张量尺寸崩坏，与 shift 无关）——**已复测推翻：装上专用节点包 + 换预转换权重后跑通，见 §9.9**；⑤ **Sol-Attn 块稀疏 ✅ 跑通**：**成片档 20 步 768p 最快**——ref2v 396.6s→311.2s（**1.27×**）、i2v 394.8s→314.7s（**1.25×**），高频细节持平（±2.5%）；8 步档 1.23×（tau1.2）～1.38×（tau2.0，已饱和）；**480p 仅 1.03× 且偏软（−13.8% 高频），不要开**。两个前提：**必须 `dense_first_percent=0`**（默认 0.2 在本栈上等于完全没开）、节点注册名是 `SolAttnMiniMaxH3`。已落地改动清单见 §9.6。
 
 **最大的结构性坑**：`shift_video/shift_audio` 目前在 manifest 的 `graph` 里**硬编码为 12.0/3.0**（`node "2" MiniMaxH3SigmaShift`），既不是可注入参数、也不随质量档变化。而 **LoRA 与其训练 shift 必须配对**（544p 系=12/3，768p 系=6/3）。换任何 768p LoRA 而不改 shift，输出会结构性崩坏，而不是"略糊"。`modes` 当前只支持 `steps` / `loras` / `longSide`，无法表达"按档切 shift" —— 所以换档的正确姿势是**加一份新 workflow JSON**（符合插件"换模型=加一份 JSON"的设计主张），而不是改 JS。
 
@@ -104,7 +104,7 @@ H3 的视频与音频在同一个 forward 里生成。所以步数蒸馏的短�
 | 方案 | ComfyUI 原生可加载 | A800(sm_80, 无 FP8) 可用 | 与本项目 base 匹配 | 结论 |
 |---|---|---|---|---|
 | lightx2v fl2v/ref2v turbo（.comfy 版） | ✅ 普通 LoraLoaderModelOnly | ✅ | ✅（ref2v v0.1 ↔ ref2va base） | **生产可用** |
-| Alibaba PDD Acc-8Step（Kijai pruned_comfy） | ✅（需较新 ComfyUI） | ✅ | ✅（pruned 版 ↔ pruned base） | **候选生产** |
+| Alibaba PDD Acc-8Step（Kijai pruned_comfy） | ✅（需较新 ComfyUI） | ✅ | ✅（pruned 版 ↔ pruned base） | **候选生产** → 该 repack 格式不可用（§9.4），改用 aptech0081 预转换版 ✅ 已落地（§9.9） |
 | SLA 版 | ✅ | ⚠️ 无 sage2 稀疏路径 | ✅ | 实验 |
 | FastVideo FastH3 4-step | 半（VSA 节点生态） | ✅（有 int8_convrot 版） | 整模型替换 | 观察 |
 | t8star int8-convrot LoRA | ❌ 需专用 loader | ✅ | ✅ | 不采用 |
@@ -121,7 +121,7 @@ H3 的视频与音频在同一个 forward 里生成。所以步数蒸馏的短�
 |---|---|---|
 | 544p 系（fl2v 4step v0.1 / 8step v1.0、ref2v 4step v0.1） | 12 / 3 | `shift_video=12.0`, `shift_audio=3.0` |
 | 768p 系（fl2v 4step v1.0/v1.1/v1.2 768p、fl2v 8step v1.0 768p、ref2v 8step v1.0 768p） | 6 / 3 | `shift_video=6.0`, `shift_audio=3.0` |
-| PDD Acc-8Step | 未公开 | 需实测 |
+| PDD Acc-8Step | 未公开 | **已实测：8 步 184.7s / 叠 Sol 137.3s（§9.9）** |
 | SLA 4step | 6 / 3（官方配置 `video_flow_shift 6.0`） | 6 / 3 |
 
 ### 3.2 steps：4 步在舒适区之下，6–8 步才是锐度舒适区
@@ -219,7 +219,7 @@ H3 的视频与音频在同一个 forward 里生成。所以步数蒸馏的短�
 |---|---|---|---|---|---|
 | **fast**（调试/画布预览） | 4 | ref2va_pruned_int8 + `ref2v_turbo_4step_v0.1_comfyui` | 12 / 3 | longSide 832 | 现有行为，保持不变 |
 | **balanced**（新增，已落地） | 8 | ref2va_pruned_int8_convrot + `ref2v_turbo_8step_v1.0_768p_comfyui_bf16`（**实测采用**） | 6 / 3 | 1344×768（必须进 768p 训练域） | 长片批量出镜、成本敏感的成片；实测 175.8s/镜 |
-| ~~balanced-b（PDD）~~ | ~~8~~ | ~~`MiniMax-H3-Ref2VA-Acc-8Step_pruned_comfy`~~ | — | — | **实测不可用，清单已删除**（§9.4） |
+| ~~balanced-b（PDD）~~ | ~~8~~ | ~~`MiniMax-H3-Ref2VA-Acc-8Step_pruned_comfy`~~ | — | — | 旧清单已删除（§9.4）；**新清单 `minimax-h3-ref2v-pdd-balanced[-sol]` 已落地（§9.9）** |
 | **quality**（成片） | 20（可试 25） | 纯 base，无 LoRA | 12 / 3 | longSide 1344 | 现有行为；建议叠加 §6.3 |
 
 一致性纪律：**同一片的同一镜不要混档**（fast 调参、quality 出片是允许的；但 fast 抽的帧不能当最终画面）。若引入 balanced 档，必须整片统一用它，否则 LoRA 带来的风格/细节漂移会在拼接处暴露。
@@ -273,7 +273,7 @@ H3 的视频与音频在同一个 forward 里生成。所以步数蒸馏的短�
 
 1. ~~**先做零风险项**：int8 VAE + 开 Sage~~ → **int8 VAE 已完成（§9.1）**；**开 Sage 仍未做**，且是当前**最大剩余杠杆**（实测采样占单镜耗时 63%（480p）～94%（768p），见 §9.3）。
 2. ~~**再做 i2v 路线 A 的文档化**~~ → 已完成并直接走到路线 B1（§9.2），base 与 LoRA 均已切换为 fl2va/fl2v 配对。
-3. ~~**然后加 balanced 档**：优先试 PDD~~ → **已完成**：PDD 实测不可用（§9.4），balanced 档采用 `ref2v_turbo_8step_v1.0_768p` + shift 6/3 + 1344×768，清单 `workflows/minimax-h3-ref2v-8step.json`，实测 175.8s/镜（§9.3）。
+3. ~~**然后加 balanced 档**：优先试 PDD~~ → **已完成**：PDD 当时实测不可用（§9.4，**后于 §9.9 复测推翻**），balanced 档采用 `ref2v_turbo_8step_v1.0_768p` + shift 6/3 + 1344×768，清单 `minimax-h3-ref2v-balanced`，实测 175.8s/镜（§9.3）；PDD 另立独立组/独立策略（§9.9）。
 4. **最后做注意力稀疏**（Sol-Attn / FBC / Sage）：这两项的收益需要用真实生成自测（合成数据会高估），放在有稳定基线之后做 —— 现在基线已建立（§9.3 三档表）。
 5. ~~**路线 B（i2v 换 fl2va base）** 作为独立议题~~ → 已落地（§9.2），磁盘成本 +21GB 已由用户承担；剩余动作只是把它写进 README 的兼容性说明（§9.6）。
 
@@ -361,7 +361,7 @@ RuntimeError: The size of tensor a (32) must match the size of tensor b (1024)
 
 ### 9.5 修正后的建议（覆盖前文相应条目）
 
-1. **平衡档 = lightx2v `ref2v_turbo_8step_v1.0_768p` + shift 6/3 + 1344×768**，不要等 PDD。
+1. **平衡档 = lightx2v `ref2v_turbo_8step_v1.0_768p` + shift 6/3 + 1344×768**（已落地）。~~不要等 PDD~~ → **PDD 已可用并作为独立策略并存（§9.9）**：要成片档画质且能等 ~185s 就选 PDD，要更快就还用它。
 2. **int8 VAE 常开**（省 2.3GB 显存比省 2s 更值）。
 3. **i2v 已切 fl2va/fl2v**，README 需补 +21GB 兼容性说明。
 4. **剩余最大杠杆是注意力内核，但它的量级是 +20~30%，不是翻倍**：采样占 63%（480p）～94%（768p）的端到端耗时，所以注意力仍是最后能抠的地方；但 **Sol-Attn 实测只有 1.23–1.33×（768p，§9.8）**，而不是"SDPA→稀疏"的名义 2×+。Sage 在本机（A800 + torch 2.15.dev + py3.14）需要源码编译（无 nvcc 就不行），且**与 Sol-Attn 互斥**，所以现实选择是：**要么 Sol-Attn（已通、1.2–1.3×），要么装 CUDA Toolkit 后编 Sage**。再往上要提速就只剩"降档"（步数/分辨率，成本 ∝ token²·步数）。
@@ -374,7 +374,7 @@ RuntimeError: The size of tensor a (32) must match the size of tensor b (1024)
 | 新清单 | `workflows/minimax-h3-ref2v-8step.json` | 平衡档：8 步 / euler / shift 6/3 / longSide 1344 / `ref2v_8step_v1.0_768p` LoRA |
 | 改清单 | `workflows/minimax-h3-i2v.json` | unet → `minimax_h3_fl2va_pruned_int8_convrot`（env `DSH_SVS_H3_MODEL_FL`）；fast_lora → `minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy`（env `DSH_SVS_H3_LORA_FL_FAST`）；shift 保持 12/3；描述补"base/LoRA 配对"铁律 |
 | 改引擎 | `lib/index.js` | **修掉一个会让上述改动失效的坑**：`LEGACY_MODEL_ASSET_MAP['minimax-h3-i2v']` 原先复用 ref2v 的 `h3RefUnet`/`h3FastLora` → 配置里有这两个旧键的用户，i2v 的 base 会被**静默改回 ref2va**（跨变体错配复现）。现改为独立的 `h3FlUnet`/`h3FlFastLora`（`getCfg().models` 新增两键，env `DSH_SVS_H3_MODEL_FL` / `DSH_SVS_H3_LORA_FL_FAST`），并把 legacy 兜底 builder `buildH3ImageToVideoWorkflow` 同步到 fl2va/fl2v。**此改动需重启插件进程才生效** |
-| 删清单 | ~~`workflows/minimax-h3-ref2v-acc8.json`~~ | PDD 不可用，下架 |
+| 删清单 | ~~`workflows/minimax-h3-ref2v-acc8.json`~~ | PDD 不可用，下架（后由 §9.9 的 PDD 清单取代） |
 | 本机配置 | `~/.dsh/dsh-short-video-studio.json` | `models.h3VideoVae` → int8_convrot；4 个 `assetOverrides`（3 个 ref2v 档挂 int8 VAE + i2v 的 fl2va/fl2v/int8VAE）；`preferred` pin 住两能力的默认档 |
 | 备份 | `e2e-out/config-backup-before-h3-accel.json` | 改动前配置，回滚用 |
 | 工具 | `e2e-out/hist.mjs` / `logs.mjs` / `pngdiff.mjs` | 历史耗时归因 / 服务端日志提取 / 零依赖 PNG 像素 diff |
@@ -535,6 +535,52 @@ node scripts/make-sol-attn-variant.mjs --tau 1.5  # 换 tau 再生成
 
 ---
 
+### 9.9 PDD 复测（2026-09-09 晚，同机）——✅ **推翻 §9.4 的"不可用"结论：已跑通并落地为每能力独立策略**
+
+**§9.4 错在哪（两处，都不是"PDD 本身不行"）**：① 当时本机**没有 PDD 专用节点包**（`object_info` 里查不到任何 PDD/Acc 节点）——PDD 不是普通 LoRA，必须由专用节点安装 head bank；② 手上那份权重是 [Kijai/MiniMax-H3-experimental](https://huggingface.co/Kijai/MiniMax-H3-experimental) 的**第三种重打包格式**（head bank 表达为 pad-and-add `reshape_weight`，面向普通 LoRA loader），既不满足 PDD 节点的加载条件（0/4 个必需顶层键），也正是当年"普通 loader 强行 patch → final_layer 32 vs 1024 崩坏"的根因。**两者都不是 shift 的问题** ✓（§9.4 这一句判断仍然成立）。
+
+**这次具备的条件**：节点包 [Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc](https://github.com/Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc) 已装（`MiniMaxH3PDDAccApply` / `...Scheduler` / `...WarmupScheduler` / `MiniMaxH3AVLatentUpscaleBy` 共 4 个类，ComfyUI 0.33.3 ≥ 其要求的 0.33.0）；权重改用 [aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI](https://huggingface.co/aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI) 的预转换版（Ref2VA / FL2VA 各 1.54GB，**放 `models/pdd_acc/`**——节点只从该目录取文件，放 `models/loras/` 会被 `LoraLoader` 系列看见但 Apply 节点的下拉里没有）。
+
+**实测配方（已被本插件模板固化，与节点包 README 逐条一致）**：
+`UNETLoader → MiniMaxH3SigmaShift(12/3) → MiniMaxH3PDDAccApply → BasicGuider(CFG 1.0)`，采样器 **euler**，sigmas = **Apply 节点的 1 号输出**（训练网格），强度 1.0，`nfe=8`，`on_off_grid=error` / `partition_check=error`（fail-closed，不静默降级）；**不叠任何其它蒸馏 LoRA**（lightx2v 系必须摘掉）、不叠 step-caching；base 与权重严格同族（节点有 trunk/head 指纹守卫，ref2va↔ref2va、fl2va↔fl2va，bf16 与 **int8-convrot pruned** base 都可用——本机用的就是 pruned int8_convrot）。
+
+**实测（A800 80GB · 同参考图/同 prompt/同 seed 42424242 · 1344×768 · 124 帧）**
+
+| 臂 | 配方 | 耗时 | 帧 60 锐度 mean\|∇\| | 噪声地板 p05 |
+|---|---|---|---|---|
+| 参照 | 20 步无蒸馏（成片档） | 394.4s | 7.243 | 0.131 |
+| **PDD** | **nfe=8** · shift 12/3 · euler · 无蒸馏 LoRA | **184.7s** | **7.986（比成片档 +10.3%）** | **0.077（比成片档更低）** |
+| PDD + Sol | 同上再叠 Sol-Attn tau1.2 | **137.3s（1.35×）** | 7.141（−1.4%，与成片档持平） | 0.064 |
+| 对照 | lightx2v 8 步 768p（现有 balanced） | 170.4s | 5.630（比成片档 −22.3%） | 0.013 |
+
+**i2v（FL2VA）侧同条件（同首帧 / 同 prompt / 同 seed，fp16 VAE）**
+
+| 臂 | 配方 | 耗时 | 帧锐度 mean\|∇\| | 噪声地板 p05 |
+|---|---|---|---|---|
+| 参照 | 20 步无蒸馏（成片档） | 392.4s | 8.137 | 0.528 |
+| **PDD** | **nfe=8** · shift 12/3 · euler | **178.8s** | **8.778（比成片档 +7.9%）** | **0.403（更低）** |
+| PDD + Sol | + Sol-Attn tau1.2 | **134.1s（1.33×）** | 7.622（比成片档 −6.3%） | 0.463 |
+| 对照 | lightx2v 8 步 768p（现有 balanced，生产路径 int8 VAE） | 177.3s | 8.648 | — |
+
+**读法**：8 步的 PDD 把细节量做到**成片档之上**，而现有 lightx2v 8 步是过平滑（ref2v 侧比成片档 −22%）；PDD 的噪声地板比 20 步**更低** ⇒ 多出来的高频是细节而非颗粒。叠加 Sol 后细节回落到与成片档持平（ref2v −1.4% / i2v −6.3%），换来 1.35× —— 即"137s 买成片档画质"（对 20 步是 **2.9×**）。
+
+**⚠️ 收益按能力不同（"每能力独立策略"的实证依据）**
+
+| 能力 | PDD 8 步 vs **成片档 20 步** | PDD 8 步 vs **现有 balanced（lightx2v 8 步）** | 因此 PDD 的定位 |
+|---|---|---|---|
+| ref2v | **+10.3%** 细节（且噪声地板更低） | **+42%** 细节（7.986 vs 5.630） | **现有 balanced 的全面升级**（同 8 步、画质越档） |
+| i2v | **+7.9%** 细节 | 仅 **+1.5%**（8.778 vs 8.648） | **成片档的廉价替代**（对比对象是 20 步，不是 balanced） |
+
+原因：i2v 的 768p fl2v LoRA 本身训练得更到位，8 步已经不错；ref2v 的 768p LoRA 偏弱，才让 PDD 的优势显得巨大。**结论不能跨能力外推**——这正是分能力独立策略的价值。
+
+**落位（本插件）**：**每个能力各自一个独立组/独立策略**（`minimax-h3-ref2v-pdd` / `minimax-h3-i2v-pdd`），组内两条策略 = **不带 Sol / 带 Sol**（沿用既有"无加速/有加速"投影，用户自由组合）。`priority: -30` ⇒ **不做隐式默认**：PDD 依赖第三方节点，必须用户在设置页显式选择；缺节点时矩阵如实置灰（不静默回退、不假装可用）。档位目前只提供 `balanced`（nfe=8，已实测）；`nfe=4`（官方允许）与"两段式超分"（`MiniMaxH3AVLatentUpscaleBy`，节点包自带、纯 resize）**未测**，需要时再补档位。
+
+**复核命令**：`node scripts/bench-h3.mjs --template=minimax-h3-pdd-ref2v --mode=balanced --ref-input=<图>`（先 `--dry` 核对配方）；结构不变量由 `verify-h3-variants` 断言（nfe↔档位步数、fail-closed 标志、无调度器、无蒸馏 LoRA、base/权重同族），档位契约由 `smoke-tier-resolution` 断言（独立组、两条策略、不隐式默认、缺节点置灰）。
+
+**残留风险**：① PDD 依赖第三方节点 + 第三方重打包权重（权重 Apache-2.0，节点包非官方）；② 画质结论来自单帧/单 seed，未做多镜头一致性验证；③ 不能与 lightx2v 叠加，也不能超过 8 步；④ 块长只能 4 或 8（越界节点直接拒绝，不静默）。
+
+---
+
 ## 10. 参考链接
 
 **模型与权重**
@@ -542,7 +588,9 @@ node scripts/make-sol-attn-variant.mjs --tau 1.5  # 换 tau 再生成
 - [MiniMaxAI/MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3)（官方权重与 prompt 写作指南）
 - [lightx2v/Minimax-h3-Turbo](https://huggingface.co/lightx2v/Minimax-h3-Turbo)（Turbo LoRA 全家族；discussion [#52](https://huggingface.co/lightx2v/Minimax-h3-Turbo/discussions/52) = v1.2 发布）
 - [lightx2v/Minimax-h3-Turbo-SLA](https://huggingface.co/lightx2v/Minimax-h3-Turbo-SLA)
-- [alibaba-pai/MiniMax-H3-Acc-LoRAs](https://huggingface.co/alibaba-pai/MiniMax-H3-Acc-LoRAs)（PDD 8 步官方加速 LoRA）
+- [alibaba-pai/MiniMax-H3-Acc-LoRAs](https://huggingface.co/alibaba-pai/MiniMax-H3-Acc-LoRAs)（PDD 8 步官方加速 LoRA，原始格式）
+- [aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI](https://huggingface.co/aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI)（ComfyUI 键名预转换版，**本插件采用**；Apache-2.0）
+- [Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc](https://github.com/Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc)（PDD 专用节点包，提供 `MiniMaxH3PDDAccApply` 等）
 - [Kijai/MiniMax-H3-experimental](https://huggingface.co/Kijai/MiniMax-H3-experimental)（Acc-8Step 的 comfy/pruned 转换、int8_convrot VAE、w4a8、FastVideo int8 版）
 - [ModelTC/Minimax-H3-Turbo](https://github.com/ModelTC/Minimax-H3-Turbo)（模型规格表：训练分辨率/训练 shift/NFE；ComfyUI 与 Diffusers 推理说明）
 - [wildminder/awesome-minimax-H3](https://github.com/wildminder/awesome-minimax-H3)（LoRA 全景索引、低秩压缩、量化、节点生态）
