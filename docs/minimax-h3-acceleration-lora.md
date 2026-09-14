@@ -355,6 +355,8 @@ RuntimeError: The size of tensor a (32) must match the size of tensor b (1024)
 
 崩点在**模型前向的 final_layer 双输出**（video_out / audio_out），不在采样调度 → **与 shift 12/3 或 6/3 无关**，改 shift 救不回来。且本机 `object_info` 中**不存在任何 PDD/Acc 专用 loader 节点**（只有通用 `LoraLoaderModelOnly` 等）——PDD 需要专用加载/推理路径（Diffusers `apply_pdd_lora`，或等 Comfy-Org/ComfyUI 官方支持）。
 
+**2026 复核（读 safetensors 明文头，未下载整文件）**：本机保留的那个权重来自 [Kijai/MiniMax-H3-experimental](https://huggingface.co/Kijai/MiniMax-H3-experimental)，是**第三种**重打包格式——head bank 被表达为「相对 base 的 pad-and-add `reshape_weight` LoRA」（键名 `diffusion_model.final_layer.{video_out,audio_out}.*.reshape_weight`、`blocks.N.adaln_proj.linear.diff_b`），面向**普通 LoRA loader**。因此它**既**解释了当初普通 loader 为何在 final_layer 崩（键被强行 patch、语义不对 → `resizing Lora — force loading` 后 32 vs 1024），**也**意味着它不满足 PDD 专用节点的加载条件（节点要求 4 个顶层键 `proj_out.weight/bias`、`audio_proj_out.weight/bias`，该文件 0/4 存在）。要用 PDD 节点须改用 [aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI](https://huggingface.co/aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI) 的预转换版（`minimax_h3_{ref2va,fl2va}_pdd_acc_8step_comfyui.safetensors`，各 1.54GB）：实测 4/4 头键（`proj_out.weight [32,96,5376]`）+ 774/774 键合规，**双门通过**。节点侧目录机制见 `nodes.py`：`add_model_folder_path("pdd_acc", models/pdd_acc)` + `get_filename_list("pdd_acc")` 下拉 + `get_full_path_or_raise`，即文件**必须**放在 `models/pdd_acc/`。
+
 **动作**：候选清单 `workflows/minimax-h3-ref2v-acc8.json` **已删除**（避免被误选而烧掉一次 3 分钟渲染）；权重 `MiniMax-H3-Ref2VA-Acc-8Step_pruned_comfy.safetensors`（1.73GB）**保留在服务器**备查。若日后 ComfyUI 支持 PDD，恢复成本 = 一个 JSON + 一次登记。
 
 ### 9.5 修正后的建议（覆盖前文相应条目）
