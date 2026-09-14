@@ -384,6 +384,34 @@ node scripts/import-comfy.mjs exported.json \
 
 ---
 
+## 更新日志
+
+> 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
+
+### v1.2.0 — 档位契约 · 策略模型 · PDD 8 步（2026-09-14）
+
+**✨ 新增 / 改进**
+
+- **受控三档 `tier`（`fast` / `balanced` / `quality`）**：一个工作流 json = 一个档位实现，`comfy_generate_video(tier=…)` / `comfy_render(tier=…)`；旧参数 `mode=` 保留为兼容别名。请求**不存在的档位显式报错并列出可用档位**（不静默换档）；分辨率＝清单声明的长边 × 画布比例推导。
+- **视频清单从 2 份扩到 18 份**：参考生成（ref2v）与首末帧生成（i2v）各有 `fast` / `balanced` / `balanced-sol` / `quality` / `quality-sol`，外加每条能力的抽帧与内部诊断清单——档位与加速实现可以按能力自由组合。
+- **策略＝每能力一条内置默认 + 你自己命名并组合的策略**：设置页「＋ 新增策略」起名 + 逐档挑实现（**挑 ≥1 档即可**，可跨清单组合），支持重命名 / **编辑档位** / 删除。**策略声明它提供哪些档位**：没挑的档位在设置页逐档区与工具条都不出现，**显式**请求会报错（不回退到别的实现），**不指定档位**时按该策略自身最靠前的档解析。
+- **PDD 8 步蒸馏（可选，需自装第三方节点包与权重）**：`nfe=8` 就拿到成片档以上的细节量——ref2v **184.7s**、i2v **178.8s**（同条件 20 步成片档 394.4s / 392.4s，帧锐度还高 +10.3% / +7.9%），叠加 Sol-Attn 后 **137.3s / 134.1s**。落地为四个普通清单，**不做隐式默认**（`priority<0`，缺节点时如实置灰）。
+- **设置页能力×档位矩阵**：逐档下拉按家族分组、带实测耗时与「缺哪个节点」标记，不可用实现置灰；策略单选 + 策略管理（新增/重命名/编辑档位/删除）。
+- **i2v 改用 FL2VA base**（修正原先"用 Ref2VA base 跑 i2v"的跨变体错配），新增独立配置键 `models.h3FlUnet` / `models.h3FlFastLora`（env `DSH_SVS_H3_MODEL_FL` / `DSH_SVS_H3_LORA_FL_FAST`），旧键只作用于 ref2v。
+
+**⚠️ 升级须知**
+
+- 旧视频清单 id `minimax-h3-ref2v` / `minimax-h3-i2v` 已拆成上表里的单档清单；配置中指向旧 id 的 `preferred` **不再决定视频档位**（改由 `tiers` / 策略决定），但旧 **asset id 仍按继承规则生效**（`assetOverrides` 不必改）。
+- i2v 换 base 需额外下载 FL2VA 权重（+21GB 左右）；不想多下可用配置钉回旧组合，见下方「版本兼容」。
+- 视频默认档是 **`quality`（20 步，最慢最贵）**，技能与手工调用建议显式传 `tier=`。
+- 新的策略模型要**重启插件**（或导入/删除任意清单触发注册表重载）后才会出现在设置页。
+
+**📝 文档**
+
+- 新增 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md)（档位/策略契约全文，含"策略声明它提供哪些档位"的解析语义）与 [`docs/minimax-h3-video-benchmark.md`](docs/minimax-h3-video-benchmark.md)（A/B 实测）；[`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md) §9.9 收录 PDD 复核（含先前"不可用"结论及其两个成因的更正）。
+
+---
+
 ## 发布新版本（维护者）
 
 npm 包由 GitHub Actions 自动发布（推送 `v*` tag 触发，见 `.github/workflows/npm-publish.yml`；发布前自动跑冒烟自检并带 provenance 供应链签名），并在 npm 发版成功后**自动为同一 tag 生成 GitHub Release**——变更摘要取「上一个 tag → 本 tag」的提交，按 **✨ 新增/改进 · 🐛 修复 · 📝 文档/其它** 自动归类，打开 Releases 页即可看到每版新增的功能。前提：仓库已配置 `NPM_TOKEN` secret（npmjs.com → Access Tokens → Automation 类型）与 `GITHUB_TOKEN`（Actions 内置，无需配置）。
