@@ -219,7 +219,7 @@ H3 的视频与音频在同一个 forward 里生成。所以步数蒸馏的短�
 |---|---|---|---|---|---|
 | **fast**（调试/画布预览） | 4 | ref2va_pruned_int8 + `ref2v_turbo_4step_v0.1_comfyui` | 12 / 3 | longSide 832 | 现有行为，保持不变 |
 | **balanced**（新增，已落地） | 8 | ref2va_pruned_int8_convrot + `ref2v_turbo_8step_v1.0_768p_comfyui_bf16`（**实测采用**） | 6 / 3 | 1344×768（必须进 768p 训练域） | 长片批量出镜、成本敏感的成片；实测 175.8s/镜 |
-| ~~balanced-b（PDD）~~ | ~~8~~ | ~~`MiniMax-H3-Ref2VA-Acc-8Step_pruned_comfy`~~ | — | — | 旧清单已删除（§9.4）；**新清单 `minimax-h3-ref2v-pdd-balanced[-sol]` 已落地（§9.9）** |
+| ~~balanced-b（PDD）~~ | ~~8~~ | ~~`MiniMax-H3-Ref2VA-Acc-8Step_pruned_comfy`~~ | — | — | 旧清单已删除（§9.4）；**新清单 `minimax-h3-ref2v-balanced-pdd[-sol]` 已落地（§9.9）** |
 | **quality**（成片） | 20（可试 25） | 纯 base，无 LoRA | 12 / 3 | longSide 1344 | 现有行为；建议叠加 §6.3 |
 
 一致性纪律：**同一片的同一镜不要混档**（fast 调参、quality 出片是允许的；但 fast 抽的帧不能当最终画面）。若引入 balanced 档，必须整片统一用它，否则 LoRA 带来的风格/细节漂移会在拼接处暴露。
@@ -573,7 +573,7 @@ node scripts/make-sol-attn-variant.mjs --tau 1.5  # 换 tau 再生成
 
 原因：i2v 的 768p fl2v LoRA 本身训练得更到位，8 步已经不错；ref2v 的 768p LoRA 偏弱，才让 PDD 的优势显得巨大。**结论不能跨能力外推**——这正是分能力独立策略的价值。
 
-**落位（本插件）**：**每个能力各自一个独立组/独立策略**（`minimax-h3-ref2v-pdd` / `minimax-h3-i2v-pdd`），组内两条策略 = **不带 Sol / 带 Sol**（沿用既有"无加速/有加速"投影，用户自由组合）。`priority: -30` ⇒ **不做隐式默认**：PDD 依赖第三方节点，必须用户在设置页显式选择；缺节点时矩阵如实置灰（不静默回退、不假装可用）。档位目前只提供 `balanced`（nfe=8，已实测）；`nfe=4`（官方允许）与"两段式超分"（`MiniMaxH3AVLatentUpscaleBy`，节点包自带、纯 resize）**未测**，需要时再补档位。
+**落位（本插件）**：**四个普通清单**（`minimax-h3-{ref2v,i2v}-balanced-pdd[-sol]`），与 lightx2v / Sol 那些实现并列在同一个家族组里；**不再自动生成"（PDD 蒸馏）"策略条目**——策略由用户在配置页「新增策略」里自行组合并命名（内置默认只有一条 = 跟随注册表首选）。`priority: -30` ⇒ **不做隐式默认**：PDD 依赖第三方节点，必须用户在设置页显式选择；缺节点时矩阵如实置灰（不静默回退、不假装可用）。档位目前只提供 `balanced`（nfe=8，已实测）；`nfe=4`（官方允许）与"两段式超分"（`MiniMaxH3AVLatentUpscaleBy`，节点包自带、纯 resize）**未测**，需要时再补档位。
 
 **复核命令**：`node scripts/bench-h3.mjs --template=minimax-h3-pdd-ref2v --mode=balanced --ref-input=<图>`（先 `--dry` 核对配方）；结构不变量由 `verify-h3-variants` 断言（nfe↔档位步数、fail-closed 标志、无调度器、无蒸馏 LoRA、base/权重同族），档位契约由 `smoke-tier-resolution` 断言（独立组、两条策略、不隐式默认、缺节点置灰）。
 
