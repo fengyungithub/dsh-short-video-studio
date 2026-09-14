@@ -390,6 +390,11 @@ node scripts/import-comfy.mjs exported.json \
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
 
+### v1.2.1 — 文档（2026-09-14）
+
+- 公开文档不再点名测试机器（README / skill / docs 一致），耗时数字保留但注明**只作量级参考**、随硬件与版本浮动；docs 里的实验报告改按架构描述（sm_80 单卡），技术前提（架构、无 FP8 路径、无 nvcc）全部保留。
+- 这一版是**纯文档版本**：为了让 npm 页面渲染到清理后的 README 而发布。
+
 ### v1.2.0 — 档位契约 · 策略模型 · PDD 8 步（2026-09-14）
 
 **✨ 新增 / 改进**
