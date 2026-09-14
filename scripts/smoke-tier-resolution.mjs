@@ -192,6 +192,43 @@ console.log('\n[7] 策略：一条内置默认 + 用户自建（命名）')
   eq('缺 id 自动补 id', typeof norm[0].id === 'string' && norm[0].id.length > 0, true)
   ok('未知档位键不会被当成档位使用（解析层只认受控三档）', !['fast', 'balanced', 'quality'].includes('bogus'))
 
+  // 部分档位策略：只挑 1 个档位也成立，不必凑满三档。
+  // 语义：没挑的档位**不属于这条策略**（≠ 跟随注册表首选）→ 请求该档位必须显式报错。
+  const oneCfg = {
+    tiers: { [R]: { balanced: 'demo-balanced-sol' } },
+    strategies: { [R]: [{ id: 'one', name: '只要 balanced', tiers: { balanced: 'demo-balanced-sol' } }] },
+    strategyOf: { [R]: 'one' },
+  }
+  const oneProj = projectCapabilityStrategies(registry, R, oneCfg)
+  eq('只有 1 个档位的策略也入列', oneProj.length, 2)
+  eq('它的 tiers 只有那一个档位（不补齐三档）', Object.keys(oneProj[1].tiers).join(','), 'balanced')
+  eq('1 档策略也能被点亮', oneProj[1].selected, true)
+  eq('1 档策略的可用性只看它挑了的那档', oneProj[1].available, true)
+  const rBal = await resolveTieredManifest(R, 'balanced', null, { registry, probe: SOL_PRESENT, selection: oneCfg.tiers[R], cfg: oneCfg })
+  eq('挑了的档位用用户选择', rBal.manifest.id, 'demo-balanced-sol')
+  // 策略没有的档位：显式报错（不静默回退到 fast 的默认实现）
+  let errFast = null
+  try { await resolveTieredManifest(R, 'fast', null, { registry, probe: SOL_PRESENT, selection: oneCfg.tiers[R], cfg: oneCfg }) } catch (e) { errFast = e }
+  ok('策略不含的档位 → 显式报错', Boolean(errFast), errFast ? '' : '居然解析成功了')
+  ok('报错说明是"策略只提供哪些档位"', /只提供 balanced 档，没有 fast 档/.test(String(errFast && errFast.message)), String(errFast && errFast.message).slice(0, 90))
+  ok('报错给出补救路径（改档位/加档/改选内置默认/显式 workflow）',
+    /改请求档位|内置默认|workflow=/.test(String(errFast && errFast.message)))
+  // 手写的逐档快照（没有策略上下文）不受此限：仍是"未选档位跟随注册表首选"
+  const rFastLoose = await resolveTieredManifest(R, 'fast', null, { registry, probe: SOL_PRESENT, selection: oneCfg.tiers[R], cfg: { tiers: oneCfg.tiers } })
+  eq('手写快照（无策略）仍按注册表首选解析', rFastLoose.manifest.id, 'demo-fast')
+  // 内置默认策略：三档都在，不受限
+  const rFastDefault = await resolveTieredManifest(R, 'fast', null, { registry, probe: SOL_PRESENT, selection: {}, cfg: { strategyOf: { [R]: '__default' } } })
+  eq('内置默认策略三档齐备', rFastDefault.manifest.id, 'demo-fast')
+  // 矩阵里给出"当前策略提供哪些档位"（工具条据此收敛）
+  const oneMatrix = await describeTierMatrix(registry, { probe: SOL_PRESENT, cfg: oneCfg })
+  eq('矩阵暴露当前策略提供的档位', (oneMatrix[R].availableTiers || []).join(','), 'balanced')
+  const defMatrix = await describeTierMatrix(registry, { probe: SOL_PRESENT, cfg: { strategyOf: { [R]: '__default' } } })
+  eq('内置默认 → availableTiers 为 null（＝各实现并集）', defMatrix[R].availableTiers, null)
+  // 2 个档位同理
+  const twoCfg = { strategies: { [R]: [{ id: 'two', name: '两档', tiers: { fast: 'demo-fast', quality: 'demo-quality-sol' } }] } }
+  const twoProj = projectCapabilityStrategies(registry, R, twoCfg)
+  eq('2 个档位的策略同样成立', Object.keys(twoProj[1].tiers).sort().join(','), 'fast,quality')
+
   // 消歧：用户策略与默认组合完全相同时，不能两条都点亮
   const sameCfg = { strategies: { [R]: [{ id: 'dup', name: '等于默认', tiers: { fast: 'demo-fast', balanced: 'demo-balanced', quality: 'demo-quality' } }] } }
   const dupAll = projectCapabilityStrategies(registry, R, sameCfg)

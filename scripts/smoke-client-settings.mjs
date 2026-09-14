@@ -78,7 +78,8 @@ console.log('\n[1] 设置页渲染（真实 /api/workflows 形状数据）')
   ok('顶部说明讲清策略＝一套档位组合', text.includes('策略＝一套档位组合'))
   ok('有「新增策略」入口', text.includes('新增策略'))
   // 摘要用短 id（长 id 会撑破下拉框宽度——这是配置页溢出的根因，故断言保持紧凑）
-  ok('策略摘要列出逐档实现（短 id）', /fast → fast/.test(text) && /balanced → balanced/.test(text))
+  ok('策略摘要列出该策略提供的档位（短 id）', /fast → fast/.test(text) && /balanced → balanced/.test(text))
+  ok('摘要只列策略自己提供的档位（不写"→ 默认"凑数）', !/→ 默认/.test(text))
   ok('策略摘要按档位顺序（fast → balanced → quality）',
     text.indexOf('fast → fast') < text.indexOf('balanced → balanced'))
   ok('策略摘要不含长 id 前缀', !text.includes('→ minimax-h3-ref2v-fast'))
@@ -290,6 +291,41 @@ console.log('\n[6] 策略：内置默认 / 用户自建 / 新增（命名 + 自�
       ok('每档下拉按组分类（跨组自由组合）', optgroups.includes('甲族') && optgroups.includes('乙族'), optgroups.join(','))
       const saveBtn = findAll(tree2, (n) => n.type === 'button' && String(textOf(n)).includes('保存并选用'))
       ok('同一时刻只展开一个新增表单（保存并选用按钮唯一）', saveBtn.length === 1, `实际 ${saveBtn.length}`)
+      ok('表单说明"只挑你关心的档位就行（≥1）"', textOf(tree2).includes('只挑你关心的档位就行'))
+      ok('未挑的档位写明"不属于这条策略"（不是跟随默认）',
+        textOf(tree2).includes('不选＝这条策略不含这一档') && textOf(tree2).includes('没挑的档位不属于这条策略'))
+
+      // ④ 只挑 1 个档位也能存（不必凑三档）；存下来的就是被挑中的那几个
+      const posts2 = []
+      global.fetch = async (url, opts2) => {
+        const isCfg = String(url).includes('/api/config')
+        if (isCfg && opts2 && opts2.method === 'POST') posts2.push(JSON.parse(opts2.body))
+        return { ok: true, json: async () => (isCfg ? { ok: true, config: cfg0 } : payload) }
+      }
+      resetHooks()
+      let t3 = await renderStable(settingsComponent, {})
+      await findAll(t3, (n) => n.type === 'button' && String(textOf(n)).includes('新增策略'))[0].props.onClick({ target: {} })
+      await new Promise((r) => setImmediate(r))
+      t3 = await renderStable(settingsComponent, {})
+      const nameIn = findAll(t3, (n) => n.type === 'input' && String(n.props.placeholder || '').includes('例如'))[0]
+      await nameIn.props.onChange({ target: { value: '只要一档' } })
+      await new Promise((r) => setImmediate(r))
+      t3 = await renderStable(settingsComponent, {})
+      // 找到该能力的新增表单里 balanced 那一档的下拉（表单在策略区之后，取最后一个匹配）
+      const formSelects = findAll(t3, (n) => n.type === 'select').filter((sel) => findAll(sel, (o) => String(o.props.children || '').includes('不选＝这条策略不含这一档')).length > 0)
+      ok('新增表单每档一个下拉（可留空）', formSelects.length >= 3, `实际 ${formSelects.length}`)
+      await formSelects[1].props.onChange({ target: { value: 'grpB-balanced-sol' } })
+      await new Promise((r) => setImmediate(r))
+      t3 = await renderStable(settingsComponent, {})
+      const saveBtn2 = findAll(t3, (n) => n.type === 'button' && String(textOf(n)).includes('保存并选用'))[0]
+      await saveBtn2.props.onClick({ target: {} })
+      await new Promise((r) => setImmediate(r))
+      const lastPost = posts2[posts2.length - 1] || {}
+      const savedList = (lastPost.strategies || {})['video.multi'] || []
+      const saved = savedList[savedList.length - 1] || {}
+      eq('只挑一个档位即可保存', saved.name, '只要一档')
+      eq('存下来的就只有被挑中的那一档（不凑三档）', Object.keys(saved.tiers || {}).join(','), 'balanced')
+      eq('档位快照也只写被挑中的档', Object.keys(lastPost.tiers?.['video.multi'] || {}).join(','), 'balanced')
     }
   }
 }
