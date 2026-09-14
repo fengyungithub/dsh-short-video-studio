@@ -85,21 +85,17 @@ Read `references/ref-en.txt` for label rules, retention analysis, and complete e
 ## 与片型 skill 的边界
 
 - 本 skill 输出 **H3 结构核心**（六段式 / 三段式 + 对齐指令 + `<d>` 对白）。
-- **风格锁、字幕烧录指令、负向意图**由片型 skill 在本输出之后拼接，不归本 skill（见 `references/studio-mapping.md` §4）。
+- **风格锁、负向意图**由片型 skill 在本输出之后拼接，不归本 skill（见 `references/studio-mapping.md` §4）。
+- **字幕与画面内文案的写法归本 skill**（见下节「字幕与画面内文案（唯一权威版）」）：片型 skill 不做定义、不复述、不追加末尾字幕指令，只提供镜头表 `字幕` / `画面文案` 字段数据与逐镜自检门。
 
-## 字幕（唯一权威版）
+## 字幕与画面内文案（唯一权威版）
 
-> 本节是字幕写法的**唯一权威来源**：片型 skill（3d-animation / brand-promo）只引用本节，不另立简化版——简化版漏掉限定词是已知缺陷（生成时字幕整段不烧）。实测矩阵与失败样本见 `references/studio-mapping.md` §5。
-
-### 0. 前置：档位不是硬规则
-
-**每一档都可以要求出字幕，没有任何档位硬规则。** 是否带字幕只取决于用户 / 脚本需求；用户可以自由选择升档路线（`fast`→`balanced`、`fast`→`quality`、`balanced`→`quality` 都允许）。
-
-字幕是**文字质量问题**，不是档位门槛：用逐镜自检门（抽说话窗帧核对字幕）发现问题，再把「升档重渲该镜 / 改短句 / 拆镜」作为选项交给用户，**不强制升档**。
+> 本节是字幕 / 画面内文案写法的**唯一权威来源**：片型 skill（3d-animation / brand-promo）只**引用**本节——不另立简化版（简化版漏掉限定词是已知缺陷 → 字幕整段不烧），也**不在别处定义任何字幕策略**。
+> **适用面**：任何解析到「声明支持字幕」的实现的镜头（当前 = `minimax-h3-*` 系）。H3 走结构化内嵌路径，非 H3 走自由格式路径，但**四条写法不变**。
 
 ### 1. 定稿写法（四条，缺一不可）
 
-字幕声明以英文双引号 on-screen text 形式**内嵌在 `detailed_description` 的 `<d>` 对白处**（**不用**末尾或其它位置的中文指令——实测六段式下中文措辞指令任何位置都不烧录）。四条限定词必须同时给全：
+字幕声明以英文双引号 on-screen text 形式给出：**H3 结构化路径**内嵌在 H3 正文的对白处（Ref2VA 的 `detailed_description` / I2VA·FL2VA 的 `integrated_multimodal_description`）；**自由格式路径**紧随对白 / 文案句给出。**两条路径都不得**用末尾或其它位置的中文指令（实测六段式下中文措辞指令任何位置都不烧录）。四条限定词必须同时给全：
 
 1. **字幕声明紧贴对白句** —— 声明与 `<d>[语言] 台词</d>` 相邻，不隔段、不放到末尾。
 2. **写明逐字要求** —— `reading exactly "字幕原文"`，原文**逐字含标点**，不翻译不改写、不加引号/书名号/括号。
@@ -112,23 +108,26 @@ Read `references/ref-en.txt` for label rules, retention analysis, and complete e
 <d>[Chinese] 我们到家了。</d> She speaks with her mouth opening and closing naturally on every word, and a Chinese subtitle with a subtle dark outline for legibility reading exactly "我们到家了。" is displayed centered near the bottom of the frame, and the subtitle fades out gently by about 4.0 seconds.
 ```
 
+画面内文案（标牌 / UI / 品牌文案）与字幕**同源同法**：英文双引号 + `reading exactly "原文"` + 强调描边 / 对比 + **只给结束点**。
+
 ### 2. 失败写法（已实测，明确的反例）
 
 - ❌ **给时间窗**：`from 1.0 seconds to 4.0 seconds` 这类**起止时间窗**会压掉字幕（只给结束点才稳）。
 - ❌ **台词很晚才开口**：对白到 **1.0s 才起**（长前摇）时字幕容易整段不烧；让台词尽早开始（`beginning almost immediately`，~0.2s 起）。
 - ❌ 其它同源失败写法：任何「XX 秒前不要字幕 / 之后必须消失」的负面时间约束；中文字幕指令句（「画面底部显示字幕」）；`silent` 镜写字幕。
 
-### 3. 实测结论（2025-08-31，单镜对白句「我们到家了。」）
+### 3. 容量与排期（片型 skill 规划镜头时按此执行）
 
-| 档位 | 步骤 | 结果 |
-|---|---|---|
-| `quality` | 20 步 | ✅ **逐字一致**（含标点），位置正确 |
-| `balanced` | 8 步 | ❌ **整段未烧**（字幕完全没出现） |
-| `fast` | 4 步 | ⚠️ 烧了但**有错字** |
+- 单个「对白+字幕+口型」块容量约 **16 字**（**12–13 字逐字精确**）；**≥18 字整句拆镜**（拆镜走片型 skill 的镜头表改表 + 自检流程），每镜一句 ≤16 字更稳。
+- **字幕出镜窗比声明短**：只给结束点（如 `~4.0s`）时，实测字幕在 **2–3s** 就消失（多个实现皆然）⇒ 按**台词长度**估出镜窗，别按声明的结束点排期。
 
-- **画面内英文标牌**（如 `"Moon Base 7"`）在 `quality` 与 `balanced` 两档**都逐字一致**——说明上述差异是**字幕（对白联动）**特有的问题，不是所有画面内文字的普遍规律。
-- 结论：字幕成片当前建议走 `quality` 档；`balanced` / `fast` 出字幕需自检门逐镜核对，字准不过就按「升档重渲该镜 / 改短句 / 拆镜」处理（见 §0，**不是硬规则**）。
-- 详细矩阵与 A/B 实验记录见 `references/studio-mapping.md` §5。
+### 4. 档位与实现（怎么写 vs 谁能不能烧）
+
+- **不是档位门槛**：每一档都能要求出字幕，是否带字幕由用户 / 脚本需求决定，升档路线自由（`fast`→`balanced`、`fast`→`quality`、`balanced`→`quality` 都允许）。
+- ⚠️ **能力看「实现」，不看档位名**：同一档位在注册表里可有多个并列实现，字幕行为可以相反（同一份 prompt，有的实现逐字烧出，有的整段不烧）。⇒ 说「某档能不能出字幕」之前，**先确认该镜实际解析到的 `implementation`**：`comfy_list_workflows`，或看工具返回里的 `implementation` 字段（真值以它为准）。
+- **本 skill 不维护实现清单、也不维护实测矩阵**——实现随清单 / 权重增删替换而变，写进 skill 即成过时知识。取证入口：① `comfy_list_workflows` 的实现在册清单；② 实现级字幕能力标记（注册表 manifest，规划中）；③ 实测矩阵与样本：工程文档 `docs/h3-prompt-integration.md` §5.4 与画布实验节点。
+- **唯一允许写进流程的默认**：字幕镜默认走**成片档 `quality`**（20 步，行为最稳）。要换到同档更省的实现时，先按上面的取证入口确认该实现**字幕已验证**；确认不了就老实过自检门或留在 `quality`。
+- **判定权在逐镜自检门**：抽说话窗帧核对字幕原文**逐字一致**（含标点）、**无整段缺失**；不过再给「**同档换实现 / 升档重渲该镜 / 改短句 / 拆镜**」选项，**不强制升档**。
 
 ## 失败回退
 
