@@ -1,10 +1,10 @@
 {
-  "id": "minimax-h3-i2v-pdd-balanced",
+  "id": "minimax-h3-ref2v-balanced-pdd-sol",
   "version": 1,
-  "capability": "video.image2video",
+  "capability": "video.reference2video",
   "runner": "comfyui",
-  "displayName": "MiniMax H3 首末帧生成视频 · PDD 蒸馏",
-  "description": "MiniMax H3 首末帧生成视频 · PDD 蒸馏 · balanced 档。由 scripts/make-h3-variants.mjs 生成，请勿手改。",
+  "displayName": "MiniMax H3 参考生成视频",
+  "description": "MiniMax H3 参考生成视频 · balanced 档（sol 加速实现）。由 scripts/make-h3-variants.mjs 生成，请勿手改。",
   "output": {
     "mediaType": "video",
     "hasAudio": true
@@ -13,9 +13,9 @@
   "assets": {
     "unet": {
       "kind": "checkpoint",
-      "default": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
-      "env": "DSH_SVS_H3_MODEL_FL",
-      "label": "H3 FL2VA UNet"
+      "default": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "env": "DSH_SVS_H3_MODEL_REF",
+      "label": "H3 参考 UNet"
     },
     "clip": {
       "kind": "clip",
@@ -27,7 +27,7 @@
       "kind": "vae",
       "default": "minimax_h3_video_vae_fp16.safetensors",
       "env": "DSH_SVS_H3_VAE",
-      "label": "H3 视频 VAE（int8_convrot 为可选加速件，经配置/assetOverrides 切换）"
+      "label": "H3 视频 VAE"
     },
     "audio_vae": {
       "kind": "vae",
@@ -37,9 +37,9 @@
     },
     "pdd": {
       "kind": "other",
-      "default": "minimax_h3_fl2va_pdd_acc_8step_comfyui.safetensors",
-      "env": "DSH_SVS_H3_PDD_FL2VA",
-      "label": "MiniMax-H3 FL2VA PDD Acc 8 步（放 models/pdd_acc/）"
+      "default": "minimax_h3_ref2va_pdd_acc_8step_comfyui.safetensors",
+      "env": "DSH_SVS_H3_PDD_REF2V",
+      "label": "MiniMax-H3 Ref2VA PDD Acc 8 步（放 models/pdd_acc/）"
     }
   },
   "graph": {
@@ -75,7 +75,7 @@
       }
     },
     "5": {
-      "class_type": "MiniMaxH3ImageToVideo",
+      "class_type": "MiniMaxH3ReferenceToVideo",
       "inputs": {
         "clip": [
           "3",
@@ -85,10 +85,15 @@
           "4",
           0
         ],
+        "audio_vae": [
+          "4a",
+          0
+        ],
         "prompt": null,
         "width": null,
         "height": null,
-        "length": null
+        "length": null,
+        "ref_image_size": "match"
       }
     },
     "6": {
@@ -101,7 +106,7 @@
       "class_type": "BasicGuider",
       "inputs": {
         "model": [
-          "2a",
+          "2b",
           0
         ],
         "conditioning": [
@@ -215,6 +220,23 @@
         "enabled": true,
         "partition_check": "error"
       }
+    },
+    "2b": {
+      "class_type": "SolAttnMiniMaxH3",
+      "inputs": {
+        "model": [
+          "2a",
+          0
+        ],
+        "enabled": true,
+        "tau": 1.2,
+        "min_seq_len": 8192,
+        "protect_prefix": true,
+        "dense_first_percent": 0,
+        "dense_first_blocks": 2,
+        "approx_correction": true,
+        "log_every": 50
+      }
     }
   },
   "params": {
@@ -261,45 +283,15 @@
       },
       "default": 24
     },
-    "first_frame": {
+    "refs": {
       "inject": "image",
       "via": "node",
       "node": "LoadImage",
       "to": {
         "node": "5",
-        "field": "first_frame"
+        "field": "ref_images.ref_image_${i}"
       },
-      "preprocess": [
-        {
-          "class_type": "ImageScale",
-          "inputs": {
-            "upscale_method": "lanczos",
-            "width": "${width}",
-            "height": "${height}",
-            "crop": "disabled"
-          }
-        }
-      ]
-    },
-    "last_frame": {
-      "inject": "image",
-      "via": "node",
-      "node": "LoadImage",
-      "to": {
-        "node": "5",
-        "field": "last_frame"
-      },
-      "preprocess": [
-        {
-          "class_type": "ImageScale",
-          "inputs": {
-            "upscale_method": "lanczos",
-            "width": "${width}",
-            "height": "${height}",
-            "crop": "disabled"
-          }
-        }
-      ]
+      "max": 8
     },
     "prefix": {
       "inject": "scalar",
@@ -342,12 +334,13 @@
     "maxDurationFrames": 310,
     "supportsSubtitles": true
   },
-  "group": "minimax-h3-i2v-pdd",
+  "group": "minimax-h3-ref2v",
   "tier": "balanced",
   "requiresNodes": [
-    "MiniMaxH3PDDAccApply"
+    "SolAttnMiniMaxH3"
   ],
   "priority": -30,
-  "note": "PDD nfe=8 · shift 12/3 · euler · 实测 178.8s（细节量高于 20 步成片档）",
-  "estSeconds": 179
+  "note": "PDD + Sol-Attn（tau 1.2）· 实测 137.3s（对 PDD 单独 1.35×；细节量仍与 20 步成片档持平）",
+  "estSeconds": 137,
+  "accel": "sol"
 }

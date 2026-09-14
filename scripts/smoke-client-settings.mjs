@@ -72,10 +72,13 @@ console.log('\n[1] 设置页渲染（真实 /api/workflows 形状数据）')
   try { tree = await renderStable(settingsComponent, {}) } catch (e) { err = e }
   ok('渲染不抛异常', !err, err && err.stack && err.stack.split('\n').slice(0, 3).join(' | '))
   const text = textOf(tree)
-  ok('显示策略条目（无加速）', text.includes('MiniMax H3 参考生成视频（无加速）'))
-  ok('显示策略条目（有加速）', text.includes('MiniMax H3 参考生成视频（有加速）'))
-  // 摘要用短 id + ⚡（长 id 会撑破下拉框宽度——这是配置页溢出的根因，故断言保持紧凑）
-  ok('策略条目列出逐档实现（短 id + 加速标记）', text.includes('balanced → balanced-sol') && text.includes('⚡'))
+  // 新契约：每能力只放一条**内置默认**策略（label = 家族名），其余策略由用户自己命名与组合
+  ok('显示内置默认策略（label = 家族名）', text.includes('MiniMax H3 参考生成视频'))
+  ok('标注「内置默认」', text.includes('内置默认'))
+  ok('顶部说明讲清策略＝一套档位组合', text.includes('策略＝一套档位组合'))
+  ok('有「新增策略」入口', text.includes('新增策略'))
+  // 摘要用短 id（长 id 会撑破下拉框宽度——这是配置页溢出的根因，故断言保持紧凑）
+  ok('策略摘要列出逐档实现（短 id）', /fast → fast/.test(text) && /balanced → balanced/.test(text))
   ok('策略摘要按档位顺序（fast → balanced → quality）',
     text.indexOf('fast → fast') < text.indexOf('balanced → balanced'))
   ok('策略摘要不含长 id 前缀', !text.includes('→ minimax-h3-ref2v-fast'))
@@ -85,7 +88,8 @@ console.log('\n[1] 设置页渲染（真实 /api/workflows 形状数据）')
   ok('显示未分级清单提示', text.includes('未分级') || text.includes('未分档'))
   ok('导入表单有组名字段', text.includes('组名 group（同名成组）'))
   ok('导入表单有档位字段', text.includes('档位 tier'))
-  ok('i2v 的 fast 档显示"无加速落标准"', text.includes('MiniMax H3 首末帧生成视频（有加速）'))
+  ok('i2v 也有自己的内置默认策略', text.includes('MiniMax H3 首末帧生成视频'))
+  ok('不再自动生成「（无加速）/（有加速）」策略条目', !text.includes('（无加速）') && !text.includes('（有加速）'))
 
   // 下拉选项里的实现 id 必须来自注册表（且加速件不被禁选——节点存在时需要预检；此处 probe=false → 未知）
   const selects = findAll(tree, (n) => n.type === 'select')
@@ -199,67 +203,94 @@ console.log('\n[5] 主题适配断言（防硬编码颜色：深色主题下白�
     badText.slice(0, 3).map((n) => n.props.style.color).join(', '))
 }
 
-// 设计模型：一个能力可以有**多个组**，每组有自己的一套策略（策略＝该组的一套 workflow）。
-// 今天内置清单每个能力恰好一个组，这条路径从未被走过，故用合成 payload 显式覆盖。
-console.log('\n[6] 多组能力：策略按组隔离（单选不串台、应用只覆盖本组）')
+// 新契约：策略＝**用户可命名的一套档位组合**（内置默认那条＝跟随注册表首选）。
+// 用合成 payload 覆盖三条路径：① 单选/应用；② 新增策略（命名 + 逐档挑，含跨组）；③ 重命名/删除。
+console.log('\n[6] 策略：内置默认 / 用户自建 / 新增（命名 + 自由组合）')
 {
   const impl = (id, group, tier, accel = '') => ({
     id, displayName: group, group, tier, accel, available: true, missingNodes: [], requiresNodes: [],
     estSeconds: 10, note: '', source: 'builtin', modes: [tier], longSide: 832, steps: 4,
   })
-  const mkGroup = (id, name, accelName) => ({
+  const mkGroup = (id, name, withAccel) => ({
     id, displayName: name,
-    tiers: { fast: [impl(id + '-fast', id, 'fast')], quality: [impl(id + '-quality', id, 'quality'), impl(id + '-quality-sol', id, 'quality', 'sol')] },
-    strategies: [
-      { id: id + '::standard', group: id, label: name + '（无加速）', tiers: { fast: id + '-fast', quality: id + '-quality' } },
-      { id: id + '::accel', group: id, label: name + '（有加速）', tiers: { fast: id + '-fast', quality: id + '-quality-sol' } },
-    ],
+    tiers: {
+      fast: [impl(id + '-fast', id, 'fast')],
+      balanced: [impl(id + '-balanced', id, 'balanced')].concat(withAccel ? [impl(id + '-balanced-sol', id, 'balanced', 'sol')] : []),
+      quality: [impl(id + '-quality', id, 'quality')].concat(withAccel ? [impl(id + '-quality-sol', id, 'quality', 'sol')] : []),
+    },
   })
-  const multi = {
+  const payload = {
     ok: true, tiers: ['fast', 'balanced', 'quality'], errors: [],
-    capabilities: [{
-      capability: 'video.multi', tiered: true, tiers: ['fast', 'quality'], unclassified: [],
-      groups: [mkGroup('grpA', '甲族'), mkGroup('grpB', '乙族')],
-      workflows: [impl('grpA-fast', 'grpA', 'fast'), impl('grpA-quality', 'grpA', 'quality'), impl('grpA-quality-sol', 'grpA', 'quality', 'sol'),
-                  impl('grpB-fast', 'grpB', 'fast'), impl('grpB-quality', 'grpB', 'quality'), impl('grpB-quality-sol', 'grpB', 'quality', 'sol')],
-      selection: {},
-    }],
+    capabilities: [
+      {
+        capability: 'video.multi', tiered: true, tiers: ['fast', 'balanced', 'quality'], unclassified: [],
+        groups: [mkGroup('grpA', '甲族', true), mkGroup('grpB', '乙族', true)],
+        strategies: [
+          { id: '__default', label: '甲族', builtin: true, available: true, selected: false, tiers: { fast: 'grpA-fast', balanced: 'grpA-balanced', quality: 'grpA-quality' } },
+          { id: 's1', label: '我的快档', builtin: false, available: true, selected: true, tiers: { balanced: 'grpB-balanced-sol' } },
+        ],
+        workflows: ['grpA', 'grpB'].flatMap((g) => [impl(g + '-fast', g, 'fast'), impl(g + '-balanced', g, 'balanced'), impl(g + '-balanced-sol', g, 'balanced', 'sol'), impl(g + '-quality', g, 'quality'), impl(g + '-quality-sol', g, 'quality', 'sol')]),
+        selection: { balanced: 'grpB-balanced-sol' },
+      },
+      {
+        capability: 'video.other', tiered: true, tiers: ['fast'], unclassified: [],
+        groups: [mkGroup('grpC', '丙族', false)],
+        strategies: [{ id: '__default', label: '丙族', builtin: true, available: true, selected: true, tiers: { fast: 'grpC-fast' } }],
+        workflows: [impl('grpC-fast', 'grpC', 'fast')],
+        selection: {},
+      },
+    ],
   }
-  const realFetch = global.fetch
-  global.fetch = async (url) => ({ ok: true, json: async () => (String(url).includes('/api/config') ? { ok: true, config: { tiers: {} } } : multi) })
+  const cfg0 = { tiers: { 'video.multi': { balanced: 'grpB-balanced-sol' } }, strategies: { 'video.multi': [{ id: 's1', name: '我的快档', tiers: { balanced: 'grpB-balanced-sol' } }] }, strategyOf: { 'video.multi': 's1' } }
+  const posts = []
+  global.fetch = async (url, opts2) => {
+    const isCfg = String(url).includes('/api/config')
+    if (isCfg && opts2 && opts2.method === 'POST') posts.push(JSON.parse(opts2.body))
+    return { ok: true, json: async () => (isCfg ? { ok: true, config: cfg0 } : payload) }
+  }
   resetHooks()
   let tree = null
-  try { tree = await renderStable(settingsComponent, {}) } catch (e) { ok('多组渲染不抛异常', false, e.message) }
+  try { tree = await renderStable(settingsComponent, {}) } catch (e) { ok('多能力渲染不抛异常', false, e.message) }
   if (tree) {
     const radios = findAll(tree, (n) => n.type === 'input' && n.props.type === 'radio' && String(n.props.name || '').startsWith('strategy-'))
     const names = [...new Set(radios.map((r) => r.props.name))]
-    eq('两组策略各自独立单选组（name 不同）', names.length, 2)
-    ok('两组共 4 个策略单选', radios.length === 4, `实际 ${radios.length}`)
+    eq('单选组按能力隔离（不串台）', names.length, 2)
+    eq('单选组名带能力 id', names.sort().join(','), 'strategy-video.multi,strategy-video.other')
+    eq('共 3 条策略单选（2+1）', radios.length, 3)
     const checked = radios.filter((r) => r.props.checked)
-    ok('两组各有一个策略被选中（不串台）', checked.length === 2,
-      checked.map((r) => r.props.name).join(','))
-    eq('两个选中项分属不同组', [...new Set(checked.map((r) => r.props.name))].length, 2)
-    // 应用乙族策略：只应写入 grpB 的档位，不动 grpA
-    const postBody = []
-    global.fetch = async (url, opts2) => {
-      if (String(url).includes('/api/config') && opts2 && opts2.method === 'POST') postBody.push(JSON.parse(opts2.body))
-      return { ok: true, json: async () => (String(url).includes('/api/config') ? { ok: true, config: { tiers: {} } } : multi) }
-    }
-    const bAccel = radios.find((r) => r.props.name.endsWith('grpB') && String(r.props.onChange))
-    // 找到乙族「有加速」那条（第二个）
-    const grpBRadios = radios.filter((r) => r.props.name.endsWith('grpB'))
-    await grpBRadios[1].props.onChange({ target: {} })
-    await new Promise((r) => setImmediate(r))
-    const tiersWritten = postBody.length ? (postBody[postBody.length - 1].tiers || {}) : null
-    ok('应用策略会写配置', Boolean(tiersWritten), JSON.stringify(postBody).slice(0, 120))
-    if (tiersWritten) {
-      const m = tiersWritten['video.multi'] || {}
-      eq('乙族有加速 → quality 写入 sol 实现', m.quality, 'grpB-quality-sol')
-      eq('只写入该组档位（不夹带另一组）', Object.keys(m).sort().join(','), 'fast,quality')
+    eq('每条被选中的策略来自注册表 selected 标记', checked.length, 2)
+    eq('内置默认与用户策略各点亮一条', checked.map((r) => r.props.name).sort().join(','), 'strategy-video.multi,strategy-video.other')
+
+    // ① 应用内置默认 → 清空该能力显式选择（跟随注册表首选），并记下选中策略
+    const defRadio = radios.find((r) => r.props.name === 'strategy-video.multi' && !r.props.checked)
+    if (defRadio) { await defRadio.props.onChange({ target: {} }); await new Promise((r) => setImmediate(r)) }
+    let last = posts[posts.length - 1] || {}
+    ok('应用内置默认会写配置', Boolean(last.tiers), JSON.stringify(last).slice(0, 140))
+    eq('内置默认 → 清空该能力档位快照（不再被冻住）', Object.keys(last.tiers?.['video.multi'] || {}).length, 0)
+    eq('内置默认 → strategyOf 记为 __default', last.strategyOf?.['video.multi'], '__default')
+    const before = posts.length
+    // ② 应用用户策略 → 写入其档位快照
+    const userRadio = radios.find((r) => r.props.name === 'strategy-video.multi' && r.props.checked)
+    if (userRadio) { await userRadio.props.onChange({ target: {} }); await new Promise((r) => setImmediate(r)) }
+    last = posts[posts.length - 1] || {}
+    ok('应用用户策略会写配置', posts.length > before)
+    eq('用户策略 → 写入它的档位快照', last.tiers?.['video.multi']?.balanced, 'grpB-balanced-sol')
+    eq('用户策略 → strategyOf 记为它的 id', last.strategyOf?.['video.multi'], 's1')
+
+    // ③ 新增策略：表单字段齐全（策略名 + 每档一个下拉，选项来自各组 = 跨组自由组合）
+    const addBtn = findAll(tree, (n) => n.type === 'button' && String(textOf(n)).includes('新增策略'))
+    ok('有「新增策略」按钮', addBtn.length === 2, `实际 ${addBtn.length}`)
+    if (addBtn.length) {
+      await addBtn[0].props.onClick({ target: {} })
+      await new Promise((r) => setImmediate(r))
+      const tree2 = await renderStable(settingsComponent, {})
+      const nameInput = findAll(tree2, (n) => n.type === 'input' && String(n.props.placeholder || '').includes('例如'))
+      ok('展开后有策略名输入框', nameInput.length === 1)
+      const optgroups = findAll(tree2, (n) => n.type === 'optgroup').map((g) => g.props.label)
+      ok('每档下拉按组分类（跨组自由组合）', optgroups.includes('甲族') && optgroups.includes('乙族'), optgroups.join(','))
+      const saveBtn = findAll(tree2, (n) => n.type === 'button' && String(textOf(n)).includes('保存并选用'))
+      ok('同一时刻只展开一个新增表单（保存并选用按钮唯一）', saveBtn.length === 1, `实际 ${saveBtn.length}`)
     }
   }
-  global.fetch = realFetch
 }
 
-console.log(`\n结果：${pass} 通过 / ${fail} 失败`)
-process.exit(fail ? 1 : 0)

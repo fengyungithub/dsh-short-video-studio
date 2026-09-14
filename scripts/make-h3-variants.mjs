@@ -30,10 +30,9 @@ const DRY = process.argv.includes('--dry')
 
 const GROUP_REF2V = { id: 'minimax-h3-ref2v', displayName: 'MiniMax H3 参考生成视频', capability: 'video.reference2video' }
 const GROUP_I2V = { id: 'minimax-h3-i2v', displayName: 'MiniMax H3 首末帧生成视频', capability: 'video.image2video' }
-// PDD 是**每个能力各自独立的策略**（独立组、独立档位集合），不混进既有组的「有加速」策略里：
-// 它与 Sol-Attn 是两种不同的东西（一个靠蒸馏换步数，一个靠稀疏注意力换算力），用户应分别选。
-const GROUP_REF2V_PDD = { id: 'minimax-h3-ref2v-pdd', displayName: 'MiniMax H3 参考生成视频 · PDD 蒸馏', capability: 'video.reference2video' }
-const GROUP_I2V_PDD = { id: 'minimax-h3-i2v-pdd', displayName: 'MiniMax H3 首末帧生成视频 · PDD 蒸馏', capability: 'video.image2video' }
+// PDD 不单列策略组：它就是**四个普通清单**（…-balanced-pdd / …-balanced-pdd-sol），
+// 归在与其它实现同一个家族组里，由用户自己在配置页「新增策略」时组合、命名。
+// 策略由用户命名 ⇒ 注册表不再自动投影出「（PDD 蒸馏）」之类的条目。
 
 /**
  * 变体表：一份 = 一个档位实现。
@@ -57,12 +56,12 @@ const VARIANTS = [
   { out: 'minimax-h3-i2v-quality-sol', group: GROUP_I2V, tier: 'quality', accel: 'sol', template: 'minimax-h3-i2v-sol.json', mode: 'quality', estSeconds: 314.7, note: 'Sol-Attn 加速 · 实测 314.7s（1.25×）' },
   // PDD（2026 引入）：8 步 nfe=8 就能达到 20 步成片档的细节量，成本约 185s（≈ 2.1× 提速）。
   // priority 为负 = **不做隐式默认**（依赖第三方节点 MiniMaxH3PDDAccApply，须用户显式选策略）。
-  { out: 'minimax-h3-ref2v-pdd-balanced', group: GROUP_REF2V_PDD, tier: 'balanced', priority: -30, template: 'minimax-h3-pdd-ref2v.json', mode: 'balanced', estSeconds: 185, note: 'PDD nfe=8 · shift 12/3 · euler · 实测 184.7s（细节量高于 20 步成片档）' },
-  { out: 'minimax-h3-i2v-pdd-balanced', group: GROUP_I2V_PDD, tier: 'balanced', priority: -30, template: 'minimax-h3-pdd-i2v.json', mode: 'balanced', estSeconds: 179, note: 'PDD nfe=8 · shift 12/3 · euler · 实测 178.8s（细节量高于 20 步成片档）' },
+  { out: 'minimax-h3-ref2v-balanced-pdd', group: GROUP_REF2V, tier: 'balanced', priority: -30, template: 'minimax-h3-pdd-ref2v.json', mode: 'balanced', estSeconds: 185, note: 'PDD nfe=8 · shift 12/3 · euler · 实测 184.7s（细节量高于 20 步成片档）' },
+  { out: 'minimax-h3-i2v-balanced-pdd', group: GROUP_I2V, tier: 'balanced', priority: -30, template: 'minimax-h3-pdd-i2v.json', mode: 'balanced', estSeconds: 179, note: 'PDD nfe=8 · shift 12/3 · euler · 实测 178.8s（细节量高于 20 步成片档）' },
   // PDD 组内的第二个策略：叠 Sol-Attn（Sol 只改注意力，PDD 的 sigma 网格与 head bank 不受影响）。
   // 实测 ref2v：184.7s → 137.3s（1.35×），细节量从"高于 20 步成片档"回落到"与成片档持平"。
-  { out: 'minimax-h3-ref2v-pdd-balanced-sol', group: GROUP_REF2V_PDD, tier: 'balanced', accel: 'sol', priority: -30, template: 'minimax-h3-pdd-ref2v-sol.json', mode: 'balanced', estSeconds: 137, note: 'PDD + Sol-Attn（tau 1.2）· 实测 137.3s（对 PDD 单独 1.35×；细节量仍与 20 步成片档持平）' },
-  { out: 'minimax-h3-i2v-pdd-balanced-sol', group: GROUP_I2V_PDD, tier: 'balanced', accel: 'sol', priority: -30, template: 'minimax-h3-pdd-i2v-sol.json', mode: 'balanced', estSeconds: 134, note: 'PDD + Sol-Attn（tau 1.2）· 实测 134.1s（对 PDD 单独 1.33×）' },
+  { out: 'minimax-h3-ref2v-balanced-pdd-sol', group: GROUP_REF2V, tier: 'balanced', accel: 'sol', accelOf: 'minimax-h3-ref2v-balanced-pdd', priority: -30, template: 'minimax-h3-pdd-ref2v-sol.json', mode: 'balanced', estSeconds: 137, note: 'PDD + Sol-Attn（tau 1.2）· 实测 137.3s（对 PDD 单独 1.35×；细节量仍与 20 步成片档持平）' },
+  { out: 'minimax-h3-i2v-balanced-pdd-sol', group: GROUP_I2V, tier: 'balanced', accel: 'sol', accelOf: 'minimax-h3-i2v-balanced-pdd', priority: -30, template: 'minimax-h3-pdd-i2v-sol.json', mode: 'balanced', estSeconds: 134, note: 'PDD + Sol-Attn（tau 1.2）· 实测 134.1s（对 PDD 单独 1.33×）' },
 ]
 
 /**
@@ -106,8 +105,13 @@ function buildVariant(spec, templates) {
 
   // requiresNodes：与同路径同档的标准版做节点类别差集（加速件依赖的第三方节点）
   if (spec.accel) {
-    const stockSpec = VARIANTS.find((v) => v.group.id === spec.group.id && v.tier === spec.tier && !v.accel)
-    if (!stockSpec) throw new Error(`${spec.out} 找不到同档标准版，无法推断 requiresNodes`)
+    // 差集对象：默认取"同组同档的第一个非 accel 变体"；同档有多个非 accel 实现时
+    // （如 balanced 的 lightx2v 版与 PDD 版同组）必须用 accelOf 显式指定兄弟清单，
+    // 否则会把 PDD 的 Apply 节点也算成 Sol 带来的依赖。
+    const stockSpec = spec.accelOf
+      ? VARIANTS.find((v) => v.out === spec.accelOf)
+      : VARIANTS.find((v) => v.group.id === spec.group.id && v.tier === spec.tier && !v.accel)
+    if (!stockSpec) throw new Error(`${spec.out} 找不到对比基准（accelOf=${spec.accelOf || '同组同档非 accel'}），无法推断 requiresNodes`)
     const stock = buildVariant(stockSpec, templates)
     const diff = [...classTypes(m.graph)].filter((c) => !classTypes(stock.graph).has(c))
     if (!diff.length) throw new Error(`${spec.out} 声明了 accel 但图与标准版无节点差异`)
@@ -184,11 +188,17 @@ for (const [cap, list] of Object.entries(fake.byCapability)) {
   const groups = {}
   for (const m of list) (groups[m.group] ||= { id: m.group, displayName: m.displayName, tiers: {} })
   for (const m of list) (groups[m.group].tiers[m.tier] ||= []).push(m)
+  // 策略不再由组自动投影（策略是**用户命名的一套档位组合**）：这里只列出"内置默认"会选中的实现，
+  // 让生成结果和配置页显示的默认一致；其余组合由用户在配置页自建。
+  const defaultLine = []
+  for (const tier of _internals.TIERS) {
+    const cand = list.filter((m) => m.tier === tier && !m.internal)
+    const pick = cand.filter((m) => !m.accel).sort((a, b) => (b.priority - a.priority) || a.id.localeCompare(b.id))[0]
+    if (pick) defaultLine.push(`${tier}→${pick.id}`)
+  }
+  if (defaultLine.length) console.log(`  「内置默认」 ` + defaultLine.join('  '))
   for (const g of Object.values(groups)) {
     console.log(`\n${cap} · ${g.displayName}（${g.id}）`)
-    for (const strategies of _internals.projectGroupStrategies(g)) {
-      console.log(`  「${strategies.label}」 ` + Object.entries(strategies.tiers).map(([t, id]) => `${t}→${id.replace(g.id + '-', '')}`).join('  '))
-    }
     for (const [tier, list] of Object.entries(g.tiers)) {
       for (const m of list) console.log(`    [${tier}] ${m.id}${m.accel ? ` · accel=${m.accel} requires=${m.requiresNodes.join(',')}` : ''} · ${m.estSeconds}s · 步数=${m.modes[tier].steps} 长边=${m.modes[tier].longSide ?? '-'}`)
     }

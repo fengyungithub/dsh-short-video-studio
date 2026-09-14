@@ -35,8 +35,8 @@ const MAP = {
   'minimax-h3-i2v-quality': ['minimax-h3-i2v.json', 'quality'],
   'minimax-h3-i2v-quality-sol': ['minimax-h3-i2v-sol.json', 'quality'],
   // PDD：模板由 scripts/make-pdd-template.mjs 从同族 base 生成
-  'minimax-h3-ref2v-pdd-balanced': ['minimax-h3-pdd-ref2v.json', 'balanced'],
-  'minimax-h3-i2v-pdd-balanced': ['minimax-h3-pdd-i2v.json', 'balanced'],
+  'minimax-h3-ref2v-balanced-pdd': ['minimax-h3-pdd-ref2v.json', 'balanced'],
+  'minimax-h3-i2v-balanced-pdd': ['minimax-h3-pdd-i2v.json', 'balanced'],
 }
 const ALLOW_DIFF = new Set(['id', 'version', 'description', 'group', 'tier', 'accel', 'displayName', 'estSeconds', 'note', 'priority', 'requiresNodes', 'modes'])
 
@@ -72,8 +72,8 @@ console.log('\n[2] 档位参数：步数 / 长边 / LoRA 配对')
     'minimax-h3-i2v-quality': { steps: 20, longSide: 1344, lora: null, sampler: 'res_multistep', shift: 12 },
     'minimax-h3-i2v-quality-sol': { steps: 20, longSide: 1344, lora: null, sampler: 'res_multistep', shift: 12, sol: true },
     // PDD：无蒸馏 LoRA（PDD 自带 trunk + head bank）、shift 必须 12/3、采样器必须 euler
-    'minimax-h3-ref2v-pdd-balanced': { steps: 8, longSide: 1344, lora: null, sampler: 'euler', shift: 12, pdd: true },
-    'minimax-h3-i2v-pdd-balanced': { steps: 8, longSide: 1344, lora: null, sampler: 'euler', shift: 12, pdd: true },
+    'minimax-h3-ref2v-balanced-pdd': { steps: 8, longSide: 1344, lora: null, sampler: 'euler', shift: 12, pdd: true },
+    'minimax-h3-i2v-balanced-pdd': { steps: 8, longSide: 1344, lora: null, sampler: 'euler', shift: 12, pdd: true },
   }
   for (const [id, e] of Object.entries(expect)) {
     const m = read(join(WF, id + '.json'))

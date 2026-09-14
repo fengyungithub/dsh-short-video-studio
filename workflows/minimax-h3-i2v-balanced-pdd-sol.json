@@ -1,10 +1,10 @@
 {
-  "id": "minimax-h3-i2v-pdd-balanced-sol",
+  "id": "minimax-h3-i2v-balanced-pdd-sol",
   "version": 1,
   "capability": "video.image2video",
   "runner": "comfyui",
-  "displayName": "MiniMax H3 首末帧生成视频 · PDD 蒸馏",
-  "description": "MiniMax H3 首末帧生成视频 · PDD 蒸馏 · balanced 档（sol 加速实现）。由 scripts/make-h3-variants.mjs 生成，请勿手改。",
+  "displayName": "MiniMax H3 首末帧生成视频",
+  "description": "MiniMax H3 首末帧生成视频 · balanced 档（sol 加速实现）。由 scripts/make-h3-variants.mjs 生成，请勿手改。",
   "output": {
     "mediaType": "video",
     "hasAudio": true
@@ -359,7 +359,7 @@
     "maxDurationFrames": 310,
     "supportsSubtitles": true
   },
-  "group": "minimax-h3-i2v-pdd",
+  "group": "minimax-h3-i2v",
   "tier": "balanced",
   "requiresNodes": [
     "SolAttnMiniMaxH3"

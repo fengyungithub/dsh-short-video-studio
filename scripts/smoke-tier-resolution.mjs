@@ -19,7 +19,7 @@ import { _internals } from '../lib/index.js'
 
 const {
   sortTierCandidates, tierImplementations, groupNameOf, isTieredCapability,
-  resolveTieredManifest, projectGroupStrategies, describeTierMatrix, checkAvailability,
+  resolveTieredManifest, projectCapabilityStrategies, userStrategiesOf, describeTierMatrix, checkAvailability,
 } = _internals
 
 let pass = 0
@@ -74,6 +74,9 @@ const probeWith = (nodes, unknown = false) => async (cls) => {
 const SOL_PRESENT = probeWith(['SolAttnMiniMaxH3', 'SolAttnStats'])
 const SOL_MISSING = probeWith(['SolAttnStats'])
 // 有 Sol-Attn、缺 PDD 节点：用于断言 PDD 实现会如实置灰（而不是假装可用后渲染时才炸）
+// Sol 与 PDD 节点都装（本机现状）：PDD 清单可显式解析
+const ALL_PRESENT = probeWith(['SolAttnMiniMaxH3', 'SolAttnStats', 'MiniMaxH3PDDAccApply'])
+// 只装 Sol、没装 PDD：PDD 清单必须如实置灰
 const PDD_MISSING = probeWith(['SolAttnMiniMaxH3', 'SolAttnStats'])
 
 const cfg = (tiers) => ({ tiers })
@@ -150,27 +153,56 @@ console.log('\n[6] 该档无实现 → 报错并列出可用档位')
   ok('isTieredCapability=true', isTieredCapability(R, onlyFast))
 }
 
-console.log('\n[7] 策略投影')
+console.log('\n[7] 策略：一条内置默认 + 用户自建（命名）')
 {
-  const group = {
-    id: 'demo', displayName: 'Demo 视频',
-    tiers: {
-      fast: [registry.byId['demo-fast']],
-      balanced: [registry.byId['demo-balanced'], registry.byId['demo-balanced-sol']],
-      quality: [registry.byId['demo-quality'], registry.byId['demo-quality-sol']],
-    },
-  }
-  const strategies = projectGroupStrategies(group)
-  eq('两条策略', strategies.length, 2)
-  eq('条目名（无加速）', strategies[0].label, 'Demo 视频（无加速）')
-  eq('条目名（有加速）', strategies[1].label, 'Demo 视频（有加速）')
-  eq('无加速：balanced → 标准', strategies[0].tiers.balanced, 'demo-balanced')
-  eq('有加速：balanced → sol', strategies[1].tiers.balanced, 'demo-balanced-sol')
-  eq('有加速：quality → sol', strategies[1].tiers.quality, 'demo-quality-sol')
-  eq('有加速：fast 无 sol 实现 → 落标准', strategies[1].tiers.fast, 'demo-fast')
+  // 内置默认 = 各档的**非加速首选**，label 取主家族名；用户不配策略时列表里就只有这一条
+  const base = await describeTierMatrix(registry, { probe: SOL_PRESENT, cfg: {} })
+  const st = base[R].strategies || []
+  eq('默认只有一条策略', st.length, 1)
+  eq('该条是内置默认', st[0].builtin, true)
+  eq('内置默认 label = 主家族名', st[0].label, 'Demo 视频')
+  eq('内置默认 balanced → 标准实现（不选加速件）', st[0].tiers.balanced, 'demo-balanced')
+  eq('内置默认 quality → 标准实现', st[0].tiers.quality, 'demo-quality')
+  eq('内置默认 fast → 标准实现', st[0].tiers.fast, 'demo-fast')
+  eq('空配置时内置默认显示为已选中', st[0].selected, true)
 
-  const noAccel = projectGroupStrategies({ id: 'x', displayName: 'X 视频', tiers: { quality: [mk('x-q', { tier: 'quality' })] } })
-  eq('无任何加速实现 → 只给一条（不造假象）', noAccel.length, 1)
+  // 用户自建：命名 + 跨清单自由组合（例如 balanced 用 sol、quality 用标准）
+  const cfg = {
+    tiers: { [R]: { balanced: 'demo-balanced-sol' } },
+    strategies: { [R]: [{ id: 's1', name: '快出片（balanced 带 Sol）', tiers: { balanced: 'demo-balanced-sol', quality: 'demo-quality' } }] },
+  }
+  const clean = await describeTierMatrix(registry, { probe: SOL_PRESENT, cfg: {} })
+  eq('配置里没有用户策略时只有内置默认一条', clean[R].strategies.length, 1)
+  const withUser = await describeTierMatrix(registry, { probe: SOL_PRESENT, cfg })
+  eq('用户策略经配置注入后出现在矩阵里', withUser[R].strategies.length, 2)
+  eq('注入的用户策略名字来自配置', withUser[R].strategies[1].label, '快出片（balanced 带 Sol）')
+
+  const projected = projectCapabilityStrategies(registry, R, cfg)
+  eq('配置里有用户策略 → 两条', projected.length, 2)
+  eq('用户策略 label = 用户命名', projected[1].label, '快出片（balanced 带 Sol）')
+  eq('用户策略 builtin=false', projected[1].builtin, false)
+  eq('用户策略 tiers 原样保留（balanced）', projected[1].tiers.balanced, 'demo-balanced-sol')
+  eq('用户策略被识别为当前选中', projected[1].selected, true)
+  eq('有选中用户策略时内置默认不再显示为选中', projected[0].selected, false)
+
+  // 规范形：非法条目被丢弃，不会在配置里留下死引用
+  eq('空名策略被丢弃', userStrategiesOf({ strategies: { [R]: [{ id: 'x', name: '   ', tiers: { fast: 'demo-fast' } }] } }, R).length, 0)
+  eq('非数组被忽略', userStrategiesOf({ strategies: { [R]: 'nope' } }, R).length, 0)
+  const norm = userStrategiesOf({ strategies: { [R]: [{ name: 'A', tiers: { fast: 'demo-fast', bogus: 'x' } }] } }, R)
+  eq('缺 id 自动补 id', typeof norm[0].id === 'string' && norm[0].id.length > 0, true)
+  ok('未知档位键不会被当成档位使用（解析层只认受控三档）', !['fast', 'balanced', 'quality'].includes('bogus'))
+
+  // 消歧：用户策略与默认组合完全相同时，不能两条都点亮
+  const sameCfg = { strategies: { [R]: [{ id: 'dup', name: '等于默认', tiers: { fast: 'demo-fast', balanced: 'demo-balanced', quality: 'demo-quality' } }] } }
+  const dupAll = projectCapabilityStrategies(registry, R, sameCfg)
+  eq('组合等于默认时不能两条同时选中', dupAll.filter((s) => s.selected).length, 1)
+  eq('未点过时按匹配规则回落到内置默认', dupAll.find((s) => s.selected).id, '__default')
+  const dupPicked = projectCapabilityStrategies(registry, R, { ...sameCfg, strategyOf: { [R]: 'dup' } })
+  eq('点过用户策略时点亮那一条', dupPicked.find((s) => s.selected).id, 'dup')
+
+  // 组不再自动生成策略（组只负责清单分组显示）
+  const groupsWithStrategies = Object.values(base).flatMap((c) => (c.groups || []).filter((g) => g.strategies))
+  eq('组不再携带 strategies', groupsWithStrategies.length, 0)
   eq('组名缺省＝自身 id', groupNameOf(mk('lonely', {})), 'lonely')
 }
 
@@ -230,36 +262,43 @@ console.log('\n[10] 拆分迁移：新 id 继承旧配置（不丢用户的 int8
   ok('别名表指向合法旧 id', badAlias.length === 0, badAlias.join(', '))
 }
 
-console.log('\n[11] PDD：每能力独立策略（独立组、独立档位集合、不做隐式默认）')
+console.log('\n[11] PDD：四个普通清单（不单列策略，由用户组合命名）')
 {
   const I = _internals
   const reg = I.getRegistry()
-  for (const [cap, groupId, pddId, solId] of [
-    [R, 'minimax-h3-ref2v-pdd', 'minimax-h3-ref2v-pdd-balanced', 'minimax-h3-ref2v-pdd-balanced-sol'],
-    ['video.image2video', 'minimax-h3-i2v-pdd', 'minimax-h3-i2v-pdd-balanced', 'minimax-h3-i2v-pdd-balanced-sol'],
+  const mx = await describeTierMatrix(reg, { probe: SOL_PRESENT })
+  for (const [cap, pddId, solId] of [
+    [R, 'minimax-h3-ref2v-balanced-pdd', 'minimax-h3-ref2v-balanced-pdd-sol'],
+    ['video.image2video', 'minimax-h3-i2v-balanced-pdd', 'minimax-h3-i2v-balanced-pdd-sol'],
   ]) {
-    const mx = await describeTierMatrix(reg, { probe: SOL_PRESENT })
-    const g = mx[cap].groups.find((x) => x.id === groupId)
-    ok(`${cap} 有独立 PDD 组`, Boolean(g), mx[cap].groups.map((x) => x.id).join(', '))
-    // 组内两种实现 → 恰好两条策略（不带 Sol / 带 Sol），这就是"用户自由组合"的落点
-    eq(`${groupId} 策略数`, g.strategies.length, 2)
-    eq(`${groupId} 策略标签带组名`, g.strategies.every((s) => s.label.includes('PDD')), true)
-    eq(`${groupId} 只提供 balanced 一档`, Object.keys(g.tiers).join('/'), 'balanced')
-    eq(`${groupId} 不带 Sol 的策略指向 PDD 实现`, g.strategies[0].tiers.balanced, pddId)
-    eq(`${groupId} 带 Sol 的策略指向 PDD+Sol 实现`, g.strategies[1].tiers.balanced, solId)
-    // 不做隐式默认：selection 注入空时，balanced 必须解析到原有实现而不是 PDD
+    const m = reg.manifests.find((x) => x.id === pddId)
+    ok(`${pddId} 存在且是 balanced 档`, Boolean(m) && m.tier === 'balanced')
+    ok(`${pddId} 归在同一家族组（不单列策略组）`, m.group === (cap === R ? 'minimax-h3-ref2v' : 'minimax-h3-i2v'), `group=${m.group}`)
+    ok(`${pddId} 不与基础实现同 id`, pddId !== (cap === R ? 'minimax-h3-ref2v-balanced' : 'minimax-h3-i2v-balanced'))
+    // 不产生任何"PDD 策略"：能力下仍然只有内置默认一条
+    eq(`${cap} 策略仍只有内置默认一条`, (mx[cap].strategies || []).length, 1)
+    eq(`${cap} 内置默认不落到 PDD`, mx[cap].strategies[0].tiers.balanced.includes('-pdd'), false)
+    // 用户可以把 PDD 组合进自己的策略（这就是"自由组合"的落点）
+    const projected = projectCapabilityStrategies(reg, cap, { strategies: { [cap]: [{ id: 'p1', name: '我的 PDD 策略', tiers: { balanced: solId } }] } })
+    eq(`${cap} 用户策略可指向 PDD+Sol`, projected[1].tiers.balanced, solId)
+    ok(`${cap} 用户策略在基准可用性下标记可用`, projected[1].available === true || projected[1].available === false)
+    // 不做隐式默认：空 selection 时 balanced 不落到 PDD
     const r = await resolveTieredManifest(cap, 'balanced', null, { registry: reg, probe: SOL_PRESENT, selection: {} })
     ok(`${cap} balanced 隐式解析不落到 PDD`, !r.manifest.id.includes('-pdd'), `实际 ${r.manifest.id}`)
-    ok(`${groupId} 的 PDD 实现 priority<0（显式可选中、不会被隐式选中）`,
-      reg.manifests.filter((m) => m.group === groupId).every((m) => m.priority < 0))
+    // 显式指定仍可用（用户策略写入的就是显式 id）
+    const ex = await resolveTieredManifest(cap, 'balanced', pddId, { registry: reg, probe: ALL_PRESENT, selection: {} })
+    eq(`${pddId} 显式指定可解析`, ex.manifest.id, pddId)
+    ok(`${pddId} priority<0（显式可选中、不会被隐式选中）`, m.priority < 0)
     // 缺节点时如实置灰（不假装可用）
     const mxMissing = await describeTierMatrix(reg, { probe: PDD_MISSING })
-    const gMissing = mxMissing[cap].groups.find((x) => x.id === groupId)
-    eq(`${groupId} 缺 PDD 节点 → 不可用`, gMissing.tiers.balanced.find((w) => w.id === pddId).available, false)
-    // PDD 权重与 base 变体严格配对（ref2va↔ref2va / fl2va↔fl2va）
-    const m = reg.manifests.find((x) => x.id === pddId)
+    const list = ((mxMissing[cap].groups.find((g) => g.id === m.group) || {}).tiers || {}).balanced || []
+    eq(`${pddId} 缺 PDD 节点 → 不可用`, (list.find((w) => w.id === pddId) || {}).available, false)
+    // base 与 PDD 权重严格同族
     const want = cap === R ? 'ref2va' : 'fl2va'
     ok(`${pddId} base/PDD 权重同族（${want}）`, m.assets.unet.default.includes(want) && m.assets.pdd.default.includes(want))
+    // Sol 变体的 requiresNodes 只含 Sol 节点（accelOf 生效，没把 PDD 节点算进去）
+    const ms = reg.manifests.find((x) => x.id === solId)
+    eq(`${solId} requiresNodes`, (ms.requiresNodes || []).join(','), 'SolAttnMiniMaxH3')
   }
 }
 
