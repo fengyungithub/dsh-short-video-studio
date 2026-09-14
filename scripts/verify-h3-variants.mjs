@@ -34,6 +34,9 @@ const MAP = {
   'minimax-h3-i2v-fast': ['minimax-h3-i2v.json', 'fast'],
   'minimax-h3-i2v-quality': ['minimax-h3-i2v.json', 'quality'],
   'minimax-h3-i2v-quality-sol': ['minimax-h3-i2v-sol.json', 'quality'],
+  // PDD：模板由 scripts/make-pdd-template.mjs 从同族 base 生成
+  'minimax-h3-ref2v-pdd-balanced': ['minimax-h3-pdd-ref2v.json', 'balanced'],
+  'minimax-h3-i2v-pdd-balanced': ['minimax-h3-pdd-i2v.json', 'balanced'],
 }
 const ALLOW_DIFF = new Set(['id', 'version', 'description', 'group', 'tier', 'accel', 'displayName', 'estSeconds', 'note', 'priority', 'requiresNodes', 'modes'])
 
@@ -68,6 +71,9 @@ console.log('\n[2] 档位参数：步数 / 长边 / LoRA 配对')
     'minimax-h3-i2v-fast': { steps: 4, longSide: 832, lora: 'fast_lora', sampler: 'res_multistep', shift: 12 },
     'minimax-h3-i2v-quality': { steps: 20, longSide: 1344, lora: null, sampler: 'res_multistep', shift: 12 },
     'minimax-h3-i2v-quality-sol': { steps: 20, longSide: 1344, lora: null, sampler: 'res_multistep', shift: 12, sol: true },
+    // PDD：无蒸馏 LoRA（PDD 自带 trunk + head bank）、shift 必须 12/3、采样器必须 euler
+    'minimax-h3-ref2v-pdd-balanced': { steps: 8, longSide: 1344, lora: null, sampler: 'euler', shift: 12, pdd: true },
+    'minimax-h3-i2v-pdd-balanced': { steps: 8, longSide: 1344, lora: null, sampler: 'euler', shift: 12, pdd: true },
   }
   for (const [id, e] of Object.entries(expect)) {
     const m = read(join(WF, id + '.json'))
@@ -78,7 +84,9 @@ console.log('\n[2] 档位参数：步数 / 长边 / LoRA 配对')
     ok(`${id} LoRA=${e.lora || '无'}`, e.lora ? deepEq(loras, [e.lora]) : loras.length === 0, `实际 ${loras.join('+') || '无'}`)
     ok(`${id} 采样器=${e.sampler}`, m.graph['8'].inputs.sampler_name === e.sampler)
     ok(`${id} shift=${e.shift}/3`, m.graph['2'].inputs.shift_video === e.shift)
-    ok(`${id} Sol 节点${e.sol ? '存在' : '不存在'}`, Boolean(m.graph['2a']) === Boolean(e.sol))
+    const hasClass = (c) => Object.values(m.graph).some((n) => n.class_type === c)
+    ok(`${id} Sol 节点${e.sol ? '存在' : '不存在'}`, hasClass('SolAttnMiniMaxH3') === Boolean(e.sol))
+    ok(`${id} PDD 节点${e.pdd ? '存在' : '不存在'}`, hasClass('MiniMaxH3PDDAccApply') === Boolean(e.pdd))
     if (e.sol) {
       ok(`${id} Sol 关键参数（dense_first_percent=0 / tau 生效）`,
         m.graph['2a'].inputs.dense_first_percent === 0 && m.graph['2a'].inputs.tau > 0,
@@ -86,6 +94,24 @@ console.log('\n[2] 档位参数：步数 / 长边 / LoRA 配对')
       ok(`${id} Sol 接线：BasicGuider/BasicScheduler → 2a`,
         m.graph['7'].inputs.model[0] === '2a' && m.graph['9'].inputs.model[0] === '2a')
       ok(`${id} requiresNodes=SolAttnMiniMaxH3`, deepEq(m.requiresNodes, ['SolAttnMiniMaxH3']))
+    }
+    if (e.pdd) {
+      // PDD 的不变量：任何一条被破掉都会退化成"普通 8 步无 LoRA"（画质掉档却查不出原因）
+      const apply = Object.entries(m.graph).find(([, n]) => n.class_type === 'MiniMaxH3PDDAccApply')
+      const [applyId, applyNode] = apply || ['?', { inputs: {} }]
+      ok(`${id} nfe 与档位步数一致（防两处漂移）`, applyNode.inputs.nfe === String(mc.steps),
+        `nfe=${applyNode.inputs.nfe} steps=${mc.steps}`)
+      ok(`${id} on_off_grid/partition_check 都是 fail-closed`,
+        applyNode.inputs.on_off_grid === 'error' && applyNode.inputs.partition_check === 'error')
+      ok(`${id} 已删除 BasicScheduler（sigmas 必须来自 PDD 训练网格）`,
+        !hasClass('BasicScheduler'))
+      ok(`${id} sigmas 取自 Apply 节点`, m.graph['10'].inputs.sigmas?.[0] === applyId && m.graph['10'].inputs.sigmas?.[1] === 1)
+      ok(`${id} guider 走 PDD 打过的 model`, m.graph['7'].inputs.model?.[0] === applyId)
+      ok(`${id} 图里没有任何蒸馏 LoRA（PDD 不叠加）`, !hasClass('LoraLoaderModelOnly'))
+      ok(`${id} requiresNodes=MiniMaxH3PDDAccApply`, deepEq(m.requiresNodes, ['MiniMaxH3PDDAccApply']))
+      ok(`${id} base 与 PDD 权重同族（ref2va↔ref2va / fl2va↔fl2va）`,
+        String(m.assets.unet?.default || '').includes(id.includes('-i2v') ? 'fl2va' : 'ref2va') &&
+        String(m.assets.pdd?.default || '').includes(id.includes('-i2v') ? 'fl2va' : 'ref2va'))
     }
   }
 }

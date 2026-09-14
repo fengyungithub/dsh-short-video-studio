@@ -3,8 +3,8 @@
   "version": 1,
   "capability": "video.reference2video",
   "runner": "comfyui",
-  "displayName": "MiniMax H3 参考生成视频（PDD 8 步）",
-  "description": "PDD（Parallel Decoding Distillation）8 步参考生成：Ref2VA PDD 权重 + PDD head bank，shift 12/3 + euler + CFG 1.0，sigmas 由 Apply 节点给出（训练网格）。必须移除外挂蒸馏 LoRA（不叠加）。",
+  "displayName": "MiniMax H3 参考生成视频 · PDD 蒸馏",
+  "description": "PDD（Parallel Decoding Distillation）8 步：PDD 权重自带 trunk LoRA + head bank，shift 必须 12/3、采样器必须 euler、sigmas 取自 Apply 节点的训练网格；base 用 ref2va（必须与 Ref2VA 的 PDD 权重配对，节点有指纹守卫）。**必须移除其它蒸馏 LoRA**（不叠加）。由 scripts/make-pdd-template.mjs 生成，请勿手改。",
   "output": {
     "mediaType": "video",
     "hasAudio": true
@@ -50,6 +50,17 @@
         "weight_dtype": "default"
       }
     },
+    "2": {
+      "class_type": "MiniMaxH3SigmaShift",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "shift_video": 12,
+        "shift_audio": 3
+      }
+    },
     "3": {
       "class_type": "CLIPLoader",
       "inputs": {
@@ -61,23 +72,6 @@
       "class_type": "VAELoader",
       "inputs": {
         "vae_name": "$assets.vae"
-      }
-    },
-    "4a": {
-      "class_type": "VAELoader",
-      "inputs": {
-        "vae_name": "$assets.audio_vae"
-      }
-    },
-    "2": {
-      "class_type": "MiniMaxH3SigmaShift",
-      "inputs": {
-        "model": [
-          "1",
-          0
-        ],
-        "shift_video": 12,
-        "shift_audio": 3
       }
     },
     "5": {
@@ -165,19 +159,6 @@
         ]
       }
     },
-    "11a": {
-      "class_type": "VAEDecodeAudio",
-      "inputs": {
-        "samples": [
-          "10",
-          0
-        ],
-        "vae": [
-          "4a",
-          0
-        ]
-      }
-    },
     "12": {
       "class_type": "CreateVideo",
       "inputs": {
@@ -204,6 +185,25 @@
         "codec": "h264"
       }
     },
+    "4a": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "$assets.audio_vae"
+      }
+    },
+    "11a": {
+      "class_type": "VAEDecodeAudio",
+      "inputs": {
+        "samples": [
+          "10",
+          0
+        ],
+        "vae": [
+          "4a",
+          0
+        ]
+      }
+    },
     "2a": {
       "class_type": "MiniMaxH3PDDAccApply",
       "inputs": {
@@ -213,8 +213,8 @@
         ],
         "pdd_file": "$assets.pdd",
         "nfe": "8",
-        "lora_strength": 1.0,
-        "head_strength": 1.0,
+        "lora_strength": 1,
+        "head_strength": 1,
         "on_off_grid": "error",
         "partition": "",
         "enabled": true,
@@ -317,10 +317,11 @@
     "maxDurationFrames": 310,
     "supportsSubtitles": true
   },
+  "group": "minimax-h3-ref2v-pdd",
   "tier": "balanced",
-  "group": "minimax-h3-pdd",
   "requiresNodes": [
     "MiniMaxH3PDDAccApply"
   ],
-  "note": "PDD 8 步 · nfe=8 · shift 12/3 · euler · CFG 1.0"
+  "priority": -30,
+  "note": "PDD 8 步 · shift 12/3 · euler · CFG 1.0"
 }

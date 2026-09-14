@@ -1,10 +1,10 @@
 {
-  "id": "minimax-h3-i2v-sol",
+  "id": "minimax-h3-pdd-ref2v-sol",
   "version": 1,
-  "capability": "video.image2video",
+  "capability": "video.reference2video",
   "runner": "comfyui",
-  "displayName": "MiniMax H3 首/末帧串联视频（带声音） · Sol-Attn 加速",
-  "description": "[加速工作流 · 需自装自定义节点 cicalooo/ComfyUI-SolAttn-Ampere] 在 MiniMaxH3SigmaShift 之后插入 Sol-Attn MiniMax H3 块稀疏注意力（Ampere/sm_80+，torch>=2.5，纯 torch.compile(flex_attention)），tau=1.2。不装节点会报 node type not found；\"不被选为隐式默认\"由 accel 标注 + 同档排序（非加速优先）保证，priority 不再承担该职责。原清单说明：本地 MiniMax H3 音视频模型，首帧/末帧串联（ImageToVideo），用于同场景续接镜，带音频。★base 用 FL2VA 变体（H3 官方 I2V/T2V 即用这套权重；Ref2VA 是给参考绑定用的另一套，两者不可混用为同一档的默认）；搭配 fl2v 系 4 步 LoRA（544p 训练域，训练 shift 12/3）。★LoRA 与 shift 必须配对：本档 4 步 544p 系 = 12/3；若改挂 768p 系 LoRA（v1.x 768p / 8step 768p）必须同时把 graph 节点 2 的 shift_video 改成 6.0 并把分辨率抬进 768p 训练域，否则不是画质下降而是结构性崩坏。",
+  "displayName": "MiniMax H3 参考生成视频 · PDD 蒸馏 · Sol-Attn 加速",
+  "description": "[加速工作流 · 需自装自定义节点 cicalooo/ComfyUI-SolAttn-Ampere] 在 MiniMaxH3SigmaShift 之后插入 Sol-Attn MiniMax H3 块稀疏注意力（Ampere/sm_80+，torch>=2.5，纯 torch.compile(flex_attention)），tau=1.2。不装节点会报 node type not found；\"不被选为隐式默认\"由 accel 标注 + 同档排序（非加速优先）保证，priority 不再承担该职责。原清单说明：PDD（Parallel Decoding Distillation）8 步：PDD 权重自带 trunk LoRA + head bank，shift 必须 12/3、采样器必须 euler、sigmas 取自 Apply 节点的训练网格；base 用 ref2va（必须与 Ref2VA 的 PDD 权重配对，节点有指纹守卫）。**必须移除其它蒸馏 LoRA**（不叠加）。由 scripts/make-pdd-template.mjs 生成，请勿手改。",
   "output": {
     "mediaType": "video",
     "hasAudio": true
@@ -13,9 +13,9 @@
   "assets": {
     "unet": {
       "kind": "checkpoint",
-      "default": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
-      "env": "DSH_SVS_H3_MODEL_FL",
-      "label": "H3 FL2VA UNet"
+      "default": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "env": "DSH_SVS_H3_MODEL_REF",
+      "label": "H3 参考 UNet"
     },
     "clip": {
       "kind": "clip",
@@ -27,7 +27,7 @@
       "kind": "vae",
       "default": "minimax_h3_video_vae_fp16.safetensors",
       "env": "DSH_SVS_H3_VAE",
-      "label": "H3 视频 VAE（int8_convrot 为可选加速件，经配置/assetOverrides 切换）"
+      "label": "H3 视频 VAE"
     },
     "audio_vae": {
       "kind": "vae",
@@ -35,11 +35,11 @@
       "env": "DSH_SVS_H3_AUDIO_VAE",
       "label": "H3 音频 VAE"
     },
-    "fast_lora": {
-      "kind": "lora",
-      "default": "minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy.safetensors",
-      "env": "DSH_SVS_H3_LORA_FL_FAST",
-      "label": "H3 fl2v fast LoRA（544p，shift 12/3）"
+    "pdd": {
+      "kind": "other",
+      "default": "minimax_h3_ref2va_pdd_acc_8step_comfyui.safetensors",
+      "env": "DSH_SVS_H3_PDD_REF2V",
+      "label": "MiniMax-H3 Ref2VA PDD Acc 8 步（放 models/pdd_acc/）"
     }
   },
   "graph": {
@@ -54,7 +54,7 @@
       "class_type": "MiniMaxH3SigmaShift",
       "inputs": {
         "model": [
-          "$model",
+          "1",
           0
         ],
         "shift_video": 12,
@@ -75,7 +75,7 @@
       }
     },
     "5": {
-      "class_type": "MiniMaxH3ImageToVideo",
+      "class_type": "MiniMaxH3ReferenceToVideo",
       "inputs": {
         "clip": [
           "3",
@@ -85,10 +85,15 @@
           "4",
           0
         ],
+        "audio_vae": [
+          "4a",
+          0
+        ],
         "prompt": null,
         "width": null,
         "height": null,
-        "length": null
+        "length": null,
+        "ref_image_size": "match"
       }
     },
     "6": {
@@ -101,7 +106,7 @@
       "class_type": "BasicGuider",
       "inputs": {
         "model": [
-          "2a",
+          "2b",
           0
         ],
         "conditioning": [
@@ -113,19 +118,7 @@
     "8": {
       "class_type": "KSamplerSelect",
       "inputs": {
-        "sampler_name": "res_multistep"
-      }
-    },
-    "9": {
-      "class_type": "BasicScheduler",
-      "inputs": {
-        "model": [
-          "2a",
-          0
-        ],
-        "scheduler": "simple",
-        "steps": null,
-        "denoise": 1
+        "sampler_name": "euler"
       }
     },
     "10": {
@@ -144,8 +137,8 @@
           0
         ],
         "sigmas": [
-          "9",
-          0
+          "2a",
+          1
         ],
         "latent_image": [
           "5",
@@ -212,10 +205,27 @@
       }
     },
     "2a": {
-      "class_type": "SolAttnMiniMaxH3",
+      "class_type": "MiniMaxH3PDDAccApply",
       "inputs": {
         "model": [
           "2",
+          0
+        ],
+        "pdd_file": "$assets.pdd",
+        "nfe": "8",
+        "lora_strength": 1,
+        "head_strength": 1,
+        "on_off_grid": "error",
+        "partition": "",
+        "enabled": true,
+        "partition_check": "error"
+      }
+    },
+    "2b": {
+      "class_type": "SolAttnMiniMaxH3",
+      "inputs": {
+        "model": [
+          "2a",
           0
         ],
         "enabled": true,
@@ -265,13 +275,6 @@
         "field": "noise_seed"
       }
     },
-    "steps": {
-      "inject": "scalar",
-      "to": {
-        "node": "9",
-        "field": "steps"
-      }
-    },
     "fps": {
       "inject": "scalar",
       "to": {
@@ -280,45 +283,15 @@
       },
       "default": 24
     },
-    "first_frame": {
+    "refs": {
       "inject": "image",
       "via": "node",
       "node": "LoadImage",
       "to": {
         "node": "5",
-        "field": "first_frame"
+        "field": "ref_images.ref_image_${i}"
       },
-      "preprocess": [
-        {
-          "class_type": "ImageScale",
-          "inputs": {
-            "upscale_method": "lanczos",
-            "width": "${width}",
-            "height": "${height}",
-            "crop": "disabled"
-          }
-        }
-      ]
-    },
-    "last_frame": {
-      "inject": "image",
-      "via": "node",
-      "node": "LoadImage",
-      "to": {
-        "node": "5",
-        "field": "last_frame"
-      },
-      "preprocess": [
-        {
-          "class_type": "ImageScale",
-          "inputs": {
-            "upscale_method": "lanczos",
-            "width": "${width}",
-            "height": "${height}",
-            "crop": "disabled"
-          }
-        }
-      ]
+      "max": 8
     },
     "prefix": {
       "inject": "scalar",
@@ -326,34 +299,27 @@
         "node": "13",
         "field": "filename_prefix"
       }
+    },
+    "nfe": {
+      "inject": "scalar",
+      "to": {
+        "node": "2a",
+        "field": "nfe"
+      },
+      "default": "8"
     }
   },
   "modes": {
-    "quality": {
-      "steps": 20,
-      "longSide": 1344,
-      "loras": []
-    },
-    "fast": {
-      "steps": 4,
-      "longSide": 832,
-      "loras": [
-        {
-          "asset": "fast_lora",
-          "strength": 1
-        }
-      ]
+    "balanced": {
+      "steps": 8,
+      "longSide": 1344
     }
   },
   "resolution": {
     "policy": "aspect-ratio",
     "snap": 32,
     "default": {
-      "fast": [
-        832,
-        480
-      ],
-      "quality": [
+      "balanced": [
         1344,
         768
       ]
@@ -368,5 +334,11 @@
     "maxDurationFrames": 310,
     "supportsSubtitles": true
   },
-  "priority": 0
+  "group": "minimax-h3-ref2v-pdd",
+  "tier": "balanced",
+  "requiresNodes": [
+    "MiniMaxH3PDDAccApply"
+  ],
+  "priority": 0,
+  "note": "PDD 8 步 · shift 12/3 · euler · CFG 1.0"
 }

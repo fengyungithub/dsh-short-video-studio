@@ -30,6 +30,10 @@ const DRY = process.argv.includes('--dry')
 
 const GROUP_REF2V = { id: 'minimax-h3-ref2v', displayName: 'MiniMax H3 参考生成视频', capability: 'video.reference2video' }
 const GROUP_I2V = { id: 'minimax-h3-i2v', displayName: 'MiniMax H3 首末帧生成视频', capability: 'video.image2video' }
+// PDD 是**每个能力各自独立的策略**（独立组、独立档位集合），不混进既有组的「有加速」策略里：
+// 它与 Sol-Attn 是两种不同的东西（一个靠蒸馏换步数，一个靠稀疏注意力换算力），用户应分别选。
+const GROUP_REF2V_PDD = { id: 'minimax-h3-ref2v-pdd', displayName: 'MiniMax H3 参考生成视频 · PDD 蒸馏', capability: 'video.reference2video' }
+const GROUP_I2V_PDD = { id: 'minimax-h3-i2v-pdd', displayName: 'MiniMax H3 首末帧生成视频 · PDD 蒸馏', capability: 'video.image2video' }
 
 /**
  * 变体表：一份 = 一个档位实现。
@@ -51,6 +55,14 @@ const VARIANTS = [
   { out: 'minimax-h3-i2v-balanced-sol', group: GROUP_I2V, tier: 'balanced', accel: 'sol', template: 'minimax-h3-i2v-8step-sol.json', mode: 'balanced', estSeconds: 131, note: 'Sol-Attn 加速 · 实测 130.5s（1.36×，tau 1.2）' },
   { out: 'minimax-h3-i2v-quality', group: GROUP_I2V, tier: 'quality', template: 'minimax-h3-i2v.json', mode: 'quality', estSeconds: 394.8, note: '20 步 · 实测 394.8s' },
   { out: 'minimax-h3-i2v-quality-sol', group: GROUP_I2V, tier: 'quality', accel: 'sol', template: 'minimax-h3-i2v-sol.json', mode: 'quality', estSeconds: 314.7, note: 'Sol-Attn 加速 · 实测 314.7s（1.25×）' },
+  // PDD（2026 引入）：8 步 nfe=8 就能达到 20 步成片档的细节量，成本约 185s（≈ 2.1× 提速）。
+  // priority 为负 = **不做隐式默认**（依赖第三方节点 MiniMaxH3PDDAccApply，须用户显式选策略）。
+  { out: 'minimax-h3-ref2v-pdd-balanced', group: GROUP_REF2V_PDD, tier: 'balanced', priority: -30, template: 'minimax-h3-pdd-ref2v.json', mode: 'balanced', estSeconds: 185, note: 'PDD nfe=8 · shift 12/3 · euler · 实测 184.7s（细节量高于 20 步成片档）' },
+  { out: 'minimax-h3-i2v-pdd-balanced', group: GROUP_I2V_PDD, tier: 'balanced', priority: -30, template: 'minimax-h3-pdd-i2v.json', mode: 'balanced', estSeconds: 179, note: 'PDD nfe=8 · shift 12/3 · euler · 实测 178.8s（细节量高于 20 步成片档）' },
+  // PDD 组内的第二个策略：叠 Sol-Attn（Sol 只改注意力，PDD 的 sigma 网格与 head bank 不受影响）。
+  // 实测 ref2v：184.7s → 137.3s（1.35×），细节量从"高于 20 步成片档"回落到"与成片档持平"。
+  { out: 'minimax-h3-ref2v-pdd-balanced-sol', group: GROUP_REF2V_PDD, tier: 'balanced', accel: 'sol', priority: -30, template: 'minimax-h3-pdd-ref2v-sol.json', mode: 'balanced', estSeconds: 137, note: 'PDD + Sol-Attn（tau 1.2）· 实测 137.3s（对 PDD 单独 1.35×；细节量仍与 20 步成片档持平）' },
+  { out: 'minimax-h3-i2v-pdd-balanced-sol', group: GROUP_I2V_PDD, tier: 'balanced', accel: 'sol', priority: -30, template: 'minimax-h3-pdd-i2v-sol.json', mode: 'balanced', estSeconds: 134, note: 'PDD + Sol-Attn（tau 1.2）· 实测 134.1s（对 PDD 单独 1.33×）' },
 ]
 
 /**
@@ -86,7 +98,7 @@ function buildVariant(spec, templates) {
   m.description = `${spec.group.displayName} · ${spec.tier} 档${spec.accel ? `（${spec.accel} 加速实现）` : ''}。由 scripts/make-h3-variants.mjs 生成，请勿手改。`
   m.estSeconds = spec.estSeconds
   m.note = spec.note
-  m.priority = 0
+  m.priority = Number.isFinite(spec.priority) ? spec.priority : 0
   // 只保留本档的 mode（名称即档位名）
   m.modes = { [spec.tier]: modeCfg }
   if (spec.accel) m.accel = spec.accel
@@ -100,6 +112,10 @@ function buildVariant(spec, templates) {
     const diff = [...classTypes(m.graph)].filter((c) => !classTypes(stock.graph).has(c))
     if (!diff.length) throw new Error(`${spec.out} 声明了 accel 但图与标准版无节点差异`)
     m.requiresNodes = diff.sort()
+  } else if (Array.isArray(src.requiresNodes) && src.requiresNodes.length) {
+    // 非 accel 变体也可以自带第三方依赖（如 PDD 的 Apply 节点）——直接沿用模板声明，
+    // 这样可用性预检/置灰对 PDD 同样生效（缺节点时不会假装可用）。
+    m.requiresNodes = [...src.requiresNodes].sort()
   } else {
     delete m.requiresNodes
   }

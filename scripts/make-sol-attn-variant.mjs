@@ -36,11 +36,19 @@ const argv = process.argv.slice(2)
 let outDir = join(ROOT, 'scripts', 'h3-templates')   // 模板层，非 workflows/ 产物层
 let tau = 1.2
 let solPriority = SOL_PRIORITY
+// 锚点 = Sol 节点吃谁的 model 输出，并把其它指向该输出的连线改指 Sol。
+// 默认 '2'（SigmaShift）即常规 Sol 变体；PDD 清单要传 --after=2a（PDD Apply 节点）——
+// 顺序是 PDD 在内、Sol 在外：PDD 要读干净模型做指纹/装 head bank，Sol 只改注意力，
+// 而 PDD 的 SIGMAS 是第 1 号输出，不会被改线（只改 [x,0]）。
+let argvAnchor = null
+let argvNodeId = null
 const files = []
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === '--out') outDir = resolve(argv[++i])
   else if (argv[i] === '--tau') tau = Number(argv[++i])
   else if (argv[i] === '--priority') solPriority = Number(argv[++i])
+  else if (argv[i] === '--after') argvAnchor = argv[++i]
+  else if (argv[i] === '--node-id') argvNodeId = argv[++i]
   else files.push(argv[i])
 }
 const sources = files.length
@@ -61,11 +69,23 @@ for (const srcPath of sources) {
   const newId = `${src.id}-sol`
   const modes = Object.keys(src.modes || {})
 
+  // 模板自带 PDD Apply 节点时，锚点必须换成它（否则 Sol 会插在 PDD **之前**，
+  // 把 PDD 推到外层去吃一个被包装过的 model）。顺序：SigmaShift → PDD → Sol → guider，
+  // PDD 的 SIGMAS 是 1 号输出，不参与改线，所以 sigmas 仍来自 PDD（Sol 不动 sigma）。
+  const pddHit = Object.entries(src.graph || {}).find(([, n]) => n.class_type === 'MiniMaxH3PDDAccApply')
+  const effAnchor = argvAnchor ?? (pddHit ? pddHit[0] : SIGMA_NODE)
+  const effNodeId = argvNodeId ?? (pddHit && pddHit[0] === SOL_NODE ? '2b' : SOL_NODE)
+  if (v.graph[effNodeId] && effNodeId !== pddHit?.[0]) {
+    console.error(`✗ ${src.id}: 节点 id ${effNodeId} 已被占用（${v.graph[effNodeId].class_type}），请用 --node-id 指定空闲 id`)
+    process.exitCode = 1
+    continue
+  }
+
   // 1) 插入 Sol-Attn 节点（model 来自 SigmaShift 输出）
-  v.graph[SOL_NODE] = {
+  v.graph[effNodeId] = {
     class_type: SOL_CLASS,
     inputs: {
-      model: [SIGMA_NODE, 0],
+      model: [effAnchor, 0],
       enabled: true,          // 置 false 即"接线不变、不稀疏"的完美对照臂（同图 A/B）
       tau,                    // 稀疏强度：越大越快、越糙；1.0–1.5 是速度优先区间
       min_seq_len: 8192,      // 低于此 token 数不稀疏（H3 的 124 帧 480p≈12k、768p≈31k 都会命中）
@@ -84,10 +104,10 @@ for (const srcPath of sources) {
   // 2) 把所有（除自身外）指向 SigmaShift 的 model 连线改指 Sol-Attn
   let repointed = []
   for (const [id, node] of Object.entries(v.graph)) {
-    if (id === SOL_NODE) continue
+    if (id === effNodeId) continue
     for (const [field, val] of Object.entries(node.inputs || {})) {
-      if (Array.isArray(val) && val.length === 2 && val[0] === SIGMA_NODE && val[1] === 0) {
-        node.inputs[field] = [SOL_NODE, 0]
+      if (Array.isArray(val) && val.length === 2 && val[0] === effAnchor && val[1] === 0) {
+        node.inputs[field] = [effNodeId, 0]
         repointed.push(`${id}.${field}`)
       }
     }
@@ -96,7 +116,7 @@ for (const srcPath of sources) {
   v.id = newId
   v.displayName = `${src.displayName || src.id} · Sol-Attn 加速`
   v.priority = solPriority
-  v.description = `[加速工作流 · 需自装自定义节点 cicalooo/ComfyUI-SolAttn-Ampere] 在 MiniMaxH3SigmaShift 之后插入 Sol-Attn MiniMax H3 块稀疏注意力（Ampere/sm_80+，torch>=2.5，纯 torch.compile(flex_attention)），tau=${tau}。不装节点会报 node type not found；priority=${solPriority} 保证它不会被选为隐式默认档。原清单说明：${src.description || ''}`.slice(0, 900)
+  v.description = `[加速工作流 · 需自装自定义节点 cicalooo/ComfyUI-SolAttn-Ampere] 在 MiniMaxH3SigmaShift 之后插入 Sol-Attn MiniMax H3 块稀疏注意力（Ampere/sm_80+，torch>=2.5，纯 torch.compile(flex_attention)），tau=${tau}。不装节点会报 node type not found；"不被选为隐式默认"由 accel 标注 + 同档排序（非加速优先）保证，priority 不再承担该职责。原清单说明：${src.description || ''}`.slice(0, 900)
 
   // 3) 校验：清单合法 + 编译出的图里接线正确、无残留哨兵
   const check = validateManifest(v, newId)
@@ -120,14 +140,16 @@ for (const srcPath of sources) {
   if (graph) {
     const g = JSON.stringify(graph)
     if (/\$assets\.|\$model/.test(g)) errs.push('编译产物残留哨兵 $assets./$model')
-    if (graph[SOL_NODE]?.inputs?.model?.[0] !== SIGMA_NODE) errs.push(`${SOL_NODE}.model 未指向节点 ${SIGMA_NODE}`)
+    if (graph[effNodeId]?.inputs?.model?.[0] !== effAnchor) errs.push(`${effNodeId}.model 未指向节点 ${effAnchor}`)
     for (const [id, node] of Object.entries(graph)) {
-      if (id === SOL_NODE) continue
+      if (id === effNodeId) continue
       for (const [field, val] of Object.entries(node.inputs || {})) {
-        if (Array.isArray(val) && val[0] === SIGMA_NODE && val[1] === 0) errs.push(`${id}.${field} 仍指向 ${SIGMA_NODE}（漏改）`)
+        if (Array.isArray(val) && val[0] === effAnchor && val[1] === 0) errs.push(`${id}.${field} 仍指向 ${effAnchor}（漏改）`)
       }
     }
-    if (repointed.length < 2) errs.push(`只改到 ${repointed.length} 条 model 连线（BasicGuider/BasicScheduler 应为 2 条）`)
+    // 常规 Sol 变体锚点是 SigmaShift，应有 BasicGuider + BasicScheduler 两条；PDD 锚点只有 guider 一条。
+    const minRefs = effAnchor === SIGMA_NODE ? 2 : 1
+    if (repointed.length < minRefs) errs.push(`只改到 ${repointed.length} 条 model 连线（锚点 ${effAnchor} 至少应有 ${minRefs} 条）`)
   }
 
   const dest = join(outDir, `${newId}.json`)
@@ -137,6 +159,6 @@ for (const srcPath of sources) {
     continue
   }
   writeFileSync(dest, JSON.stringify(v, null, 2) + '\n', 'utf8')
-  console.log(`✓ ${src.id} → ${newId}  (${repointed.join(', ')} 改指 ${SOL_NODE}; tau=${tau})`)
+  console.log(`✓ ${src.id} → ${newId}  (${repointed.join(', ')} 改指 ${effNodeId}; 锚点 ${effAnchor}; tau=${tau})`)
   console.log(`   写入 ${dest}`)
 }

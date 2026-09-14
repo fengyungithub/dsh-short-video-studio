@@ -73,6 +73,8 @@ const probeWith = (nodes, unknown = false) => async (cls) => {
 }
 const SOL_PRESENT = probeWith(['SolAttnMiniMaxH3', 'SolAttnStats'])
 const SOL_MISSING = probeWith(['SolAttnStats'])
+// 有 Sol-Attn、缺 PDD 节点：用于断言 PDD 实现会如实置灰（而不是假装可用后渲染时才炸）
+const PDD_MISSING = probeWith(['SolAttnMiniMaxH3', 'SolAttnStats'])
 
 const cfg = (tiers) => ({ tiers })
 
@@ -226,6 +228,39 @@ console.log('\n[10] 拆分迁移：新 id 继承旧配置（不丢用户的 int8
   // 别名表不允许指向不存在的旧 id 之外的怪值（形如 minimax-h3-*）
   const badAlias = Object.entries(I.ASSET_OVERRIDE_ALIASES).flatMap(([k, v]) => v.filter((x) => !/^minimax-h3-/.test(x)).map((x) => k + '→' + x))
   ok('别名表指向合法旧 id', badAlias.length === 0, badAlias.join(', '))
+}
+
+console.log('\n[11] PDD：每能力独立策略（独立组、独立档位集合、不做隐式默认）')
+{
+  const I = _internals
+  const reg = I.getRegistry()
+  for (const [cap, groupId, pddId, solId] of [
+    [R, 'minimax-h3-ref2v-pdd', 'minimax-h3-ref2v-pdd-balanced', 'minimax-h3-ref2v-pdd-balanced-sol'],
+    ['video.image2video', 'minimax-h3-i2v-pdd', 'minimax-h3-i2v-pdd-balanced', 'minimax-h3-i2v-pdd-balanced-sol'],
+  ]) {
+    const mx = await describeTierMatrix(reg, { probe: SOL_PRESENT })
+    const g = mx[cap].groups.find((x) => x.id === groupId)
+    ok(`${cap} 有独立 PDD 组`, Boolean(g), mx[cap].groups.map((x) => x.id).join(', '))
+    // 组内两种实现 → 恰好两条策略（不带 Sol / 带 Sol），这就是"用户自由组合"的落点
+    eq(`${groupId} 策略数`, g.strategies.length, 2)
+    eq(`${groupId} 策略标签带组名`, g.strategies.every((s) => s.label.includes('PDD')), true)
+    eq(`${groupId} 只提供 balanced 一档`, Object.keys(g.tiers).join('/'), 'balanced')
+    eq(`${groupId} 不带 Sol 的策略指向 PDD 实现`, g.strategies[0].tiers.balanced, pddId)
+    eq(`${groupId} 带 Sol 的策略指向 PDD+Sol 实现`, g.strategies[1].tiers.balanced, solId)
+    // 不做隐式默认：selection 注入空时，balanced 必须解析到原有实现而不是 PDD
+    const r = await resolveTieredManifest(cap, 'balanced', null, { registry: reg, probe: SOL_PRESENT, selection: {} })
+    ok(`${cap} balanced 隐式解析不落到 PDD`, !r.manifest.id.includes('-pdd'), `实际 ${r.manifest.id}`)
+    ok(`${groupId} 的 PDD 实现 priority<0（显式可选中、不会被隐式选中）`,
+      reg.manifests.filter((m) => m.group === groupId).every((m) => m.priority < 0))
+    // 缺节点时如实置灰（不假装可用）
+    const mxMissing = await describeTierMatrix(reg, { probe: PDD_MISSING })
+    const gMissing = mxMissing[cap].groups.find((x) => x.id === groupId)
+    eq(`${groupId} 缺 PDD 节点 → 不可用`, gMissing.tiers.balanced.find((w) => w.id === pddId).available, false)
+    // PDD 权重与 base 变体严格配对（ref2va↔ref2va / fl2va↔fl2va）
+    const m = reg.manifests.find((x) => x.id === pddId)
+    const want = cap === R ? 'ref2va' : 'fl2va'
+    ok(`${pddId} base/PDD 权重同族（${want}）`, m.assets.unet.default.includes(want) && m.assets.pdd.default.includes(want))
+  }
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`)
