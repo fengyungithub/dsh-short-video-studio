@@ -12,7 +12,7 @@
 ### 🖥️ 本地化、0 成本的视频工作流
 
 - **零云端依赖**：默认图片用 FLUX 2、视频用 MiniMax H3 **音视频 AV 模型**（**带声音**、支持**参考图绑定**与**画面内原生字幕**，对白直接写进 prompt，无需后期叠加）——两者都只是内置默认，可整体替换为你自己的任何 ComfyUI 模型/工作流。
-- **画质/速度三档（tier）**：视频 `fast`（调试 / 调构图，长边 832）· `balanced`（日常，画质与耗时平衡，长边 1344）· `quality`（成片，长边 1344）；旧参数 `mode=` 为兼容别名。**加速不暴露到产品层**——设置页选的是策略条目「（无加速）/（有加速）」。图生图仍走 `fast` / `quality` 的 mode 轴（图片清单未分档）。分辨率按画布比例自动推导，支持 16:9 / 9:16 / 1:1 等任意画幅，snap32。
+- **画质/速度三档（tier）**：视频 `fast`（调试 / 调构图，长边 832）· `balanced`（日常，画质与耗时平衡，长边 1344）· `quality`（成片，长边 1344）；旧参数 `mode=` 为兼容别名。**加速不暴露到产品层**——设置页每个能力只有一条**内置默认策略**，其余策略由你自己命名与组合（见下）。图生图仍走 `fast` / `quality` 的 mode 轴（图片清单未分档）。分辨率按画布比例自动推导，支持 16:9 / 9:16 / 1:1 等任意画幅，snap32。
 - **图片双模（文生图 / 图生图）**：t2i 用 FLUX 2 直接出卡（角色卡 / 场景卡 / 分镜图），i2i 用 FLUX 2 ReferenceLatent **改绘**——保持主体不变、换背景 / 场景 / 画风 / 去水印；单张参考图、尺寸跟随参考图（≤1MP），`quality`（20 步无 LoRA，保真）/ `fast`（8 步 Turbo LoRA，调试快），可一次出 1–4 张。
 - **完整后处理**：同场景末帧串联（连续性过渡）、生成式转场镜、抽帧、拼接合成（本机有 ffmpeg 走零重编码，否则 ComfyUI 纯节点链路）——一条龙出片。
 
@@ -134,7 +134,7 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 ├── schemas/              # workflow-manifest 权威 JSON Schema
 ├── skills/               # 自带 skill（安装时复制到 ~/.dsh/skills/）
 ├── docs/                 # 架构 / 契约 / 实验报告
-└── scripts/              # 冒烟 / e2e / 导入转换脚本
+└── scripts/              # 冒烟 / e2e / 导入转换 / 模板生成（h3-templates → workflows）与实测（bench-h3）脚本
 ```
 
 ## 内置工作流清单（默认，可替换）
@@ -156,7 +156,8 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 
 - **产品层档位是受控三档**：`fast`（调试 / 调构图，长边 832）/ `balanced`（日常，画质与耗时平衡，长边 1344）/ `quality`（成片，长边 1344）。呼叫 `comfy_generate_video(tier=…)` / `comfy_render(tier=…)`；**旧参数 `mode=` 保留为兼容别名**（`mode=fast|balanced|quality` 与 `tier` 等价）。缺省是 `quality` —— **成本最高，技能与手工调用都建议显式传 `tier=`**。
 - **请求了不存在的档位不会静默换档**：如 i2v 请求 `tier=balanced` → 工具**显式报错并列出可用档位**，改请求可用档位即可（不要原样重试）。
-- **分辨率读清单（长边）+ 画布比例推导**：`fast` 长边 832、`balanced`/`quality` 长边 1344；工具条会显式传 `size=WxH`（显式优先）。
+- **分辨率读清单（长边）+ 画布比例推导**：`fast` 长边 832、`balanced`/`quality` 长边 1344；工具条会显式传 `size=WxH`（显式优先）。长边由**清单**声明，UI 不按档位名硬编码。
+- **策略与档位的关系**：策略就是把「每个档用哪份清单」存成一套并起个名；点选后写入配置 `tiers`（快照语义）。逐档下拉＝不命名的临时组合（显示为「自定义」）。两者都随时可改，技能侧始终只传 `tier`。
 - **加速不暴露到产品层**：设置页每个能力默认只放**一条内置默认策略**（跟随注册表首选 = 各档非加速首选实现）。**技能与文档只写 `tier`，不写加速实现 id 或节点名。**
 - **策略由你自己命名与组合**：点「＋ 新增策略（命名 + 逐档组合）」→ 起名 + 逐档从现有清单里挑（可按家族跨清单组合，例如 balanced 用 PDD+Sol、quality 用标准），保存即选用；之后可重命名/删除。Sol / PDD 都只是**可选清单**，不会被自动包装成"官方策略"。逐档下拉也随时可用（不保存为策略时显示为「自定义」）。
   - ⚠️ Sol 清单**需自装第三方节点** [ComfyUI-SolAttn-Ampere](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere)（注册名 `SolAttnMiniMaxH3`，没装会报 node type not found）；缺节点时该实现**置灰不可用**（不静默回退到标准实现）。
@@ -169,12 +170,12 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 | ref2v（832×480 / 1344×768） | 24.6s | 166.3s | 136.3s | 396.6s | 311.2s |
 | i2v（832×480 / 1344×768） | 26.1s | 177.3s | 130.5s | 394.8s | 314.7s |
 
-**PDD 策略**（独立组，长边 1344）：ref2v **184.7s** / 叠加 Sol **137.3s**；i2v **178.8s** / 叠加 Sol **134.1s**。同条件下的 20 步成片档为 394.4s / 392.4s（PDD 的锐度还高 +10.3% / +7.9%）→ **PDD 相当于用 8 步的钱买 20 步的画质**。
+**PDD 清单**（长边 1344，需自己在设置页组进策略）：ref2v **184.7s** / 叠加 Sol **137.3s**；i2v **178.8s** / 叠加 Sol **134.1s**。同条件下的 20 步成片档为 394.4s / 392.4s（PDD 的锐度还高 +10.3% / +7.9%）→ **PDD 相当于用 8 步的钱买 20 步的画质**。
 
 画质：`balanced`（8 步）帧锐度比 `quality`（20 步）高约 13%；`fast` 档细节最弱、适合调构图 / 走位；PDD 8 步则**高于**成片档。
 
 
-> **⚠️ 版本兼容（v0.1.x → 现在）**：组 `minimax-h3-i2v`（拆分后为 `minimax-h3-i2v-fast` / `-quality` / `-quality-sol`）的 base 已从 `minimax_h3_ref2va_pruned_int8_convrot` 换成 **`minimax_h3_fl2va_pruned_int8_convrot`（+21GB 下载）**，LoRA 换成 `minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy`（+2GB）。原因是原先 i2v 用 Ref2VA base 跑 `MiniMaxH3ImageToVideo` 属**跨变体错配**（拿不到 fl2v 系迭代红利）。这两个资产现在由**独立配置键**驱动（`models.h3FlUnet` / `models.h3FlFastLora`，或 env `DSH_SVS_H3_MODEL_FL` / `DSH_SVS_H3_LORA_FL_FAST`）——旧键 `h3RefUnet` / `h3FastLora` **只作用于 ref2v 档**，不再被 i2v 复用。若不想多下 21GB，用配置把它按旧组合钉回去即可（i2v 会退回旧行为）：
+> **⚠️ 版本兼容（v0.1.x → 现在）**：组 `minimax-h3-i2v`（拆分后是多份单档清单，见上表）的 base 已从 `minimax_h3_ref2va_pruned_int8_convrot` 换成 **`minimax_h3_fl2va_pruned_int8_convrot`（+21GB 下载）**，LoRA 换成 `minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy`（+2GB）。原因是原先 i2v 用 Ref2VA base 跑 `MiniMaxH3ImageToVideo` 属**跨变体错配**（拿不到 fl2v 系迭代红利）。这两个资产现在由**独立配置键**驱动（`models.h3FlUnet` / `models.h3FlFastLora`，或 env `DSH_SVS_H3_MODEL_FL` / `DSH_SVS_H3_LORA_FL_FAST`）——旧键 `h3RefUnet` / `h3FastLora` **只作用于 ref2v 档**，不再被 i2v 复用。若不想多下 21GB，用配置把它按旧组合钉回去即可（i2v 会退回旧行为）：
 >
 > ```jsonc
 > "assetOverrides": {
@@ -297,11 +298,13 @@ node scripts/import-comfy.mjs exported.json \
 
 - `models.*` / 环境变量（`DSH_SVS_COMFY_URL` / `DSH_SVS_FLUX_MODEL` / `DSH_SVS_H3_MODEL_REF` / `DSH_SVS_H3_MODEL_FL` / `DSH_SVS_H3_LORA_FL_FAST` / `DSH_SVS_H3_LORA_8STEP` 等）：换模型文件不改图结构；
 - `preferred`：**未分档**能力默认用哪个工作流（设置页「设为默认」写回这里）——**把你导入的工作流设为某能力的默认，即完成「换模型」，内置清单可保留可遮蔽可删除**。H3 视频能力已分档，默认由 `tiers` / 设置页策略决定，不走 `preferred`；
-- `tiers`：**已分档**能力的档位选择（capability → tier → 实现 id，见 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md) §4.1）；设置页选策略条目/逐档下拉就是写这里；
+- `tiers`：**已分档**能力的档位选择（capability → tier → 实现 id，见 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md) §4.1）；设置页点选策略/逐档下拉就是写这里。选「内置默认」= **清空**该能力的条目（回到跟随注册表首选）；
+- `strategies`：**你自己命名并组合的策略**（capability → `[{ id, name, tiers }]`）。设置页「＋ 新增策略（命名 + 逐档组合）」写这里，可重命名可删除，上限 24 条/能力；指向不存在实现的选择在投影时被丢弃（不留死引用）；
+- `strategyOf`：最近一次点过的策略 id（capability → 策略 id），**只用于 UI 点亮与消歧**（某条用户策略的组合恰好等于默认时，避免两个单选同时点亮）；真正生效的仍然是 `tiers`；
 - `assetOverrides`：覆盖资产文件（同 `$assets` 机制，优先级最高）。**精确匹配该档 id 的覆盖 > 旧 id 继承的覆盖**（`minimax-h3-ref2v-*` 继承 `minimax-h3-ref2v`、`*-balanced*` 额外继承 `minimax-h3-ref2v-8step`、`minimax-h3-i2v-*` 继承 `minimax-h3-i2v`）；
 - `apiKey` 非空时请求带 `Authorization: Bearer`（适配需鉴权的 ComfyUI 网关）。
 
-> **关于"某能力的默认工作流是哪一个"**：**已分档能力（H3 视频）不用 `preferred` 解析档位**——档位由 `tiers` 配置或组内该档的标准实现决定（见 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md)）。`preferred` 对**未分档清单**（图片能力、你导入的自定义清单）仍是固定选择；没有 `preferred` 时取候选列表第一个，顺序是**确定性的**：`priority` 降序（缺省 0），相同则按 `id` 升序。想让某份清单**永不被选为隐式默认**（实验性、依赖自定义节点），在它的 JSON 里写 `"priority": -100`。`internal: true` 的诊断清单（如 `minimax-h3-ref2v-sol-stats`）则完全不参与解析。要显式钉住未分档能力的默认：
+> **关于"某能力的默认工作流是哪一个"**：**已分档能力（H3 视频）不用 `preferred` 解析档位**——档位由 `tiers` 配置或**各实现里该档的首选**（priority 降序 → 非加速优先 → id 升序）决定（见 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md)）。`preferred` 对**未分档清单**（图片能力、你导入的自定义清单）仍是固定选择；没有 `preferred` 时取候选列表第一个，顺序是**确定性的**：`priority` 降序（缺省 0），相同则按 `id` 升序。想让某份清单**永不被选为隐式默认**（实验性、依赖自定义节点），在它的 JSON 里写负数 `priority`（内置的 PDD 清单用 `-30`；显式在设置页选进策略仍可用，缺节点时如实置灰而不是静默换实现）。`internal: true` 的诊断清单（如 `minimax-h3-ref2v-sol-stats`）则完全不参与解析。要显式钉住未分档能力的默认：
 >
 > ```jsonc
 > "preferred": { "image.image2image": ["flux2-img2img"] }
@@ -314,12 +317,12 @@ node scripts/import-comfy.mjs exported.json \
 | **fl2v 8 步 768p LoRA**（`minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors`，i2v `balanced` 档） | `models.h3FlBalancedLora` 或各清单的 `assetOverrides.<id>.lora_8step` | [lightx2v/Minimax-h3-Turbo](https://huggingface.co/lightx2v/Minimax-h3-Turbo)（Apache-2.0，1.82GB）。**必须与 shift 6/3 配对**：768p 系 LoRA 配 544p 系的 shift 12/3 会结构性崩坏，而不是「略糊」——这就是该档单列一份模板（`scripts/h3-templates/minimax-h3-i2v-8step.json`）而非改现有 i2v 清单的原因 |
 | **int8_convrot 视频 VAE**（需自行下载 `minimax_h3_video_vae_int8_convrot.safetensors`，[Kijai/MiniMax-H3-experimental](https://huggingface.co/Kijai/MiniMax-H3-experimental)） | `models.h3VideoVae` 或各清单的 `assetOverrides.<id>.vae`（不设则用内置 fp16） | 解码 ~1.2–1.5×、**常驻显存 2.7GB vs 5.0GB**；同 seed 抽帧像素均值差 1.88/255（视觉等价）。端到端仅省 ~2s/镜（480p）～~5s/镜（768p） |
 | **日常档** `balanced`（组「MiniMax H3 参考生成视频」，清单 `minimax-h3-ref2v-balanced` / `-balanced-sol`） | 显式传 `tier="balanced"`（或在设置页把该档选成带加速实现） | 166.3s/镜（带加速 136.3s）vs 成片档 396.6s/镜（**省 58%**），画质明显优于 4 步 fast 档，帧锐度比 quality 还高约 13% |
-| **PDD 8 步蒸馏**（需自装第三方节点包 [ComfyUI-MiniMax-H3-PDD-Acc](https://github.com/Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc) + 权重 [aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI](https://huggingface.co/aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI)，Apache-2.0，Ref2VA/FL2VA 各 1.54GB） | **权重必须放 `ComfyUI/models/pdd_acc/`**；配置键 `models.h3PddRef2v` / `models.h3PddFl2v`（env `DSH_SVS_H3_PDD_REF2V` / `DSH_SVS_H3_PDD_FL2VA`）或 `assetOverrides.<id>.pdd`；在设置页选 PDD 组的策略条目（**默认不选**，`priority<0`） | **184.7s / i2v 178.8s 即达 20 步成片档以上细节**（锐度 +10.3% / +7.9%；噪声地板比 20 步更低）；叠加 Sol 后 137.3s / 134.1s。⚠️ 不能与 lightx2v 叠加、不能超 8 步、shift 固定 12/3、采样器必须 euler。详见 [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md) §9.9 |
+| **PDD 8 步蒸馏**（需自装第三方节点包 [ComfyUI-MiniMax-H3-PDD-Acc](https://github.com/Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc) + 权重 [aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI](https://huggingface.co/aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI)，Apache-2.0，Ref2VA/FL2VA 各 1.54GB） | **权重必须放 `ComfyUI/models/pdd_acc/`**；配置键 `models.h3PddRef2v` / `models.h3PddFl2v`（env `DSH_SVS_H3_PDD_REF2V` / `DSH_SVS_H3_PDD_FL2VA`）或 `assetOverrides.<id>.pdd`；在设置页「＋ 新增策略」里把该档选成 `…-balanced-pdd[-sol]`（**不做隐式默认**，`priority<0`） | **184.7s / i2v 178.8s 即达 20 步成片档以上细节**（锐度 +10.3% / +7.9%；噪声地板比 20 步更低）；叠加 Sol 后 137.3s / 134.1s。⚠️ 不能与 lightx2v 叠加、不能超 8 步、shift 固定 12/3、采样器必须 euler。详见 [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md) §9.9 |
 | **Sol-Attn 块稀疏注意力**（需自装第三方节点 [ComfyUI-SolAttn-Ampere](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere)，sm_80+，纯 `torch.compile(flex_attention)`，**不需要 nvcc**） | **不需要手动生成清单**：内置已带各档 `-sol` 实现（`node scripts/make-h3-variants.mjs` 从 `scripts/h3-templates/` 生成）；在设置页把它选进你自己的策略（「＋ 新增策略」），或逐档下拉指定 | **A800 实测**：成片档收益最大（ref2v 1.27× / i2v 1.25×），balanced 1.23×；**fast / 480p 仅 1.03× 且高频细节 −13.8%，不要开**。详见 [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md) §9.8 |
 
-> **档位契约全文**：见 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md)（三层模型、受控三档、清单字段契约、策略投影、解析与错误语义、实施阶段与验收脚本）。
+> **档位契约全文**：见 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md)（三层模型、受控三档、清单字段契约、**策略＝内置默认 + 用户命名组合**、解析与错误语义、实施阶段与验收脚本）。
 
-> 内置清单**不**默认使用第三方 int8 VAE：它是社区实验件，通过配置或 `assetOverrides` 开启，符合"换模型=改配置/加清单"的设计。**`balanced`（8 步）与加速实现（`-sol`）已改为内置**：前者是正式档位之一；后者需自装第三方节点，**缺节点时该实现置灰不可用（不静默回退）**，并按上面「有加速」策略条目选用。
+> 内置清单**不**默认使用第三方 int8 VAE：它是社区实验件，通过配置或 `assetOverrides` 开启，符合"换模型=改配置/加清单"的设计。**`balanced`（8 步）与加速实现（`-sol`）已改为内置**：前者是正式档位之一；后者需自装第三方节点，**缺节点时该实现置灰不可用（不静默回退）**，并在设置页「＋ 新增策略」里自行组合、命名、选用。
 
 **H3 加速选型与实测数据**：见 [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md)（LoRA 全家福、shift/steps/分辨率/base 四条硬约束、三档成本阶梯、**PDD 复测与落地（§9.9）**、Sol-Attn 细则、剩余杠杆排序）。
 
