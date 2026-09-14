@@ -106,7 +106,7 @@ H3 是视频模型，本身具备 3D 空间理解，正面单图已足够支撑�
 给 manifest 的 `refs` 参数挂一个 `preprocess`：
 
 ```jsonc
-// workflows/minimax-h3-ref2v.json
+// workflows/minimax-h3-ref2v.json（P2 拆分后为 minimax-h3-ref2v-<tier>.json，图等价）
 "refs": {
   "inject": "image", "via": "node", "node": "LoadImage",
   "to": { "node": "5", "field": "ref_images.ref_image_${i}" },

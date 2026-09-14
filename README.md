@@ -12,7 +12,7 @@
 ### 🖥️ 本地化、0 成本的视频工作流
 
 - **零云端依赖**：默认图片用 FLUX 2、视频用 MiniMax H3 **音视频 AV 模型**（**带声音**、支持**参考图绑定**与**画面内原生字幕**，对白直接写进 prompt，无需后期叠加）——两者都只是内置默认，可整体替换为你自己的任何 ComfyUI 模型/工作流。
-- **画质/速度两档**：视频 `fast`（4 步 + LoRA，调试快 5×+）与 `quality`（20 步，成片）；图生图 `fast`（8 步 + Turbo LoRA）与 `quality`（20 步成片）。分辨率按画布比例自动推导，支持 16:9 / 9:16 / 1:1 等任意画幅，snap32。
+- **画质/速度三档（tier）**：视频 `fast`（调试 / 调构图，长边 832）· `balanced`（日常，画质与耗时平衡，长边 1344）· `quality`（成片，长边 1344）；旧参数 `mode=` 为兼容别名。**加速不暴露到产品层**——设置页选的是策略条目「（无加速）/（有加速）」。图生图仍走 `fast` / `quality` 的 mode 轴（图片清单未分档）。分辨率按画布比例自动推导，支持 16:9 / 9:16 / 1:1 等任意画幅，snap32。
 - **图片双模（文生图 / 图生图）**：t2i 用 FLUX 2 直接出卡（角色卡 / 场景卡 / 分镜图），i2i 用 FLUX 2 ReferenceLatent **改绘**——保持主体不变、换背景 / 场景 / 画风 / 去水印；单张参考图、尺寸跟随参考图（≤1MP），`quality`（20 步无 LoRA，保真）/ `fast`（8 步 Turbo LoRA，调试快），可一次出 1–4 张。
 - **完整后处理**：同场景末帧串联（连续性过渡）、生成式转场镜、抽帧、拼接合成（本机有 ffmpeg 走零重编码，否则 ComfyUI 纯节点链路）——一条龙出片。
 
@@ -22,7 +22,7 @@
 - 文本节点**实时渲染 markdown**（标题/表格/列表/代码块），媒体节点直接内嵌预览；分组、排序、删除、**入库**（一键登记为跨会话资产）都在画布上完成。
 - **自己添加资产**：画布顶栏「＋ 上传图片」可直接把本地 png/jpg/webp/gif 传成角色卡/场景卡等资产节点（无需先生成）；「📚 资产库」带缩略图把已入库的跨会话资产取到当前画布，之后即可作为 ref 参考直接驱动视频生成。
 - **生成的卡也能编辑替换**：已生成/已入库的角色卡、场景卡上点「编辑」→ 选本地图即可替换该卡图片（节点/标题/分组保留；若已入库会解除绑定，替换后按需重新「入库」登记新版本）。
-- **输入框视频生成（`video-generate` skill 的可视化入口）**：会话输入框工具行左端保留「🎨 图片 / 🎬 视频」开关。点「🎬 视频」即把 **`/video-generate` 斜杠命令（内联 `type/tier/ratio/size/length/refs/first/last` 参数）写入官方输入框**，用 dsh 原生 skill 加载机制加载内置 `video-generate` skill；同时在输入卡上方弹出**紧凑工具条**——类型 **r2v（参考图生成）/ i2v（首/末帧生成）**、**quality / fast 档**、比例、时长（原生下拉菜单）与「参考图 / 首帧 / 末帧」自定义上传元素（经 `/canvas/upload` 落为画布节点；dsh 原生附件无法端到端转成 `ref_nodes`，故保留自定义图片输入）。**prompt 接着写在官方输入框空行后**，改参数时工具条自动重写命令行、保留 prompt；**发送直接点 dsh 默认发送键**（提交整条草稿，不额外做发送按钮、不劫持 Enter），Agent 按对应 skill 解析命令行参数并调用生成工具出片，产物回进对话并落画布。图片生成（🎨 `image-generate`）同机制：工具条切换 **文生图（t2i）/ 图生图（i2i）**——t2i 选比例与张数（默认 1344×768，可 1–4 张）；i2i 上传**单张参考图**（图 chip + ➕ 新增格，与 dsh 原生上传同款 64px 样式）、选 **quality / fast 档**与张数，命令头自动写 `/image-generate type=… tier=… refs=<画布节点id>`。**档位按模式独立记忆**：视频默认 `fast`（调试快）、图生图默认 `quality`（保真优先），手动选过后各自记住；上传的参考图即画布节点（删除/切型/清空草稿都会同步清理，画布不残留）。
+- **输入框视频生成（`video-generate` skill 的可视化入口）**：会话输入框工具行左端保留「🎨 图片 / 🎬 视频」开关。点「🎬 视频」即把 **`/video-generate` 斜杠命令（内联 `type/tier/ratio/size/length/refs/first/last` 参数）写入官方输入框**，用 dsh 原生 skill 加载机制加载内置 `video-generate` skill；同时在输入卡上方弹出**紧凑工具条**——类型 **r2v（参考图生成）/ i2v（首/末帧生成）**、**档位下拉（选项来自档位矩阵，带实测耗时）**、比例、时长（原生下拉菜单）与「参考图 / 首帧 / 末帧」自定义上传元素（经 `/canvas/upload` 落为画布节点；dsh 原生附件无法端到端转成 `ref_nodes`，故保留自定义图片输入）。**prompt 接着写在官方输入框空行后**，改参数时工具条自动重写命令行、保留 prompt；**发送直接点 dsh 默认发送键**（提交整条草稿，不额外做发送按钮、不劫持 Enter），Agent 按对应 skill 解析命令行参数并调用生成工具出片，产物回进对话并落画布。图片生成（🎨 `image-generate`）同机制：工具条切换 **文生图（t2i）/ 图生图（i2i）**——t2i 选比例与张数（默认 1344×768，可 1–4 张）；i2i 上传**单张参考图**（图 chip + ➕ 新增格，与 dsh 原生上传同款 64px 样式）、选 **quality / fast 档**与张数，命令头自动写 `/image-generate type=… tier=… refs=<画布节点id>`。**档位按模式独立记忆**：视频默认 `fast`（调试快）、图生图默认 `quality`（保真优先），手动选过后各自记住；上传的参考图即画布节点（删除/切型/清空草稿都会同步清理，画布不残留）。
 - Agent 工具与画布页读写**同一份持久状态**，对话推进的每一步产物都实时可见。
 
 ### 🧩 自由扩展：skill 与 workflow
@@ -86,7 +86,7 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 |---|---|---|
 | ![ui-video](./examples/ui/ui-video.png) | ![ui-image-t2i](./examples/ui/ui-image-t2i.png) | ![ui-image-i2i](./examples/ui/ui-image-i2i.png) |
 
-视频条：类型 **r2v（参考图）/ i2v（首/末帧）** · 档位（默认 **fast**，832 长边调试；quality 1344 成片）· 比例 · 时长，参考图/首帧/末帧可上传画布节点。图片条：类型 **文生图 / 图生图**——t2i 选比例（1344 长边）+ 张数；i2i 传**单张参考图**（尺寸跟随参考图）、档位默认 **quality**、可出 1–4 张。
+视频条：类型 **r2v（参考图）/ i2v（首/末帧）** · 档位 **来自档位矩阵**（能力有几个档、每档长边与耗时全部读注册表 —— UI 不预设档位数量与名称，默认取该能力首个可用档）——**矩阵未加载时不猜档位，命令行也不拼 `tier=`（交给服务端按清单解析）**，并显示解析到的实现 id、加速标记与缺节点告警 · 比例 · 时长，参考图/首帧/末帧可上传画布节点。图片条：类型 **文生图 / 图生图**——t2i 选比例（1344 长边）+ 张数；i2i 传**单张参考图**（尺寸跟随参考图）、档位默认 **quality**、可出 1–4 张。
 
 ## 架构概览
 
@@ -143,11 +143,47 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 
 | 清单 | 能力 | 说明 |
 |---|---|---|
-| `flux-text2image` | `image.text2image` | FLUX 2 文生图（角色卡 / 场景卡 / 分镜图） |
-| `flux2-img2img` | `image.image2image` | FLUX 2 参考图改绘（ReferenceLatent，尺寸跟随参考图，quality 20 步 / fast 8 步 Turbo LoRA） |
-| `minimax-h3-ref2v` | `video.reference2video` | H3 参考绑定，`ref_nodes` 绑定身份/环境，**带声音** |
-| `minimax-h3-i2v` | `video.image2video` | H3 首/末帧串联（同场景续接镜 / 转场镜），带声音 |
+| `flux-text2image` | `image.text2image` | FLUX 2 文生图（角色卡 / 场景卡 / 分镜图）。**未分档**（清单未声明 `tier`，不传档位） |
+| `flux2-img2img` | `image.image2image` | FLUX 2 参考图改绘（ReferenceLatent，尺寸跟随参考图）。**未分档**：走 `mode` 轴（`quality` 20 步 / `fast` 8 步 Turbo LoRA） |
+| `minimax-h3-ref2v-fast` · `-balanced` · `-balanced-sol` · `-quality` · `-quality-sol` | `video.reference2video` | **组「MiniMax H3 参考生成视频」**：H3 参考绑定，`ref_nodes` 绑定身份/环境，**带声音**。一个 json = 一个档位实现；`fast` 长边 832，`balanced`/`quality` 长边 1344 |
+| `minimax-h3-i2v-fast` · `-balanced` · `-balanced-sol` · `-quality` · `-quality-sol` | `video.image2video` | **组「MiniMax H3 首末帧生成视频」**：H3 首/末帧串联（同场景续接镜 / 转场镜），带声音，**base = FL2VA 变体**。一个 json = 一个档位实现；`fast` 长边 832，`balanced`/`quality` 长边 1344（`balanced` = 8 步 + fl2v 768p LoRA，shift 6/3） |
 | `extract-frame` | `image.from_video` | 抽帧（末帧 / 首帧 → 图片节点） |
+| `minimax-h3-ref2v-sol-stats` | `video.reference2video` | **内部诊断清单**（`internal: true`）：跑 Sol 时输出统计用于复核。**不参与档位解析、不进 UI 与技能选项**，只能显式 `workflow=` 调用 |
+
+### 档位（tier）与加速策略
+
+- **产品层档位是受控三档**：`fast`（调试 / 调构图，长边 832）/ `balanced`（日常，画质与耗时平衡，长边 1344）/ `quality`（成片，长边 1344）。呼叫 `comfy_generate_video(tier=…)` / `comfy_render(tier=…)`；**旧参数 `mode=` 保留为兼容别名**（`mode=fast|balanced|quality` 与 `tier` 等价）。缺省是 `quality` —— **成本最高，技能与手工调用都建议显式传 `tier=`**。
+- **请求了不存在的档位不会静默换档**：如 i2v 请求 `tier=balanced` → 工具**显式报错并列出可用档位**，改请求可用档位即可（不要原样重试）。
+- **分辨率读清单（长边）+ 画布比例推导**：`fast` 长边 832、`balanced`/`quality` 长边 1344；工具条会显式传 `size=WxH`（显式优先）。
+- **加速不暴露到产品层**：用户在设置页选的是**策略条目**「〈组名〉（无加速）」/「〈组名〉（有加速）」，或逐档自由组合。**技能与文档只写 `tier`，不写加速实现 id 或节点名。**
+  - ref2v「有加速」= `fast` 标准 / `balanced` + `quality` 带 Sol；i2v「有加速」= `fast` 标准 / `quality` 带 Sol。
+  - ⚠️ 加速实现**需自装第三方节点** [ComfyUI-SolAttn-Ampere](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere)（注册名 `SolAttnMiniMaxH3`，没装会报 node type not found）；缺节点时该实现**置灰不可用**（不静默回退到标准实现）。
+  - **A800 实测**（同 seed 关/开对照）：成片档 20 步 768p 收益最大——ref2v 396.6s→311.2s（**1.27×**）、i2v 394.8s→314.7s（**1.25×**），高频细节持平（±2.5%）；`balanced` 8 步 166.3s→136.3s（1.23×）；**480p / fast 档只有 1.03× 且高频细节 −13.8%，不要开**。⚠️ 本插件栈**必须 `dense_first_percent: 0`**（默认 0.2 会让节点把每次调用判为"去噪早期"而**完全不稀疏**）；诊断清单可复核 `sol_attn>0`。⚠️ **同 seed 不再复现同像素**（注意力内核换了，即使不稀疏也差 15.1/255）→ 一部片子里要一致地全用或全不用，不能逐镜混用。由 `node scripts/make-h3-variants.mjs` 从 `scripts/h3-templates/` 生成，详见 `docs/minimax-h3-acceleration-lora.md` §9.8 与 `docs/tier-strategy-design.md`。
+
+### 实测耗时（16:9 · 124 帧 ≈ 5.17s，A800 80GB）
+
+| 能力 | `fast` | `balanced` | `balanced` 带加速 | `quality` | `quality` 带加速 |
+|---|---|---|---|---|---|
+| ref2v（832×480 / 1344×768） | 24.6s | 166.3s | 136.3s | 396.6s | 311.2s |
+| i2v（832×480 / 1344×768） | 26.1s | 177.3s | 130.5s | 394.8s | 314.7s |
+
+画质：`balanced`（8 步）帧锐度比 `quality`（20 步）高约 13%；`fast` 档细节最弱、适合调构图 / 走位。
+
+
+> **⚠️ 版本兼容（v0.1.x → 现在）**：组 `minimax-h3-i2v`（拆分后为 `minimax-h3-i2v-fast` / `-quality` / `-quality-sol`）的 base 已从 `minimax_h3_ref2va_pruned_int8_convrot` 换成 **`minimax_h3_fl2va_pruned_int8_convrot`（+21GB 下载）**，LoRA 换成 `minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy`（+2GB）。原因是原先 i2v 用 Ref2VA base 跑 `MiniMaxH3ImageToVideo` 属**跨变体错配**（拿不到 fl2v 系迭代红利）。这两个资产现在由**独立配置键**驱动（`models.h3FlUnet` / `models.h3FlFastLora`，或 env `DSH_SVS_H3_MODEL_FL` / `DSH_SVS_H3_LORA_FL_FAST`）——旧键 `h3RefUnet` / `h3FastLora` **只作用于 ref2v 档**，不再被 i2v 复用。若不想多下 21GB，用配置把它按旧组合钉回去即可（i2v 会退回旧行为）：
+>
+> ```jsonc
+> "assetOverrides": {
+>   "minimax-h3-i2v-quality": {
+>     "unet": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+>     "fast_lora": "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors"
+>   }
+> }
+> ```
+>
+> **旧 id 的配置无需改写**（P2 迁移已内置）：`assetOverrides` 按族继承——新 id 会同时读旧 id 的覆盖（`minimax-h3-ref2v-*` 继承 `minimax-h3-ref2v`，`*-balanced*` 额外继承 `minimax-h3-ref2v-8step`，`minimax-h3-i2v-*` 继承 `minimax-h3-i2v`），且精确匹配新 id 的覆盖优先级更高；旧 `models.*` 键也按族映射到各档清单。所以你**不必**逐档重写配置。
+>
+> **⚠️ LoRA 与 shift 必须配对**（硬约束）：544p 系 LoRA（`ref2v/fl2v 4step v0.1`）= shift **12/3**；768p 系 LoRA（`*_8step_v1.0_768p`、`fl2v v1.1/v1.2 768p`）= shift **6/3**，且分辨率必须进 768p 训练域（本插件用 1344×768）。错配不是"略糊"而是**结构性崩坏**。shift 写在清单 `graph` 里（`modes` 不支持按档改标量），所以**换档位 pairing 的正确做法是加一份新清单**。
 
 ## Agent 工具契约
 
@@ -247,15 +283,42 @@ node scripts/import-comfy.mjs exported.json \
   "pollMs": 2000,
   "timeoutMs": 900000,
   "models": { "fluxUnet": "flux2_dev_fp8mixed.safetensors", "h3Fps": 24, "…": "…" },
-  "preferred": { "video.reference2video": ["minimax-h3-ref2v"] },
-  "assetOverrides": { "minimax-h3-ref2v": { "unet": "my_custom.safetensors" } }
+  "tiers": {
+    "video.reference2video": { "fast": "minimax-h3-ref2v-fast", "balanced": "minimax-h3-ref2v-balanced-sol", "quality": "minimax-h3-ref2v-quality-sol" }
+  },
+  "preferred": { "image.image2image": ["flux2-img2img"] },
+  "assetOverrides": { "minimax-h3-ref2v-quality": { "unet": "my_custom.safetensors" } }
 }
 ```
 
-- `models.*` / 环境变量（`DSH_SVS_COMFY_URL` / `DSH_SVS_FLUX_MODEL` / `DSH_SVS_H3_MODEL_REF` 等）：换模型文件不改图结构；
-- `preferred`：每个能力默认用哪个工作流（设置页「设为默认」写回这里）——**把你导入的工作流设为某能力的默认，即完成「换模型」，内置清单可保留可遮蔽可删除**；
-- `assetOverrides`：按清单粒度覆盖资产文件（同 `$assets` 机制，优先级最高）；
+- `models.*` / 环境变量（`DSH_SVS_COMFY_URL` / `DSH_SVS_FLUX_MODEL` / `DSH_SVS_H3_MODEL_REF` / `DSH_SVS_H3_MODEL_FL` / `DSH_SVS_H3_LORA_FL_FAST` / `DSH_SVS_H3_LORA_8STEP` 等）：换模型文件不改图结构；
+- `preferred`：**未分档**能力默认用哪个工作流（设置页「设为默认」写回这里）——**把你导入的工作流设为某能力的默认，即完成「换模型」，内置清单可保留可遮蔽可删除**。H3 视频能力已分档，默认由 `tiers` / 设置页策略决定，不走 `preferred`；
+- `tiers`：**已分档**能力的档位选择（capability → tier → 实现 id，见 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md) §4.1）；设置页选策略条目/逐档下拉就是写这里；
+- `assetOverrides`：覆盖资产文件（同 `$assets` 机制，优先级最高）。**精确匹配该档 id 的覆盖 > 旧 id 继承的覆盖**（`minimax-h3-ref2v-*` 继承 `minimax-h3-ref2v`、`*-balanced*` 额外继承 `minimax-h3-ref2v-8step`、`minimax-h3-i2v-*` 继承 `minimax-h3-i2v`）；
 - `apiKey` 非空时请求带 `Authorization: Bearer`（适配需鉴权的 ComfyUI 网关）。
+
+> **关于"某能力的默认工作流是哪一个"**：**已分档能力（H3 视频）不用 `preferred` 解析档位**——档位由 `tiers` 配置或组内该档的标准实现决定（见 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md)）。`preferred` 对**未分档清单**（图片能力、你导入的自定义清单）仍是固定选择；没有 `preferred` 时取候选列表第一个，顺序是**确定性的**：`priority` 降序（缺省 0），相同则按 `id` 升序。想让某份清单**永不被选为隐式默认**（实验性、依赖自定义节点），在它的 JSON 里写 `"priority": -100`。`internal: true` 的诊断清单（如 `minimax-h3-ref2v-sol-stats`）则完全不参与解析。要显式钉住未分档能力的默认：
+>
+> ```jsonc
+> "preferred": { "image.image2image": ["flux2-img2img"] }
+> ```
+
+### 可选的加速件（非内置默认，按需开启）
+
+| 项 | 开启方式 | 实测收益（A800 80GB / ComfyUI 0.33.3 / 124 帧） |
+|---|---|---|
+| **fl2v 8 步 768p LoRA**（`minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors`，i2v `balanced` 档） | `models.h3FlBalancedLora` 或各清单的 `assetOverrides.<id>.lora_8step` | [lightx2v/Minimax-h3-Turbo](https://huggingface.co/lightx2v/Minimax-h3-Turbo)（Apache-2.0，1.82GB）。**必须与 shift 6/3 配对**：768p 系 LoRA 配 544p 系的 shift 12/3 会结构性崩坏，而不是「略糊」——这就是该档单列一份模板（`scripts/h3-templates/minimax-h3-i2v-8step.json`）而非改现有 i2v 清单的原因 |
+| **int8_convrot 视频 VAE**（需自行下载 `minimax_h3_video_vae_int8_convrot.safetensors`，[Kijai/MiniMax-H3-experimental](https://huggingface.co/Kijai/MiniMax-H3-experimental)） | `models.h3VideoVae` 或各清单的 `assetOverrides.<id>.vae`（不设则用内置 fp16） | 解码 ~1.2–1.5×、**常驻显存 2.7GB vs 5.0GB**；同 seed 抽帧像素均值差 1.88/255（视觉等价）。端到端仅省 ~2s/镜（480p）～~5s/镜（768p） |
+| **日常档** `balanced`（组「MiniMax H3 参考生成视频」，清单 `minimax-h3-ref2v-balanced` / `-balanced-sol`） | 显式传 `tier="balanced"`（或在设置页把该档选成带加速实现） | 166.3s/镜（带加速 136.3s）vs 成片档 396.6s/镜（**省 58%**），画质明显优于 4 步 fast 档，帧锐度比 quality 还高约 13% |
+| **Sol-Attn 块稀疏注意力**（需自装第三方节点 [ComfyUI-SolAttn-Ampere](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere)，sm_80+，纯 `torch.compile(flex_attention)`，**不需要 nvcc**） | **不需要手动生成清单**：内置已带各档 `-sol` 实现（`node scripts/make-h3-variants.mjs` 从 `scripts/h3-templates/` 生成）；在设置页选「（有加速）」策略条目，或逐档下拉指定 | **A800 实测**：成片档收益最大（ref2v 1.27× / i2v 1.25×），balanced 1.23×；**fast / 480p 仅 1.03× 且高频细节 −13.8%，不要开**。详见 [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md) §9.8 |
+
+> **档位契约全文**：见 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md)（三层模型、受控三档、清单字段契约、策略投影、解析与错误语义、实施阶段与验收脚本）。
+
+> 内置清单**不**默认使用第三方 int8 VAE：它是社区实验件，通过配置或 `assetOverrides` 开启，符合"换模型=改配置/加清单"的设计。**`balanced`（8 步）与加速实现（`-sol`）已改为内置**：前者是正式档位之一；后者需自装第三方节点，**缺节点时该实现置灰不可用（不静默回退）**，并按上面「有加速」策略条目选用。
+
+**H3 加速选型与实测数据**：见 [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md)（LoRA 全家福、shift/steps/分辨率/base 四条硬约束、三档成本阶梯、PDD 不可用结论、剩余杠杆排序）。
+
+**全工作流 Benchmark（分辨率 × 档位 × LoRA × Sol 加速）**：见 [`docs/minimax-h3-video-benchmark.md`](docs/minimax-h3-video-benchmark.md) —— 速查结论表、token/成本模型（分辨率超线性 tokens^1.5、步数线性 `t≈19s+18.9s×步数`）、Sol 交叉点（768p 才值得，1.25–1.38×）、一条 60 镜短片的时间换算、陷阱与未测清单。取数脚本：`node e2e-out/bench.mjs`、`node e2e-out/inventory.mjs`。
 
 ## 渠道交付（飞书 / TUI）
 
@@ -281,7 +344,7 @@ node scripts/import-comfy.mjs exported.json \
 - **hook 门兜底**：`tools/pre-execute` 校验 H3 系工作流的 prompt 是否携带结构化字段，缺失时 deny 并引导 agent 加载 skill 重写（同一 agent 连续 2 次后降级放行，不会死循环）。
 - **关闭方式**：覆盖 / 删除 `~/.dsh/skills/h3-prompt-writing` 的「插件对接」适配节（或整体删目录）即回到自由格式组装；`lib/index.js` 的 `H3_PROMPT_GATE` 常量可单独关掉 hook 门。
 
-> ✅ 字幕兼容已实测定稿（A/B 六变体，见画布「A/B 实验结论」）：六段式下字幕**必须**以英文双引号 on-screen text 声明内嵌 `detailed_description` 对白处（中文措辞指令任何位置不生效），dialogue 镜成片用 quality 档保证字准；口型安全 / 一致性 / 音频与旧格式同级，动作执行略优。
+> ✅ 字幕兼容已实测定稿（A/B 六变体，见画布「A/B 实验结论」，**配方唯一权威版在 `skills/h3-prompt-writing/SKILL.md` 的 §字幕**）：六段式下字幕以英文双引号 on-screen text 声明内嵌 `detailed_description` 对白处（中文措辞指令任何位置不生效），四条限定词缺一不可——**声明紧贴对白句 + `reading exactly "原文"` + 强调描边对比 + 只给结束点（不给起止时间窗）**；失败写法：给时间窗、台词 1.0s 才起。**每档都能出字幕、没有档位硬规则**（由用户/脚本需求决定）；实测 `quality` 20 步逐字一致、`balanced` 8 步整段未烧、`fast` 4 步有错字，故成片字幕建议 `quality`，其余档走自检门逐镜核对后再按需升档。口型安全 / 一致性 / 音频与旧格式同级，动作执行略优。
 
 ## 示例：《一只想当宇航员的小狐狸》
 

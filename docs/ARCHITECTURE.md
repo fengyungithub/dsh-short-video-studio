@@ -33,9 +33,9 @@ dsh-short-video-studio/
 ├── client.js → lib/client.js    # 浏览器半：conversation.view「画布」tab + settings.section「ComfyUI」设置
 ├── studio/                      # 画布页（自包含 HTML/CSS/JS，无构建）
 ├── workflows/                   # 内置工作流清单（数据）
-│   ├── flux-text2image.json     # image.text2image：FLUX 2 文生图
-│   ├── minimax-h3-ref2v.json    # video.reference2video：H3 参考绑定（带声音）
-│   ├── minimax-h3-i2v.json      # video.image2video：H3 首/末帧串联（带声音）
+│   ├── flux-text2image.json     # image.text2image：FLUX 2 文生图（未分档）
+│   ├── minimax-h3-ref2v-<tier>.json  # video.reference2video：H3 参考绑定（带声音），一档一 json：fast/balanced/balanced-sol/quality/quality-sol
+│   ├── minimax-h3-i2v-<tier>.json    # video.image2video：H3 首/末帧串联（带声音）：fast/balanced/balanced-sol/quality/quality-sol
 │   └── extract-frame.json       # image.from_video：抽帧（末帧/首帧 → 图片）
 ├── schemas/
 │   └── workflow-manifest.schema.json  # manifest 权威 JSON Schema（外部工具/文档参照）
@@ -140,7 +140,7 @@ comfy_render / comfy_generate_* → runRender(ctx, opts)
 
 #### 跨场景转场（生成式转场镜）
 
-不做后期溶解，而是用 `extract-frame` 抽前一镜末帧 + 后一镜首帧，喂给既有的 `minimax-h3-i2v`（首末帧串联）生成一个短过渡镜，当普通片段参与拼接。已端到端实跑：抽帧 1.5s ×2 → 转场镜 16.9s（fast/`length=39`）→ 拼接 4.5s；成片 11.250s = 5.167 + 1.625 + 4.459，双轨完整，中间帧是真实运镜、末帧精确落回后一镜首帧。
+不做后期溶解，而是用 `extract-frame` 抽前一镜末帧 + 后一镜首帧，喂给既有的 `minimax-h3-i2v-*`（首末帧串联，组「MiniMax H3 首末帧生成视频」）生成一个短过渡镜，当普通片段参与拼接。已端到端实跑：抽帧 1.5s ×2 → 转场镜 16.9s（fast/`length=39`）→ 拼接 4.5s；成片 11.250s = 5.167 + 1.625 + 4.459，双轨完整，中间帧是真实运镜、末帧精确落回后一镜首帧。
 
 两条实测坑（已写进 SKILL.md 自检门与 Step 7）：
 1. **烧录字幕会被继承**——`dialogue` 镜的末帧带字幕，直接当转场首帧则字幕进转场镜。对策是在镜头表层面要求跨场景边界的前一镜最后 0.5s 无对白（自检门第 8 项）。
@@ -185,14 +185,14 @@ comfy_render / comfy_generate_* → runRender(ctx, opts)
 
 ### 4.1 一次图片/视频生成（Agent 工具路径）
 ```
-Agent 调用 comfy_generate_video(prompt, ref_nodes=[角色卡,场景卡], ...)
+Agent 调用 comfy_generate_video(prompt, ref_nodes=[角色卡,场景卡], tier='quality', ...)
   → runRender(capability=video.reference2video)
-  → 注册表按 preferred 选中 minimax-h3-ref2v
+  → 注册表按 tier 解析（显式 workflow > tiers 配置 > 组内该档标准实现；缺档/不可用显式报错）
   → 上传参考图（画布节点 media 或资产库图片 → /upload/image）
-  → buildGraphFromManifest：$assets 替换 → params 注入 → $model 按 mode 插 LoRA
+  → buildGraphFromManifest：$assets 替换 → params 注入 → 按该档插 LoRA
   → POST /prompt 提交 → 轮询 /history → 下载 mp4 → 落盘 canvas/<sid>/<nodeId>.mp4
-  → 写画布节点（params 记录 workflow/mode/seed/width/height/ref_nodes，可复现）
-  → 返回 {ok, nodeId, media} → studio iframe 刷新可见，Agent 弹片段批准卡
+  → 写画布节点（params 记录 tier/implementation/resolution/seed/width/height/ref_nodes，可复现）
+  → 返回 {ok, nodeId, media, tier, implementation, resolution, warnings} → studio iframe 刷新可见，Agent 弹片段批准卡
 ```
 
 ### 4.2 参考图 / 末帧串联
@@ -213,11 +213,14 @@ Agent 调用 comfy_generate_video(prompt, ref_nodes=[角色卡,场景卡], ...)
 | 清单 | 能力 | 图骨架（关键节点） | 质量档 | 分辨率策略 |
 |---|---|---|---|---|
 | `flux-text2image` | image.text2image | UNETLoader → ModelSamplingFlux → CLIPTextEncode(flux2) → FluxGuidance → EmptyFlux2LatentImage → Flux2Scheduler → SamplerCustomAdvanced → VAEDecode → SaveImage | （无 modes，默认 20 步） | explicit，默认 1344×768 |
-| `minimax-h3-ref2v` | video.reference2video | UNETLoader → SigmaShift → **MiniMaxH3ReferenceToVideo**（ref_images dotted）→ SamplerCustomAdvanced → VAEDecode + **VAEDecodeAudio** → **CreateVideo(audio)** → SaveVideo(mp4/h264) | quality 20 步 / fast 4 步 + LoRA | aspect-ratio，longSide 1344/832 |
-| `minimax-h3-i2v` | video.image2video | 同上，但 **MiniMaxH3ImageToVideo** + first/last_frame 经 LoadImage→ImageScale preprocess 链 | quality 20 步 / fast 4 步 + LoRA | aspect-ratio，longSide 1344/832 |
+| `minimax-h3-ref2v-fast` / `-balanced` / `-balanced-sol` / `-quality` / `-quality-sol` | video.reference2video | UNETLoader → SigmaShift → **MiniMaxH3ReferenceToVideo**（ref_images dotted）→ SamplerCustomAdvanced → VAEDecode + **VAEDecodeAudio** → **CreateVideo(audio)** → SaveVideo(mp4/h264) | **组「MiniMax H3 参考生成视频」**：一个 json = 一个档位；`fast` 4 步 + LoRA / `balanced` 8 步 + 768p LoRA（shift 6/3） / `quality` 20 步无 LoRA | aspect-ratio，longSide 1344（fast 为 832） |
+| `minimax-h3-i2v-fast` / `-quality` / `-quality-sol` | video.image2video | 同上，但 **MiniMaxH3ImageToVideo** + first/last_frame 经 LoadImage→ImageScale preprocess 链 | **组「MiniMax H3 首末帧生成视频」**：`fast` 4 步 + LoRA / `quality` 20 步；**`balanced` 档空缺**（缺 i2v 8 步 LoRA 资产，请求该档显式报错） | aspect-ratio，longSide 1344（fast 为 832） |
+| `minimax-h3-ref2v-sol-stats` | video.reference2video | 同上 + Sol-Attn 统计诊断节点 | **内部诊断清单**（`internal: true`）：不参与档位解析、不进 UI/技能选项 | 同上 |
 | `extract-frame` | image.from_video | LoadVideo → GetVideoComponents → **ImageFromBatch**(batch_index，负数从末尾数) → SaveImage | （无 modes，无采样） | 由源视频决定，不推导 |
 
 **H3 音视频链**是核心卖点：`MiniMaxH3ReferenceToVideo + audio_vae + VAEDecodeAudio → CreateVideo(audio)`，端到端产出**带声音**的单镜头视频（非静音）。
+
+**档位解析**：H3 视频清单已**分档**（`group` / `tier` / `accel` 字段），呼叫时传 `tier=`（`mode=` 为兼容别名）；策略由注册层投影成「（无加速）/（有加速）」条目，加速实现（`-sol`）不暴露给技能。完整契约见 `docs/tier-strategy-design.md`。
 
 **注册表来源优先级**：内置 `workflows/*.json` < 用户 `~/.dsh/dsh-short-video-studio/workflows/*.json`（同名遮蔽）< `assetOverrides` / env 换模型文件名（不动图结构）。
 
@@ -295,7 +298,7 @@ Agent 调用 comfy_generate_video(prompt, ref_nodes=[角色卡,场景卡], ...)
 
 两个漂移放大器：
 1. **skill 是独立副本且不随插件升级更新**——`installBundledSkills()`（`lib/index.js`）是「目标已存在则跳过」，装进 `~/.dsh/skills/` 后升级插件改 `SKILL.md` 不会同步，散文与工具必然漂移。
-2. **references 里仍写死 workflow id 作「当前默认」**（`model-selection.md`：「当前 `video.reference2video` → `minimax-h3-ref2v`」）——用户改 `preferred` 后该备注即过时（行为上已用「Do not preselect a named alternative」兜底，但文字 stale 仍在）。
+2. **references 里仍写死 workflow id 作「当前默认」**（`model-selection.md`：「当前 `video.reference2video` → `minimax-h3-ref2v`」）——用户改 `preferred` / 设置页策略后该备注即过时（行为上已用「Do not preselect a named alternative」兜底，但文字 stale 仍在）。**注**：H3 视频能力现已分档，默认不再由 `preferred` 决定而是由档位策略解析，这类「写死当前默认」的备注更易漂移；技能侧只写 `tier=`，不写实现 id。
 
 ### 9.3 解耦：把「复述」改成「引用」
 

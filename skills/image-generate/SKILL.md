@@ -39,11 +39,17 @@ Keep the flying pig exactly as it is, only change the sky from daytime blue to a
 |---|---|---|
 | prompt（空行后的正文） | 画面描述（t2i）或「保留什么、改什么」的改动描述（i2i） | 一只戴草帽的橘猫… |
 | `type` | `t2i`（文生图）或 `i2i`（参考图生图） | t2i |
-| `tier` | 档位（仅 i2i）：`quality` 成片 20 步 / `fast` 调试 8 步 Turbo LoRA | quality |
+| `tier` | **仅 i2i**：`quality`（成片）/ `fast`（调试）。注意图片能力目前是**未分档清单**（清单未声明 `tier`），见下「图片档位口径」 | quality |
 | `ratio` | 画面比例（仅 t2i） | 16:9 |
 | `size` | 显式宽×高，已 snap32、`x` 分隔（仅 t2i） | 1344x768 |
 | `count` | 生成张数（1–4） | 2 |
 | `refs` | 画布节点 id（i2i，单个，作 `ref_nodes`） | c71ee706-… |
+
+**图片档位口径（与视频不同）**：图片能力目前是**未分档清单**——清单本身**未声明 `tier`**，所以：
+
+- **t2i（`image.text2image`）不分档，不传任何档位**；`comfy_generate_image` 只按长边推导尺寸。
+- **i2i（`image.image2image`）传 `mode=quality|fast`**（走清单的 mode 轴，非 tier 轴）：`quality` 成片 20 步 / `fast` 调试 8 步 Turbo LoRA。
+- **若请求了 `tier=` 而该清单没有对应档**（如对未分档清单请求 `tier=balanced`），工具**不会报错**——它按清单的**唯一实现执行**，并在返回里带一条 `warnings`（「清单未声明档位：按唯一实现执行，忽略请求的 X 档」）。收到 warning 就在回复里如实说明，别声称用了请求的档位。这与视频侧「缺档显式报错」的语义不同，不要混淆。
 
 ## 流程
 
@@ -54,8 +60,8 @@ Keep the flying pig exactly as it is, only change the sky from daytime blue to a
    - i2i：**尺寸跟随参考图**（工作流内缩放到 ≤1MP），不传 width/height。
 4. **调用生成**（按类型二选一）：
    - t2i：`comfy_generate_image(prompt, width=…, height=…, count=张数, title='手动 t2i · 比例', group='手动生成')`。
-   - i2i：`comfy_render(capability='image.image2image', mode=档位(quality/fast), prompt=改动描述, ref_nodes=[参考节点 id], count=张数, title='手动 i2i · 档位 · 参考改绘', group='手动生成')`。档位取消息 `tier` 字段（缺省 quality）；调试/挑构图用 fast（8 步 Turbo LoRA，细节弱于 quality 但快 5×+）。
-5. **回报结果**：工具已把产物写回画布；回复里给出图片节点标题、媒体相对路径与「画布」tab 入口，一句话说明用了哪个能力与档位。
+   - i2i：`comfy_render(capability='image.image2image', mode=档位(quality/fast), prompt=改动描述, ref_nodes=[参考节点 id], count=张数, title='手动 i2i · 档位 · 参考改绘', group='手动生成')`。档位取消息 `tier` 字段（缺省 quality）**并映射到 `mode=` 传参**（图片清单未分档，走 mode 轴，见上方「图片档位口径」）；调试/挑构图用 `fast`（8 步 Turbo LoRA，细节弱于 `quality` 但快 5×+）。
+5. **回报结果**：工具已把产物写回画布；回复里给出图片节点标题、媒体相对路径与「画布」tab 入口，一句话说明用了哪个能力与档位。工具返回若带 `warnings`（如图片清单未分档、请求的档位被忽略）**必须如实说明实际用的实现**，不要复述一个没生效的档位。
 6. **失败不盲重试**：失败先简化改动描述 / 换档位（fast↔quality）/ 换参考图再重试；同一请求不要原样重复提交。
 
 ## 提示词建议

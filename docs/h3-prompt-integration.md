@@ -15,7 +15,7 @@ MiniMax 官方 H3 系统 = **H3-Context-IR → H3-Base → H3-Regenerate-2K** �
 - **H3-Context-IR**（云端托管、不开源）负责把用户自由格式的多模态输入（文/图/音/参考视频）深度理解、跨模态关联、补全缺失语义，再序列化为 H3-Base 能直接读懂的结构化 prompt（基础模式三段式：`integrated_multimodal_description` / `overall_soundscape` / `non_diegetic_music`；全参考模式六段式：`subject_definitions` / `summary` / `retention_analysis` / `detailed_description` / `overall_soundscape` / `non_diegetic_music`）。
 - 官方 README 明确：**「H3-Context-IR is critical to the quality of the final output」**，并给出两条路：① 调官方 IR API；② 按 **Prompting Guidance** 自建上下文处理系统。
 
-本插件是**完全本地、零云端依赖**的产品：本地 ComfyUI 直接跑 H3-Base（`minimax-h3-ref2v` 工作流，prompt 注入 `MiniMaxH3ReferenceToVideo` 节点），**没有也不应引入云端 IR**。当前 prompt 由 agent 按 skill 规则手工拼自由格式自然语言——恰好是官方说「质量受影响」的形态。
+本插件是**完全本地、零云端依赖**的产品：本地 ComfyUI 直接跑 H3-Base（`minimax-h3-ref2v-*` 工作流，prompt 注入 `MiniMaxH3ReferenceToVideo` 节点；分档后一个 json = 一个档位，由注册表按 `tier` 解析），**没有也不应引入云端 IR**。当前 prompt 由 agent 按 skill 规则手工拼自由格式自然语言——恰好是官方说「质量受影响」的形态。
 
 **集成目标**：把官方 `h3-prompt-writing` skill 接进来，让本地生成走 H3 结构化 prompt，**用「本地 agent + 独立 prompt 优化 skill」复刻 Context-IR 的核心产物**，保住零云端依赖的同时尽量拉近与官方成片质量的差距。
 
@@ -25,7 +25,7 @@ MiniMax 官方 H3 系统 = **H3-Context-IR → H3-Base → H3-Regenerate-2K** �
 
 | 项 | 现状 | 结论 |
 |---|---|---|
-| prompt 注入点 | `workflows/minimax-h3-ref2v.json`：`params.prompt → node "5" (MiniMaxH3ReferenceToVideo).prompt`，scalar 直通 | **工作流清单无需改动**，重写只发生在 agent 组装 prompt 那一刻 |
+| prompt 注入点 | `workflows/minimax-h3-ref2v-<tier>.json`（如 `-quality`）：`params.prompt → node "5" (MiniMaxH3ReferenceToVideo).prompt`，scalar 直通 | **工作流清单无需改动**，重写只发生在 agent 组装 prompt 那一刻 |
 | 能力路径 | 参考绑定镜走 `video.reference2video`（Ref2V）；首末帧串联镜 / 转场镜走 `video.image2video`（I2V） | 主要需要 **ref-en.txt（六段式）** 与 **base-en.txt 的 I2VA / FL2VA 格式** |
 | 现有 prompt 形态 | `[AUDIO_MODE:...][SPEAKER:...]` 前缀 + 分镜正文 + 风格锁 + 字幕指令 + 负向 | 需与 H3 官方格式**做映射**，见 §5 |
 | 模型无关原则 | 插件不认识模型名，只认 capability | H3 结构化重写**必须条件启用**，换 Wan/LTX 等回到通用自然语言，见 §6 |

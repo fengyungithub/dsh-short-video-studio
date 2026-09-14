@@ -60,7 +60,7 @@ export function slugifyName(s) {
 
 ### D3 · 没有身份锁，只有参考图
 
-三个 workflow manifest 里没有任何 IPAdapter / FaceID / 角色 LoRA 节点。LoRA 只用于 fast 档加速（`minimax-h3-ref2v.json:47`）。身份完全由 `ref_images` + prompt 里的 `[char:]` 标签承载。
+三个 workflow manifest 里没有任何 IPAdapter / FaceID / 角色 LoRA 节点。LoRA 只用于 fast / balanced 档加速（`minimax-h3-ref2v-fast.json` / `-balanced.json`；P2 拆分前为 `minimax-h3-ref2v.json:47`）。身份完全由 `ref_images` + prompt 里的 `[char:]` 标签承载。
 
 同时 `resolution.policy` 之类的约束都进了 manifest，但"参考图怎么选、顺序怎么排"没有：`refs` 只有 `max: 8`，谁先谁后、说话人是否必须排第一，全靠 skill 散文第 4 条。
 

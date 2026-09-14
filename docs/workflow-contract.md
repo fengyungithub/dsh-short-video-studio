@@ -70,7 +70,7 @@
 
 ```jsonc
 {
-  "id": "minimax-h3-ref2v",                 // 唯一 id
+  "id": "minimax-h3-ref2v-quality",         // 唯一 id（H3 视频已分档：`<组名>-<档位>[-sol]`）
   "version": 1,
   "capability": "video.reference2video",    // 实现哪个能力
   "displayName": "MiniMax H3 参考绑定视频",
@@ -171,19 +171,21 @@ ComfyUI 图是「字段写入」与「节点连线」的混合。为了让任意
 // ① 自发现：Agent 不再硬编码「有什么模型可用」
 comfy_list_workflows() -> {
   "capabilities": [ { "id": "video.reference2video", "workflows": [
-      { "id": "minimax-h3-ref2v", "modes": ["quality","fast"], "constraints": {...} } ] } ],
+      { "id": "minimax-h3-ref2v-quality", "group": "minimax-h3-ref2v", "tier": "quality", "constraints": {...} } ] } ],
   "assets": { ... }   // 当前生效的模型文件名（便于展示/排错）
 }
 
 // ② 统一渲染入口
 comfy_render({
   capability: "video.reference2video",   // 必填：能力（能力词汇表）
-  workflow: "minimax-h3-ref2v",          // 可选：显式指定实现；缺省按默认规则解析
-  mode: "quality",                       // 可选：质量档（映射到 manifest.modes）
+  workflow: "minimax-h3-ref2v-quality",  // 可选：显式指定实现（其 tier 与请求档位不符会报错，不静默）
+  tier: "quality",                       // 可选：档位 fast|balanced|quality（缺省 quality）；mode= 为兼容别名
   prompt, width, height, seed, steps, length, refs[], first_frame, last_frame, // 能力输入
   title, group, nodeId, sessionId, workspaceId                              // 画布落库参数（与能力无关，宿主统一处理）
-}) -> { ok, nodeId, media, workflowId, mode }
+}) -> { ok, nodeId, media, tier, implementation, resolution, warnings }
 ```
+
+> **档位解析**：显式 `workflow` > 配置 `tiers[capability][tier]` > 组内该档标准实现；该档无实现或实现不可用**一律报错**（含可用档位列表 / 缺哪个节点），**不静默跨档替换**。旧 `modes` 仅作只读兼容（未分档清单按 mode 名匹配）。详见 `docs/tier-strategy-design.md`。
 
 ### 5.2 保留旧工具作为薄别名（向后兼容，流水线不中断）
 
@@ -291,15 +293,20 @@ comfy_render(capability, hints…):
   "pollMs": 2000,
   "timeoutMs": 900000,
 
-  // 换模型：manifestId -> assetKey -> 文件名
+  // 换模型：manifestId -> assetKey -> 文件名（分档后按**单档清单 id** 覆盖，逐档写）
   "assetOverrides": {
-    "minimax-h3-ref2v": { "unet": "minimax_h3_ref2va_pruned_int8_convrot.safetensors" }
+    "minimax-h3-ref2v-quality": { "unet": "minimax_h3_ref2va_pruned_int8_convrot.safetensors" }
   },
 
-  // 换工作流/默认模型：capability -> 有序 workflowId 列表（第 1 个 = 默认，其余 = fallback 顺序）
+  // 档位选择：capability -> tier -> 实现 id（H3 视频分档后的主路径，见 tier-strategy-design §4.1）
+  "tiers": {
+    "video.reference2video": { "fast": "minimax-h3-ref2v-fast", "balanced": "minimax-h3-ref2v-balanced-sol", "quality": "minimax-h3-ref2v-quality-sol" }
+  },
+
+  // 未分档清单的固定选择：capability -> 有序 workflowId 列表（第 1 个 = 默认，其余 = fallback 顺序）
   "preferred": {
     "image.text2image": ["flux-text2image", "sdxl-text2image"],
-    "video.reference2video": ["minimax-h3-ref2v"]
+    "image.image2image": ["flux2-img2img"]
   }
 }
 ```
