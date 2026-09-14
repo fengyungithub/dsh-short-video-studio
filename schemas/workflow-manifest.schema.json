@@ -97,6 +97,41 @@
         ]
       }
     },
+    "priority": {
+      "type": "number",
+      "description": "同能力候选的确定性排序权重（降序，缺省 0；相同则按 id 升序）。该顺序决定 preferred 为空时的隐式默认档：写负数可让清单永不被选为默认（适合实验性、依赖自定义节点或成本高出一个量级的加速变体）。"
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["fast", "balanced", "quality"],
+      "description": "档位（受控枚举，锁定三档）。一个清单只服务一个档位；声明了才参与档位解析。契约见 docs/tier-strategy-design.md。"
+    },
+    "group": {
+      "type": "string",
+      "description": "组名（唯一的分组依据，不从文件名猜）：同 group 的清单聚合成一组，配置页显示为「displayName（档位列表）」。缺省以自身 id 成组。"
+    },
+    "accel": {
+      "type": "string",
+      "description": "加速实现标注（如 sol），仅用于 UI 标注与「有加速/无加速」策略投影，不参与档位解析。"
+    },
+    "requiresNodes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "该实现必需的 ComfyUI 节点 class_type（预检依据）。缺失 → 显式不可用并报错，本插件不会静默替换用户选定的实现。"
+    },
+    "estSeconds": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "实测耗时（秒），口径：16:9 · 124 帧 · 该档长边。内置清单由生成器从 benchmark 数据填入；用户上传留空 → UI 显示「耗时未知」。"
+    },
+    "note": {
+      "type": "string",
+      "description": "UI 上给用户看的一行事实（如「Sol-Attn 加速 · 1344×768 实测 1.27× · 480p 无收益」）。"
+    },
+    "internal": {
+      "type": "boolean",
+      "description": "诊断/调试清单：true 时永不参与档位解析，也不出现在 UI 与技能选项里（只能显式 workflow= 调用）。"
+    },
     "modes": {
       "type": "object",
       "additionalProperties": {

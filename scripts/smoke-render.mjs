@@ -29,11 +29,18 @@ const reg = loadBuiltinManifests(workflowsDir)
 
 console.log('== 1) resolveManifest ==')
 eq(resolveManifest(reg, 'image.text2image').id, 'flux-text2image', 'image.text2image 默认')
-eq(resolveManifest(reg, 'video.reference2video').id, 'minimax-h3-ref2v', 'video.reference2video 默认')
-eq(resolveManifest(reg, 'video.image2video').id, 'minimax-h3-i2v', 'video.image2video 默认')
-eq(resolveManifest(reg, 'video.reference2video', 'minimax-h3-ref2v').id, 'minimax-h3-ref2v', '显式 workflow 命中')
+// P2 之后视频能力已分档：隐式默认改由 resolveTieredManifest 解析（缺省 quality 档），
+// resolveManifest 只服务「未分档能力」与显式 id 查找。
+const { resolveTieredManifest } = _internals
+// selection 注入空对象：断言的是「无配置选择时的解析规则」，不继承本机已保存的策略
+const none = { registry: reg, probe: false, selection: {} }
+eq((await resolveTieredManifest('video.reference2video', null, null, none)).manifest.id, 'minimax-h3-ref2v-quality', 'video.reference2video 缺省 → quality 档（STANDARD）')
+eq((await resolveTieredManifest('video.reference2video', 'balanced', null, none)).manifest.id, 'minimax-h3-ref2v-balanced', 'balanced 档默认取无加速实现（加速件需显式选择）')
+eq((await resolveTieredManifest('video.reference2video', 'balanced', null, { ...none, selection: { balanced: 'minimax-h3-ref2v-balanced-sol' } })).manifest.id, 'minimax-h3-ref2v-balanced-sol', '注入配置选择 → 用加速实现')
+eq((await resolveTieredManifest('video.image2video', 'fast', null, { registry: reg, probe: false })).manifest.id, 'minimax-h3-i2v-fast', 'video.image2video fast 档')
+eq((await resolveTieredManifest('video.reference2video', 'quality', 'minimax-h3-ref2v-quality', { registry: reg, probe: false })).manifest.id, 'minimax-h3-ref2v-quality', '显式 workflow 命中')
 let threw = false
-try { resolveManifest(reg, 'image.text2image', 'minimax-h3-ref2v') } catch { threw = true }
+try { resolveManifest(reg, 'image.text2image', 'minimax-h3-ref2v-quality') } catch { threw = true }
 ok(threw, '能力不匹配抛错')
 threw = false
 try { resolveManifest(reg, 'image.text2image', 'nonexistent') } catch { threw = true }
@@ -41,7 +48,8 @@ ok(threw, '不存在 workflow 抛错')
 
 console.log('== 2) computeManifestSize ==')
 const flux = reg.byId['flux-text2image']
-const ref2v = reg.byId['minimax-h3-ref2v']
+const ref2vQ = reg.byId['minimax-h3-ref2v-quality']
+const ref2vF = reg.byId['minimax-h3-ref2v-fast']
 {
   const s = computeManifestSize(flux, null, 1344, 768, undefined)
   eq(s.w, 1344, 'flux 显式宽'); eq(s.h, 768, 'flux 显式高')
@@ -51,24 +59,24 @@ const ref2v = reg.byId['minimax-h3-ref2v']
   eq(s3.w, 1344, 'flux default 宽'); eq(s3.h, 768, 'flux default 高')
 }
 {
-  const s = computeManifestSize(ref2v, 'quality', undefined, undefined, '9:16')
+  const s = computeManifestSize(ref2vQ, 'quality', undefined, undefined, '9:16')
   eq(s.w, 768, 'ref2v quality 9:16 宽'); eq(s.h, 1344, 'ref2v quality 9:16 高')
-  const sf = computeManifestSize(ref2v, 'fast', undefined, undefined, '9:16')
+  const sf = computeManifestSize(ref2vF, 'fast', undefined, undefined, '9:16')
   eq(sf.w, 480, 'ref2v fast 9:16 宽'); eq(sf.h, 832, 'ref2v fast 9:16 高')
-  const s169 = computeManifestSize(ref2v, 'quality', undefined, undefined, '16:9')
+  const s169 = computeManifestSize(ref2vQ, 'quality', undefined, undefined, '16:9')
   eq(s169.w, 1344, 'ref2v quality 16:9 宽'); eq(s169.h, 768, 'ref2v quality 16:9 高')
 }
 
 console.log('== 3) buildRenderGraph ==')
 {
-  const { mode, job, graph } = buildRenderGraph(ref2v, { prompt: 'p', mode: 'quality', refs: ['a.png'], prefix: 'x' }, '16:9')
+  const { mode, job, graph } = buildRenderGraph(ref2vQ, { prompt: 'p', mode: 'quality', refs: ['a.png'], prefix: 'x' }, '16:9')
   eq(mode, 'quality', 'mode=quality')
   eq(job.width, 1344, 'quality 宽'); eq(job.height, 768, 'quality 高')
   eq(job.steps, 20, 'quality 步数 20')
   ok(Array.isArray(graph['5'].inputs['ref_images.ref_image_0']), 'refs 注入为连线')
 }
 {
-  const { mode, job, graph } = buildRenderGraph(ref2v, { prompt: 'p', mode: 'fast', refs: ['a.png'], prefix: 'x' }, '16:9')
+  const { mode, job, graph } = buildRenderGraph(ref2vF, { prompt: 'p', mode: 'fast', refs: ['a.png'], prefix: 'x' }, '16:9')
   eq(mode, 'fast', 'mode=fast')
   eq(job.width, 832, 'fast 宽'); eq(job.height, 480, 'fast 高')
   eq(job.steps, 4, 'fast 步数 4')
@@ -76,7 +84,7 @@ console.log('== 3) buildRenderGraph ==')
 }
 {
   // 显式 steps 覆盖 mode 默认
-  const { job } = buildRenderGraph(ref2v, { prompt: 'p', mode: 'quality', steps: 30, prefix: 'x' }, '16:9')
+  const { job } = buildRenderGraph(ref2vQ, { prompt: 'p', mode: 'quality', steps: 30, prefix: 'x' }, '16:9')
   eq(job.steps, 30, '显式 steps 覆盖 mode 默认')
 }
 

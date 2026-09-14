@@ -1,29 +1,29 @@
 {
-  "id": "minimax-h3-i2v",
+  "id": "minimax-h3-ref2v-8step",
   "version": 1,
-  "capability": "video.image2video",
+  "capability": "video.reference2video",
   "runner": "comfyui",
-  "displayName": "MiniMax H3 首/末帧串联视频（带声音）",
-  "description": "本地 MiniMax H3 音视频模型，首帧/末帧串联（ImageToVideo），用于同场景续接镜，带音频。与旧 buildH3ImageToVideoWorkflow 等价。",
+  "displayName": "MiniMax H3 参考绑定 · 8 步平衡档（lightx2v 8-step 768p）",
+  "description": "H3 参考绑定，8 步蒸馏 LoRA（768p 训练域）。★硬约束：本档 shift 必须是 6/3（768p 系 LoRA 的训练 shift）；fast 档那支 4 步 544p 系 LoRA 必须配 12/3，两者不可互换——错配不是画质下降而是结构性崩坏。★分辨率必须贴 768p 训练域（longSide 1344），不要降到 832 复用 fast 档尺寸。采样器按蒸馏 LoRA 参考实现用 euler + simple。带原生音视频。",
   "output": { "mediaType": "video", "hasAudio": true },
   "modelNode": "1",
   "assets": {
     "unet": { "kind": "checkpoint", "default": "minimax_h3_ref2va_pruned_int8_convrot.safetensors", "env": "DSH_SVS_H3_MODEL_REF", "label": "H3 参考 UNet" },
     "clip": { "kind": "clip", "default": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "env": "DSH_SVS_H3_CLIP", "label": "H3 CLIP" },
-    "vae": { "kind": "vae", "default": "minimax_h3_video_vae_fp16.safetensors", "env": "DSH_SVS_H3_VAE", "label": "H3 视频 VAE" },
+    "vae": { "kind": "vae", "default": "minimax_h3_video_vae_fp16.safetensors", "env": "DSH_SVS_H3_VAE", "label": "H3 视频 VAE（int8_convrot 为可选加速件，经配置/assetOverrides 切换）" },
     "audio_vae": { "kind": "vae", "default": "minimax_h3_audio_vae_fp32.safetensors", "env": "DSH_SVS_H3_AUDIO_VAE", "label": "H3 音频 VAE" },
-    "fast_lora": { "kind": "lora", "default": "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "env": "DSH_SVS_H3_LORA_FAST", "label": "H3 fast LoRA" }
+    "lora_8step": { "kind": "lora", "default": "minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "env": "DSH_SVS_H3_LORA_8STEP", "label": "H3 8 步平衡档 LoRA（768p，shift 6/3）" }
   },
   "graph": {
     "1": { "class_type": "UNETLoader", "inputs": { "unet_name": "$assets.unet", "weight_dtype": "default" } },
     "3": { "class_type": "CLIPLoader", "inputs": { "clip_name": "$assets.clip", "type": "minimax" } },
     "4": { "class_type": "VAELoader", "inputs": { "vae_name": "$assets.vae" } },
     "4a": { "class_type": "VAELoader", "inputs": { "vae_name": "$assets.audio_vae" } },
-    "2": { "class_type": "MiniMaxH3SigmaShift", "inputs": { "model": ["$model", 0], "shift_video": 12.0, "shift_audio": 3.0 } },
-    "5": { "class_type": "MiniMaxH3ImageToVideo", "inputs": { "clip": ["3", 0], "vae": ["4", 0], "prompt": null, "width": null, "height": null, "length": null } },
+    "2": { "class_type": "MiniMaxH3SigmaShift", "inputs": { "model": ["$model", 0], "shift_video": 6.0, "shift_audio": 3.0 } },
+    "5": { "class_type": "MiniMaxH3ReferenceToVideo", "inputs": { "clip": ["3", 0], "vae": ["4", 0], "audio_vae": ["4a", 0], "prompt": null, "width": null, "height": null, "length": null, "ref_image_size": "match" } },
     "6": { "class_type": "RandomNoise", "inputs": { "noise_seed": null } },
     "7": { "class_type": "BasicGuider", "inputs": { "model": ["2", 0], "conditioning": ["5", 0] } },
-    "8": { "class_type": "KSamplerSelect", "inputs": { "sampler_name": "res_multistep" } },
+    "8": { "class_type": "KSamplerSelect", "inputs": { "sampler_name": "euler" } },
     "9": { "class_type": "BasicScheduler", "inputs": { "model": ["2", 0], "scheduler": "simple", "steps": null, "denoise": 1.0 } },
     "10": { "class_type": "SamplerCustomAdvanced", "inputs": { "noise": ["6", 0], "guider": ["7", 0], "sampler": ["8", 0], "sigmas": ["9", 0], "latent_image": ["5", 1] } },
     "11": { "class_type": "VAEDecode", "inputs": { "samples": ["10", 0], "vae": ["4", 0] } },
@@ -39,14 +39,12 @@
     "seed": { "inject": "scalar", "to": { "node": "6", "field": "noise_seed" } },
     "steps": { "inject": "scalar", "to": { "node": "9", "field": "steps" } },
     "fps": { "inject": "scalar", "to": { "node": "12", "field": "fps" }, "default": 24 },
-    "first_frame": { "inject": "image", "via": "node", "node": "LoadImage", "to": { "node": "5", "field": "first_frame" }, "preprocess": [ { "class_type": "ImageScale", "inputs": { "upscale_method": "lanczos", "width": "${width}", "height": "${height}", "crop": "disabled" } } ] },
-    "last_frame": { "inject": "image", "via": "node", "node": "LoadImage", "to": { "node": "5", "field": "last_frame" }, "preprocess": [ { "class_type": "ImageScale", "inputs": { "upscale_method": "lanczos", "width": "${width}", "height": "${height}", "crop": "disabled" } } ] },
+    "refs": { "inject": "image", "via": "node", "node": "LoadImage", "to": { "node": "5", "field": "ref_images.ref_image_${i}" }, "max": 8 },
     "prefix": { "inject": "scalar", "to": { "node": "13", "field": "filename_prefix" } }
   },
   "modes": {
-    "quality": { "steps": 20, "longSide": 1344, "loras": [] },
-    "fast": { "steps": 4, "longSide": 832, "loras": [ { "asset": "fast_lora", "strength": 1.0 } ] }
+    "balanced": { "steps": 8, "longSide": 1344, "loras": [ { "asset": "lora_8step", "strength": 1.0 } ] }
   },
-  "resolution": { "policy": "aspect-ratio", "snap": 32, "default": { "fast": [832, 480], "quality": [1344, 768] } },
+  "resolution": { "policy": "aspect-ratio", "snap": 32, "default": { "balanced": [1344, 768] } },
   "constraints": { "aspectRatios": ["16:9", "9:16", "1:1"], "maxDurationFrames": 310, "supportsSubtitles": true }
 }

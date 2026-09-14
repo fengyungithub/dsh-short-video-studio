@@ -60,11 +60,23 @@ function assertCleanGraph(graph, label) {
 console.log('== 1) 加载 + 校验内置清单 ==')
 const report = loadBuiltinManifests(workflowsDir)
 ok(report.errors.length === 0, `无校验错误${report.errors.length ? '\n    ' + report.errors.join('\n    ') : ''}`)
-for (const id of ['flux-text2image', 'minimax-h3-ref2v', 'minimax-h3-i2v', 'extract-frame']) {
+// P2 之后内置 H3 清单是「一档一文件」（组名-档位[-sol]）
+const BUILTIN_IDS = [
+  'flux-text2image', 'extract-frame',
+  'minimax-h3-ref2v-fast', 'minimax-h3-ref2v-balanced', 'minimax-h3-ref2v-balanced-sol',
+  'minimax-h3-ref2v-quality', 'minimax-h3-ref2v-quality-sol',
+  'minimax-h3-i2v-fast', 'minimax-h3-i2v-quality', 'minimax-h3-i2v-quality-sol',
+]
+for (const id of BUILTIN_IDS) {
   ok(Boolean(report.byId[id]), `内置清单含 ${id}`)
 }
-for (const id of ['flux-text2image', 'minimax-h3-ref2v', 'minimax-h3-i2v']) {
-  ok(Boolean(report.byId[id]), `清单存在: ${id}`)
+// 档位契约：每份 H3 清单必须声明 tier/group，且 modes 只剩本档
+for (const id of BUILTIN_IDS.filter((x) => x.startsWith('minimax-h3'))) {
+  const m = report.byId[id]
+  if (!m) continue
+  ok(Boolean(m.tier && m.group), `${id} 声明 tier/group（tier=${m.tier} group=${m.group}）`)
+  ok(Object.keys(m.modes || {}).join(',') === m.tier, `${id} 只有一个 mode 且名称＝档位`)
+  if (id.endsWith('-sol')) ok(Array.isArray(m.requiresNodes) && m.requiresNodes.length > 0, `${id} 声明 requiresNodes（${(m.requiresNodes || []).join(',')}）`)
 }
 
 console.log('== 2) FLUX 文生图 vs buildFluxImageWorkflow ==')
@@ -85,7 +97,7 @@ console.log('== 2) FLUX 文生图 vs buildFluxImageWorkflow ==')
 
 console.log('== 3) H3 参考绑定视频 vs buildH3VideoWorkflow ==')
 for (const mode of ['quality', 'fast']) {
-  const m = report.byId['minimax-h3-ref2v']
+  const m = report.byId[mode === 'fast' ? 'minimax-h3-ref2v-fast' : 'minimax-h3-ref2v-quality']
   const job = { prompt: '狐狸说话', width: mode === 'fast' ? 832 : 1344, height: mode === 'fast' ? 480 : 768, length: 124, seed: 3, steps: mode === 'fast' ? 4 : 20, fps: 24, refs: ['a.png', 'b.png'], prefix: 'canvas/s/s01', mode }
   const g = buildGraphFromManifest(m, job)
   assertCleanGraph(g, `ref2v-${mode}`)
@@ -100,7 +112,7 @@ for (const mode of ['quality', 'fast']) {
 
 console.log('== 4) H3 首/末帧串联 vs buildH3ImageToVideoWorkflow ==')
 for (const mode of ['quality', 'fast']) {
-  const m = report.byId['minimax-h3-i2v']
+  const m = report.byId[mode === 'fast' ? 'minimax-h3-i2v-fast' : 'minimax-h3-i2v-quality']
   const job = { prompt: '续接镜头', width: mode === 'fast' ? 832 : 1344, height: mode === 'fast' ? 480 : 768, length: 124, seed: 5, steps: mode === 'fast' ? 4 : 20, fps: 24, first_frame: 'f.png', last_frame: 'l.png', prefix: 'canvas/s/s02', mode }
   const g = buildGraphFromManifest(m, job)
   assertCleanGraph(g, `i2v-${mode}`)

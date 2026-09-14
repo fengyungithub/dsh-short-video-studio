@@ -775,7 +775,7 @@ import { markdownToHtml } from './markdown.js'
     el.meta.textContent = '画幅 ' + (project.settings?.aspectRatio || '16:9')
       + (project.settings?.duration ? ' · 时长 ' + project.settings.duration : '')
       + ' · 音频 ' + (project.settings?.audioMode || 'silent')
-      + ' · 模式 ' + (project.settings?.mode || 'quality')
+      + ' · 档位 ' + (project.settings?.mode || 'quality')
       + ' · 节点 ' + nodes.length
       + (nodes.length ? '（主线 ' + main.length + (frames.length ? ' · 抽帧 ' + frames.length : '') + (discards.length ? ' · 作废 ' + discards.length : '') + '）' : '')
 
