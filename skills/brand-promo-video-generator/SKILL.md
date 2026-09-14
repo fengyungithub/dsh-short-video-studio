@@ -284,7 +284,7 @@ whenToUse: |
 
 **档位与能力可用性**：一个能力支持多档，**具体有哪些档、每档什么代价，以 `comfy_list_workflows` 为准**（不同能力可以不同，用户增删工作流后也会变）——不要假设档位数量或名称。请求了该能力没有的档会**显式报错并列出可用档位**（工具不会静默换档）。遇到这类报错就改请求可用档位，**不要原样重试同一请求**。
 
-**档位与分辨率/耗时同源**：工具返回会带 `tier` / `implementation` / `resolution`，回复与交付清单里如实回报**实际用到的实现 id**（透明化）。实测参考（16:9 · 124 帧 ≈ 5.17s，A800 80GB）：ref2v `fast`(832×480) 24.6s ｜ `balanced`(1344×768) 166.3s ｜ `balanced` 带加速 136.3s ｜ `quality`(1344×768) 396.6s ｜ `quality` 带加速 311.2s；i2v `fast` 26.1s ｜ `balanced`(1344×768) 177.3s ｜ `balanced` 带加速 130.5s ｜ `quality` 394.8s ｜ `quality` 带加速 314.7s。画质：`balanced`(8 步) 帧锐度比 `quality`(20 步) 高约 13%；`fast` 档细节最弱、适合调构图 / 走位。
+**档位与分辨率/耗时同源**：工具返回会带 `tier` / `implementation` / `resolution`，回复与交付清单里如实回报**实际用到的实现 id**（透明化）。实测参考（16:9 · 124 帧 ≈ 5.17s，随硬件/驱动/模型版本浮动，只作量级参考）：ref2v `fast`(832×480) 24.6s ｜ `balanced`(1344×768) 166.3s ｜ `balanced` 带加速 136.3s ｜ `quality`(1344×768) 396.6s ｜ `quality` 带加速 311.2s；i2v `fast` 26.1s ｜ `balanced`(1344×768) 177.3s ｜ `balanced` 带加速 130.5s ｜ `quality` 394.8s ｜ `quality` 带加速 314.7s。画质：`balanced`(8 步) 帧锐度比 `quality`(20 步) 高约 13%；`fast` 档细节最弱、适合调构图 / 走位。
 
 **工作流**：默认由能力注册表 `preferred` 决定，不出选项卡。仅当用户主动要求换模型时，先 `comfy_list_workflows` 核对能力，再出工作流选项卡，选定后用 `comfy_render` 显式传 `workflow`，并把选择记入生产简报。
 
