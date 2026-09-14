@@ -11,6 +11,10 @@
  * 用法：node scripts/smoke-manifest.mjs
  */
 
+// 测试隔离：不读本机 ~/.dsh 里的真实配置（里面可能有用户自建策略/档位选择，
+// 会把「未指定档位」「档位列表」等断言前提改掉）。纯逻辑测试一律跑在空配置上。
+process.env.DSH_SVS_CONFIG = process.env.DSH_SVS_CONFIG || '/nonexistent/svs-smoke-config.json'
+
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { loadBuiltinManifests, buildGraphFromManifest, validateManifest } from '../lib/manifest.js'

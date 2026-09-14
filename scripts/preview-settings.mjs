@@ -49,9 +49,11 @@ const cfgFixture = {
 const realCfg = _internals.getCfg ? _internals.getCfg() : null
 const cfg = USE_FIXTURE || !realCfg ? cfgFixture : realCfg
 const apiPayload = await _internals.describeWorkflowsApi(_internals.getRegistry(), { probe: true })
+// 注意：/api/config 必须回**同一份** cfg（payload 用的是哪份就回哪份），否则
+// "注册表侧（策略/选中）"与"客户端侧（逐档回显）"会来自两份不同配置，预览会自相矛盾。
 global.fetch = async (url) => ({
   ok: true,
-  json: async () => (String(url).includes('/api/config') ? { ok: true, config: cfgFixture } : apiPayload),
+  json: async () => (String(url).includes('/api/config') ? { ok: true, config: cfg } : apiPayload),
 })
 
 let settingsComponent = null

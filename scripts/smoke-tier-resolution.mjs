@@ -15,6 +15,10 @@
  * 用法：node scripts/smoke-tier-resolution.mjs
  */
 
+// 测试隔离：不读本机 ~/.dsh 里的真实配置（里面可能有用户自建策略/档位选择，
+// 会把「未指定档位」「档位列表」等断言前提改掉）。纯逻辑测试一律跑在空配置上。
+process.env.DSH_SVS_CONFIG = process.env.DSH_SVS_CONFIG || '/nonexistent/svs-smoke-config.json'
+
 import { _internals } from '../lib/index.js'
 
 const {
@@ -83,14 +87,14 @@ const cfg = (tiers) => ({ tiers })
 
 console.log('\n[1] 默认解析 / 无加速优先')
 {
-  const r = await resolveTieredManifest(R, 'balanced', null, { registry, probe: SOL_PRESENT, selection: {} })
+  const r = await resolveTieredManifest(R, 'balanced', null, { registry, probe: SOL_PRESENT, selection: {}, cfg: {} })
   eq('balanced 无配置 → 标准实现', r.manifest.id, 'demo-balanced')
   eq('resolution', r.resolution, 'tier-default')
-  const q = await resolveTieredManifest(R, 'quality', null, { registry, probe: SOL_PRESENT, selection: {} })
+  const q = await resolveTieredManifest(R, 'quality', null, { registry, probe: SOL_PRESENT, selection: {}, cfg: {} })
   eq('quality 无配置 → 标准实现（internal 不参与）', q.manifest.id, 'demo-quality')
-  const f = await resolveTieredManifest(R, 'fast', null, { registry, probe: SOL_PRESENT, selection: {} })
+  const f = await resolveTieredManifest(R, 'fast', null, { registry, probe: SOL_PRESENT, selection: {}, cfg: {} })
   eq('fast → 唯一实现', f.manifest.id, 'demo-fast')
-  const none = await resolveTieredManifest(R, null, null, { registry, probe: SOL_PRESENT, selection: {} })
+  const none = await resolveTieredManifest(R, null, null, { registry, probe: SOL_PRESENT, selection: {}, cfg: {} })
   eq('未指定档位 → 默认档', none.tier, 'quality')
   ok('未指定档位带警告（不静默）', none.warnings.length > 0)
 }
@@ -109,7 +113,7 @@ console.log('\n[2] 排序确定性：priority 降序 → 无加速优先 → id 
 console.log('\n[3] 配置选定生效 + 不可用必须报错（绝不静默替换）')
 {
   // 配置选定：注入 selection 即模拟「设置页点了加速策略 / 逐档改选」
-  const r = await resolveTieredManifest(R, 'quality', null, { registry, probe: SOL_PRESENT, selection: { quality: 'demo-quality-sol' } })
+  const r = await resolveTieredManifest(R, 'quality', null, { registry, probe: SOL_PRESENT, selection: { quality: 'demo-quality-sol' }, cfg: {} })
   eq('配置选定 → 用选中的实现', r.manifest.id, 'demo-quality-sol')
   eq('解析来源标记为 tier-config', r.resolution, 'tier-config')
   // 选中的实现没装节点 → 必须报错（不静默回退标准实现）
@@ -135,11 +139,11 @@ console.log('\n[5] 显式 workflow：档位不符 → 报错；相符 → 用它
   try { await resolveTieredManifest(R, 'fast', 'demo-quality', { registry, probe: SOL_PRESENT, selection: {} }) } catch (e) { threw = e }
   ok('fast 请求 + quality 实现 → 报错', Boolean(threw))
   ok('报错说明不静默跨档替换', threw && threw.message.includes('不静默跨档替换'), threw && threw.message)
-  const r = await resolveTieredManifest(R, 'quality', 'demo-quality', { registry, probe: SOL_PRESENT, selection: {} })
+  const r = await resolveTieredManifest(R, 'quality', 'demo-quality', { registry, probe: SOL_PRESENT, selection: {}, cfg: {} })
   eq('档位相符 → 用显式实现', r.manifest.id, 'demo-quality')
   eq('resolution', r.resolution, 'explicit')
   // internal 诊断清单可显式调用
-  const s = await resolveTieredManifest(R, null, 'demo-stats', { registry, probe: SOL_PRESENT, selection: {} })
+  const s = await resolveTieredManifest(R, null, 'demo-stats', { registry, probe: SOL_PRESENT, selection: {}, cfg: {} })
   eq('internal 清单可显式调用', s.manifest.id, 'demo-stats')
 }
 
@@ -213,6 +217,12 @@ console.log('\n[7] 策略：一条内置默认 + 用户自建（命名）')
   ok('报错说明是"策略只提供哪些档位"', /只提供 balanced 档，没有 fast 档/.test(String(errFast && errFast.message)), String(errFast && errFast.message).slice(0, 90))
   ok('报错给出补救路径（改档位/加档/改选内置默认/显式 workflow）',
     /改请求档位|内置默认|workflow=/.test(String(errFast && errFast.message)))
+  // 「没指定档位」＝交给策略决定（不是点名 quality）：用策略自己的档位 + warning，不报错
+  const auto = await resolveTieredManifest(R, null, null, { registry, probe: SOL_PRESENT, selection: oneCfg.tiers[R], cfg: oneCfg })
+  eq('未指定档位 → 用策略提供的档位', auto.manifest.id, 'demo-balanced-sol')
+  ok('未指定档位时有 warning 说明为什么不是 quality',
+    auto.warnings.some((w) => w.includes('只提供 balanced') && w.includes('按 balanced 档解析')), JSON.stringify(auto.warnings))
+  // 但**显式**点名策略不提供的档位仍然报错（上面已断言 fast）
   // 手写的逐档快照（没有策略上下文）不受此限：仍是"未选档位跟随注册表首选"
   const rFastLoose = await resolveTieredManifest(R, 'fast', null, { registry, probe: SOL_PRESENT, selection: oneCfg.tiers[R], cfg: { tiers: oneCfg.tiers } })
   eq('手写快照（无策略）仍按注册表首选解析', rFastLoose.manifest.id, 'demo-fast')
@@ -246,7 +256,7 @@ console.log('\n[7] 策略：一条内置默认 + 用户自建（命名）')
 console.log('\n[8] 未分档的旧清单：按 mode 名匹配；匹配不到则报错')
 {
   const legacyOnly = makeRegistry([mk('legacy-multi', { modes: { quality: { steps: 20 }, fast: { steps: 4 } } })])
-  const r = await resolveTieredManifest(R, 'fast', null, { registry: legacyOnly, probe: SOL_PRESENT, selection: {} })
+  const r = await resolveTieredManifest(R, 'fast', null, { registry: legacyOnly, probe: SOL_PRESENT, selection: {}, cfg: {} })
   eq('tier=fast → 旧清单的 fast mode', r.manifest.id, 'legacy-multi')
   eq('resolution=legacy-mode', r.resolution, 'legacy-mode')
   ok('带"尚未分档"警告', r.warnings.some((w) => w.includes('尚未分档')))
@@ -254,13 +264,13 @@ console.log('\n[8] 未分档的旧清单：按 mode 名匹配；匹配不到则�
   try { await resolveTieredManifest(R, 'balanced', null, { registry: legacyOnly, probe: SOL_PRESENT, selection: {} }) } catch (e) { threw = e }
   ok('tier=balanced（旧清单没有）→ 报错，不猜', Boolean(threw))
   ok('报错列出旧清单现有 mode', threw && threw.message.includes('quality'), threw && threw.message)
-  const noTier = await resolveTieredManifest(R, null, null, { registry: legacyOnly, probe: SOL_PRESENT, selection: {} })
+  const noTier = await resolveTieredManifest(R, null, null, { registry: legacyOnly, probe: SOL_PRESENT, selection: {}, cfg: {} })
   eq('未指定档位 → 旧路径', noTier.resolution, 'legacy')
 }
 
 console.log('\n[9] describeTierMatrix（UI/技能数据源）')
 {
-  const mx = await describeTierMatrix(registry, { probe: SOL_PRESENT })
+  const mx = await describeTierMatrix(registry, { probe: SOL_PRESENT, cfg: {} })
   const cap = mx[R]
   ok('tiered=true', cap.tiered)
   eq('档位列表', cap.tiers.join('/'), 'fast/balanced/quality')
@@ -273,7 +283,7 @@ console.log('\n[9] describeTierMatrix（UI/技能数据源）')
   ok('internal 清单不出现在矩阵里', !JSON.stringify(g).includes('demo-stats'))
   const mx2 = await describeTierMatrix(registry, { probe: SOL_MISSING })
   eq('缺节点时可用性=false', mx2[R].groups[0].tiers.quality.find((w) => w.accel === 'sol').available, false)
-  const mx3 = await describeTierMatrix(registry, { probe: false })
+  const mx3 = await describeTierMatrix(registry, { probe: false, cfg: {} })
   eq('probe=false → 可用性未知(null)', mx3[R].groups[0].tiers.quality.find((w) => w.accel === 'sol').available, null)
 }
 
@@ -303,7 +313,7 @@ console.log('\n[11] PDD：四个普通清单（不单列策略，由用户组合
 {
   const I = _internals
   const reg = I.getRegistry()
-  const mx = await describeTierMatrix(reg, { probe: SOL_PRESENT })
+  const mx = await describeTierMatrix(reg, { probe: SOL_PRESENT, cfg: {} })
   for (const [cap, pddId, solId] of [
     [R, 'minimax-h3-ref2v-balanced-pdd', 'minimax-h3-ref2v-balanced-pdd-sol'],
     ['video.image2video', 'minimax-h3-i2v-balanced-pdd', 'minimax-h3-i2v-balanced-pdd-sol'],
@@ -320,14 +330,14 @@ console.log('\n[11] PDD：四个普通清单（不单列策略，由用户组合
     eq(`${cap} 用户策略可指向 PDD+Sol`, projected[1].tiers.balanced, solId)
     ok(`${cap} 用户策略在基准可用性下标记可用`, projected[1].available === true || projected[1].available === false)
     // 不做隐式默认：空 selection 时 balanced 不落到 PDD
-    const r = await resolveTieredManifest(cap, 'balanced', null, { registry: reg, probe: SOL_PRESENT, selection: {} })
+    const r = await resolveTieredManifest(cap, 'balanced', null, { registry: reg, probe: SOL_PRESENT, selection: {}, cfg: {} })
     ok(`${cap} balanced 隐式解析不落到 PDD`, !r.manifest.id.includes('-pdd'), `实际 ${r.manifest.id}`)
     // 显式指定仍可用（用户策略写入的就是显式 id）
-    const ex = await resolveTieredManifest(cap, 'balanced', pddId, { registry: reg, probe: ALL_PRESENT, selection: {} })
+    const ex = await resolveTieredManifest(cap, 'balanced', pddId, { registry: reg, probe: ALL_PRESENT, selection: {}, cfg: {} })
     eq(`${pddId} 显式指定可解析`, ex.manifest.id, pddId)
     ok(`${pddId} priority<0（显式可选中、不会被隐式选中）`, m.priority < 0)
     // 缺节点时如实置灰（不假装可用）
-    const mxMissing = await describeTierMatrix(reg, { probe: PDD_MISSING })
+    const mxMissing = await describeTierMatrix(reg, { probe: PDD_MISSING, cfg: {} })
     const list = ((mxMissing[cap].groups.find((g) => g.id === m.group) || {}).tiers || {}).balanced || []
     eq(`${pddId} 缺 PDD 节点 → 不可用`, (list.find((w) => w.id === pddId) || {}).available, false)
     // base 与 PDD 权重严格同族

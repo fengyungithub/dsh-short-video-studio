@@ -10,6 +10,10 @@
  * 用法：node scripts/smoke-client-settings.mjs
  */
 
+// 测试隔离：不读本机 ~/.dsh 里的真实配置（里面可能有用户自建策略/档位选择，
+// 会把「未指定档位」「档位列表」等断言前提改掉）。纯逻辑测试一律跑在空配置上。
+process.env.DSH_SVS_CONFIG = process.env.DSH_SVS_CONFIG || '/nonexistent/svs-smoke-config.json'
+
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -48,7 +52,9 @@ const cfgFixture = {
   preferred: { 'video.reference2video': ['minimax-h3-ref2v-quality'] },
   tiers: { 'video.reference2video': { quality: 'minimax-h3-ref2v-quality-sol' } },
 }
-const apiPayload = await _internals.describeWorkflowsApi(_internals.getRegistry(), { probe: false })
+// cfg 显式传空对象：**不使用本机真实配置**。否则用户/开发机在里面存过的策略与档位选择
+// 会改变档位列表（availableTiers 收敛）与选中态，测试前提随之漂移。
+const apiPayload = await _internals.describeWorkflowsApi(_internals.getRegistry(), { probe: false, cfg: {} })
 global.fetch = async (url) => {
   const u = String(url)
   const body = u.includes('/api/config') ? { ok: true, config: cfgFixture } : apiPayload
@@ -226,6 +232,7 @@ console.log('\n[6] 策略：内置默认 / 用户自建 / 新增（命名 + 自�
       {
         capability: 'video.multi', tiered: true, tiers: ['fast', 'balanced', 'quality'], unclassified: [],
         groups: [mkGroup('grpA', '甲族', true), mkGroup('grpB', '乙族', true)],
+        availableTiers: ['balanced'],   // 当前策略只提供 balanced（其余档位对它而言不存在）
         strategies: [
           { id: '__default', label: '甲族', builtin: true, available: true, selected: false, tiers: { fast: 'grpA-fast', balanced: 'grpA-balanced', quality: 'grpA-quality' } },
           { id: 's1', label: '我的快档', builtin: false, available: true, selected: true, tiers: { balanced: 'grpB-balanced-sol' } },
@@ -236,13 +243,14 @@ console.log('\n[6] 策略：内置默认 / 用户自建 / 新增（命名 + 自�
       {
         capability: 'video.other', tiered: true, tiers: ['fast'], unclassified: [],
         groups: [mkGroup('grpC', '丙族', false)],
+        availableTiers: ['fast'],
         strategies: [{ id: '__default', label: '丙族', builtin: true, available: true, selected: true, tiers: { fast: 'grpC-fast' } }],
         workflows: [impl('grpC-fast', 'grpC', 'fast')],
         selection: {},
       },
     ],
   }
-  const cfg0 = { tiers: { 'video.multi': { balanced: 'grpB-balanced-sol' } }, strategies: { 'video.multi': [{ id: 's1', name: '我的快档', tiers: { balanced: 'grpB-balanced-sol' } }] }, strategyOf: { 'video.multi': 's1' } }
+  const cfg0 = { tiers: { 'video.multi': { balanced: 'grpB-balanced-sol' }, 'video.other': { fast: 'grpC-fast' } }, strategies: { 'video.multi': [{ id: 's1', name: '我的快档', tiers: { balanced: 'grpB-balanced-sol' } }] }, strategyOf: { 'video.multi': 's1' } }
   const posts = []
   global.fetch = async (url, opts2) => {
     const isCfg = String(url).includes('/api/config')
@@ -277,6 +285,17 @@ console.log('\n[6] 策略：内置默认 / 用户自建 / 新增（命名 + 自�
     ok('应用用户策略会写配置', posts.length > before)
     eq('用户策略 → 写入它的档位快照', last.tiers?.['video.multi']?.balanced, 'grpB-balanced-sol')
     eq('用户策略 → strategyOf 记为它的 id', last.strategyOf?.['video.multi'], 's1')
+
+    // ③ 逐档区只回显"当前策略提供的档位"——没这个档位＝不出现，而不是显示成"默认"
+    const tierSel = findAll(tree, (n) => n.type === 'select' && findAll(n, (o) => String(o.props.children || '').includes('默认（注册表首选')).length > 0)
+    eq('逐档区只显示策略提供的档位（multi 1 行 + other 1 行）', tierSel.length, 2)
+    const shownIds = tierSel.flatMap((sel) => findAll(sel, (o) => o.props.value).map((o) => o.props.value))
+    ok('策略没挑的档位在逐档区不出现（不是显示成"默认"）',
+      ['grpA-fast', 'grpA-quality', 'grpA-quality-sol'].every((id) => !shownIds.includes(id)),
+      shownIds.join(','))
+    ok('策略挑的那一档仍然出现且回显的是它挑的清单',
+      tierSel.some((sel) => sel.props.value === 'grpB-balanced-sol'), tierSel.map((s2) => s2.props.value).join('|'))
+    ok('不再出现「未单独选择，跟随注册表首选」', !textOf(tree).includes('未单独选择，跟随注册表首选'))
 
     // ③ 新增策略：表单字段齐全（策略名 + 每档一个下拉，选项来自各组 = 跨组自由组合）
     const addBtn = findAll(tree, (n) => n.type === 'button' && String(textOf(n)).includes('新增策略'))

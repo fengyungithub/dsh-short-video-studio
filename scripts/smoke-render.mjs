@@ -9,6 +9,10 @@
  * 用法：node scripts/smoke-render.mjs
  */
 
+// 测试隔离：不读本机 ~/.dsh 里的真实配置（里面可能有用户自建策略/档位选择，
+// 会把「未指定档位」「档位列表」等断言前提改掉）。纯逻辑测试一律跑在空配置上。
+process.env.DSH_SVS_CONFIG = process.env.DSH_SVS_CONFIG || '/nonexistent/svs-smoke-config.json'
+
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { loadBuiltinManifests } from '../lib/manifest.js'
@@ -33,12 +37,13 @@ eq(resolveManifest(reg, 'image.text2image').id, 'flux-text2image', 'image.text2i
 // resolveManifest 只服务「未分档能力」与显式 id 查找。
 const { resolveTieredManifest } = _internals
 // selection 注入空对象：断言的是「无配置选择时的解析规则」，不继承本机已保存的策略
-const none = { registry: reg, probe: false, selection: {} }
+// cfg 也注入空对象：本机配置里若存了用户自建策略（如只提供 balanced），会改变"未指定档位"的解析结果
+const none = { registry: reg, probe: false, selection: {}, cfg: {} }
 eq((await resolveTieredManifest('video.reference2video', null, null, none)).manifest.id, 'minimax-h3-ref2v-quality', 'video.reference2video 缺省 → quality 档（STANDARD）')
 eq((await resolveTieredManifest('video.reference2video', 'balanced', null, none)).manifest.id, 'minimax-h3-ref2v-balanced', 'balanced 档默认取无加速实现（加速件需显式选择）')
 eq((await resolveTieredManifest('video.reference2video', 'balanced', null, { ...none, selection: { balanced: 'minimax-h3-ref2v-balanced-sol' } })).manifest.id, 'minimax-h3-ref2v-balanced-sol', '注入配置选择 → 用加速实现')
-eq((await resolveTieredManifest('video.image2video', 'fast', null, { registry: reg, probe: false })).manifest.id, 'minimax-h3-i2v-fast', 'video.image2video fast 档')
-eq((await resolveTieredManifest('video.reference2video', 'quality', 'minimax-h3-ref2v-quality', { registry: reg, probe: false })).manifest.id, 'minimax-h3-ref2v-quality', '显式 workflow 命中')
+eq((await resolveTieredManifest('video.image2video', 'fast', null, { ...none })).manifest.id, 'minimax-h3-i2v-fast', 'video.image2video fast 档')
+eq((await resolveTieredManifest('video.reference2video', 'quality', 'minimax-h3-ref2v-quality', { ...none })).manifest.id, 'minimax-h3-ref2v-quality', '显式 workflow 命中')
 let threw = false
 try { resolveManifest(reg, 'image.text2image', 'minimax-h3-ref2v-quality') } catch { threw = true }
 ok(threw, '能力不匹配抛错')

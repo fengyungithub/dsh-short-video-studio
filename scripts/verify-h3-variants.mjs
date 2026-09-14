@@ -11,6 +11,10 @@
  * 用法：node scripts/verify-h3-variants.mjs
  */
 
+// 测试隔离：不读本机 ~/.dsh 里的真实配置（里面可能有用户自建策略/档位选择，
+// 会把「未指定档位」「档位列表」等断言前提改掉）。纯逻辑测试一律跑在空配置上。
+process.env.DSH_SVS_CONFIG = process.env.DSH_SVS_CONFIG || '/nonexistent/svs-smoke-config.json'
+
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -128,7 +132,7 @@ console.log('\n[3] 解析链：tier → 实现 → 尺寸（含 9:16）')
   ]
   for (const [cap, tier, wantId, wh] of cases) {
     // selection 注入空：断言「默认解析到的实现」，不继承本机配置里已保存的策略
-    const r = await resolveTieredManifest(cap, tier, null, { registry: reg, probe: false, selection: {} })
+    const r = await resolveTieredManifest(cap, tier, null, { registry: reg, probe: false, selection: {}, cfg: {} })
     ok(`${cap} ${tier} → ${wantId}`, r.manifest.id === wantId, `实际 ${r.manifest.id}`)
     const mode = r.tier
     const size = computeManifestSize(r.manifest, mode, undefined, undefined, '16:9')
@@ -137,7 +141,7 @@ console.log('\n[3] 解析链：tier → 实现 → 尺寸（含 9:16）')
     ok(`${cap} ${tier} 9:16 尺寸 ${wh[1]}×${wh[0]}`, v.w === wh[1] && v.h === wh[0], `实际 ${v.w}×${v.h}`)
   }
   // 编译一次，确认图能落地（无残留哨兵/连线完整由 buildGraphFromManifest 自身保证）
-  const r = await resolveTieredManifest('video.reference2video', 'quality', null, { registry: reg, probe: false, selection: {} })
+  const r = await resolveTieredManifest('video.reference2video', 'quality', null, { registry: reg, probe: false, selection: {}, cfg: {} })
   const { graph } = buildRenderGraph(r.manifest, { prompt: 'verify', width: 1344, height: 768, length: 124, seed: 7, refs: [], prefix: 'verify/x', first_frame: null, last_frame: null }, '16:9')
   ok('quality 清单可编译（含音频/视频 VAE 解码）',
     Boolean(graph['11'] && graph['11a'] && graph['5'].inputs.width === 1344 && graph['9'].inputs.steps === 20))

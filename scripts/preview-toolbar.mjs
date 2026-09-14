@@ -8,6 +8,10 @@
  * 产物：e2e-out/ui/toolbar-<宽>.png
  */
 
+// 测试隔离：不读本机 ~/.dsh 里的真实配置（里面可能有用户自建策略/档位选择，
+// 会把「未指定档位」「档位列表」等断言前提改掉）。纯逻辑测试一律跑在空配置上。
+process.env.DSH_SVS_CONFIG = process.env.DSH_SVS_CONFIG || '/nonexistent/svs-smoke-config.json'
+
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -48,7 +52,7 @@ const bar = reg['conversation.input.attachments']
 if (!toggle || !bar) { console.error('未取到组件注册：', Object.keys(reg)); process.exit(1) }
 
 const cfg = _internals.getCfg ? _internals.getCfg() : {}
-const apiPayload = await _internals.describeWorkflowsApi(_internals.getRegistry(), { probe: false })
+const apiPayload = await _internals.describeWorkflowsApi(_internals.getRegistry(), { probe: false, cfg: {} })
 global.fetch = async (url) => ({
   ok: true,
   json: async () => (String(url).includes('/api/config') ? { ok: true, config: cfg } : apiPayload),
