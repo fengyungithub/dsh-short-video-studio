@@ -101,7 +101,7 @@ H3 的视频与音频在同一个 forward 里生成。所以步数蒸馏的短�
 
 ### 2.3 一张表看清"哪些能用"
 
-| 方案 | ComfyUI 原生可加载 | 单卡 Ampere（sm_80）(sm_80, 无 FP8) 可用 | 与本项目 base 匹配 | 结论 |
+| 方案 | ComfyUI 原生可加载 | sm_80（单卡 Ampere，无 FP8）可用 | 与本项目 base 匹配 | 结论 |
 |---|---|---|---|---|
 | lightx2v fl2v/ref2v turbo（.comfy 版） | ✅ 普通 LoraLoaderModelOnly | ✅ | ✅（ref2v v0.1 ↔ ref2va base） | **生产可用** |
 | Alibaba PDD Acc-8Step（Kijai pruned_comfy） | ✅（需较新 ComfyUI） | ✅ | ✅（pruned 版 ↔ pruned base） | **候选生产** → 该 repack 格式不可用（§9.4），改用 aptech0081 预转换版 ✅ 已落地（§9.9） |
