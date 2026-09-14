@@ -330,6 +330,8 @@ node scripts/import-comfy.mjs exported.json \
 
 **全工作流 Benchmark（分辨率 × 档位 × LoRA × Sol 加速）**：见 [`docs/minimax-h3-video-benchmark.md`](docs/minimax-h3-video-benchmark.md) —— 速查结论表、token/成本模型（分辨率超线性 tokens^1.5、步数线性 `t≈19s+18.9s×步数`）、Sol 交叉点（768p 才值得，1.25–1.38×）、一条 60 镜短片的时间换算、陷阱与未测清单。取数脚本：`node e2e-out/bench.mjs`、`node e2e-out/inventory.mjs`。
 
+**I2V 与 Ref2V 的概念差别 · 跨模型选型参考（LTX-2.5 vs MiniMax H3）**：见 [`docs/i2v-vs-ref2v-and-model-comparison.md`](docs/i2v-vs-ref2v-and-model-comparison.md) —— 两种"图生视频"的机制差别、角色一致性 / 分辨率 / 时长 / 速度 / 音频与字幕 / 部署成本逐维对照、按镜头类型的选型建议与未验证清单。**本文是技术选型参考，不属于插件契约**（插件侧只说能力、保持模型无关）。
+
 ## 渠道交付（飞书 / TUI）
 
 > 前置：飞书渠道 dsh-lark 是 **web profile 插件**，需 `dsh plugin --profile web add dsh-lark-channel@latest`（与 dsh web 共用同一 profile，见[飞书集成](#-飞书集成远程操控工作台创作)）。
@@ -389,6 +391,21 @@ node scripts/import-comfy.mjs exported.json \
 ## 更新日志
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
+
+### v1.2.2 — 字幕写法单源 · I2V/Ref2V 选型文档（2026-09-14）
+
+**✨ 新增 / 改进**
+
+- **字幕与画面内文案的写法收归单一权威**：`h3-prompt-writing` 该节升级为「字幕与画面内文案（唯一权威版）」，四条定稿写法 + 失败写法 + 容量阈值 + 档位口径集中一处；`3d-animation-short-generator` / `brand-promo-video-generator` **只引用、不复述**（原先各自带一份简化版，漏限定词会导致字幕整段不烧，属已实测缺陷）。画面内文案与字幕**同源同法**（标牌 / UI / 品牌文案同理）。
+- **适用面扩到「声明支持字幕的实现」**：H3 走结构化内嵌路径（Ref2VA 的 `detailed_description`、I2VA·FL2VA 的 `integrated_multimodal_description`），非 H3 走自由格式路径（英文引号逐字声明紧随对白 / 文案句，**不用末尾中文指令**）；两条路径的四条写法一致。
+- **档位口径写清**：字幕能力是**实现级属性**，判定权在逐镜自检门；**没有「某档必须出字幕」的硬规则**（默认 `quality`，同档换实现前先按取证入口验证）。
+- **新增选型参考文档** [`docs/i2v-vs-ref2v-and-model-comparison.md`](docs/i2v-vs-ref2v-and-model-comparison.md)：I2V 与 Ref2V 的机制差别、角色一致性 / 分辨率 / 时长 / 速度 / 音频与字幕 / 部署成本逐维对照（LTX-2.5 vs MiniMax H3）、按镜头类型的选型建议与未验证清单。**该文不属于插件契约**（插件侧只说能力、保持模型无关）。
+
+**📝 文档 / 其它**
+
+- 修正 `docs/tier-strategy-design.md` 中指向旧节名的两处失效引用（节名已改）。
+- 公开文档不再出现测试机器的型号与显存数字（延续 v1.2.1 的口径）；技术前提（架构、无 FP8 路径、无 nvcc）全部保留。
+- 本版为**技能 + 文档**版本：接口、档位契约与工作流清单零变化。
 
 ### v1.2.1 — 文档（2026-09-14）
 
