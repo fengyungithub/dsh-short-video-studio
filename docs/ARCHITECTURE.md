@@ -12,7 +12,7 @@
 - **画布页**：每个会话多一个「画布」视图 tab，按生产顺序预览 / 编辑各步骤产物。
 - **生成服务**：统一走**本地 ComfyUI API**——图片用本地 FLUX 2，视频用本地 MiniMax H3（音视频 AV 模型，默认带声音、支持参考图绑定与原生字幕）。
 - **Agent 工具**：`comfy_generate_image` / `comfy_generate_video` / `comfy_render` / `canvas_*` / `asset_*`，Agent 与画布页读写同一份持久状态。
-- **自带 skill**：安装插件时自动把 `skills/` 下的 skill 复制到 `~/.dsh/skills/`，供模型 / 技能中心发现。
+- **自带 skill**：安装插件时自动把 `skills/` 下的 skill 复制到 `~/.dsh/skills/`，供模型 / 技能中心发现；**带版本戳刷新**（见 §3 末），用户改过的副本永不覆盖。
 
 **核心架构主张**（贯穿全篇）：插件退化为一个**通用 ComfyUI 工作流执行器 + 注册表**。宿主不认识「FLUX」「H3」这些名字，只认识**能力（capability）**与**工作流清单（manifest，数据而非代码）**——换模型 / 换工作流 = 增删一份 JSON，不动 JS、不动工具描述、不动 systemPrompt。
 
@@ -121,7 +121,9 @@ comfy_render / comfy_generate_* → runRender(ctx, opts)
   → 写/更新画布节点（kind / media / params 含 workflow、mode、seed、assets，可复现）
 ```
 
-`comfy_generate_image` / `comfy_generate_video` 是**薄别名**：前者固定 `capability=image.text2image`，后者按是否传 `first/last_frame_node` 自动分派 `video.image2video`（首末帧串联）或 `video.reference2video`（参考绑定）——向后兼容，现有 skill 与流水线零改动即可继续跑。
+`comfy_generate_image` / `comfy_generate_video` 是**薄别名**：前者固定 `capability=image.text2image`；后者按**显式必填的 `type`** 分派 —— `type=r2v` → `video.reference2video`（参考绑定，配 `ref_nodes`）、`type=i2v` → `video.image2video`（首末帧串联，配 `first_frame_node`）。
+
+形状**不再由「传没传首帧」隐式推断**（旧行为会把冲突参数静默丢弃，见 `docs/video-shape-contract.md`）：真值表集中在 `VIDEO_SHAPES`，校验由 `validateVideoArgs()` 实现，`runRender` 在**上传参考图之前**调用，工具 / HTTP 路由 / 脚本共用同一张表；冲突报错必须带修法。形状与「续接」（`continuity_from`）正交，跨形状续接刻意允许。
 
 > 注：`runImageGeneration` / `runVideoGeneration` 与三个 legacy builder（`buildFluxImageWorkflow` / `buildH3VideoWorkflow` / `buildH3ImageToVideoWorkflow`）已无生产调用点，仅经 `_internals` 供 `smoke-manifest.mjs` 做「manifest 编译 vs legacy 构造」节点类别等价性比对（见 §7 架构债）。
 
@@ -176,7 +178,12 @@ comfy_render / comfy_generate_* → runRender(ctx, opts)
   - `/api/canvas`、`/api/canvas/node`、`/api/canvas/group`、`/api/canvas/reorder`、`DELETE /api/canvas/node`、`/api/assets`（含「入库」）、`/api/generate/image|video`：需 `x-dsh-svs-token` 头；
   - `/media`：token 走 query（便于 `<img>/<video>` 直接加载），**路径安全五步校验**（`safeRelative` → `resolve` → `inside` → `realpath` → 再 `inside`，连符号链接逃逸都堵）；
   - 静态 `studio/`：index.html 注入 token 后伺服，开发期 no-cache。
-- **skill 自动安装**：`apply()` 时把 `<包>/skills/<name>` 复制到 `~/.dsh/skills/<name>`，幂等（目标已存在则跳过，不覆盖用户修改）。
+- **skill 自动安装 + 版本戳刷新**：`apply()` 时调 `syncBundledSkills()`（`lib/index.js`，本插件 skill 分发的唯一实现，可注入路径以便测试）把 `<包>/skills/<name>` 同步到 `~/.dsh/skills/<name>`：
+  - **判定依据是内容哈希**（`hashSkillDir`：sha256 over 排序后的「相对路径 + 内容」，跳过 `.dsh-studio-manifest` 与 `.DS_Store`；与 mtime / 复制方式无关）；
+  - 每个已安装副本的 `.dsh-studio-manifest` 记 `pluginVersion` + `contentHash` + `installedAt`；
+  - **五种情形**：① 目标不存在 → 安装 + 落戳；② 有戳且内容 == 记录（用户没改）→ 与源不同则**刷新**（删掉重拷 + 更新戳），相同则只补戳（静默）；③ 有戳但内容 != 记录（**用户改过**）→ **不覆盖**，日志提示取新版的办法；④ 有戳无哈希（旧版安装）→ 内容与源一致只补戳，不一致按「用户改过」保守处理；⑤ 无戳 → 内容与源逐字节一致才**收编补戳**（只写标记，不碰内容），否则视为用户/第三方同名 skill → 冲突提示、不覆盖；
+  - `DSH_SVS_SKILL_REFRESH=off` 关掉刷新（只做首次安装 + 冲突提示），`=force` 连用户改过的也覆盖（显式越权）；
+  - 回归：`scripts/smoke-skill-install.mjs`（37 断言，临时目录里自建 bundle + 目标，不碰真实 `~/.dsh/skills`），已进 `npm run smoke`。
 - **配置**：插件 `inject = ['webServer', 'tools', 'systemPrompt', 'workspaceRegistry']`（fiber 等待服务就绪）。
 
 ---
@@ -185,7 +192,7 @@ comfy_render / comfy_generate_* → runRender(ctx, opts)
 
 ### 4.1 一次图片/视频生成（Agent 工具路径）
 ```
-Agent 调用 comfy_generate_video(prompt, ref_nodes=[角色卡,场景卡], tier='quality', ...)
+Agent 调用 comfy_generate_video(prompt, type='r2v', ref_nodes=[角色卡,场景卡], tier='quality', ...)
   → runRender(capability=video.reference2video)
   → 注册表按 tier 解析（显式 workflow > tiers 配置 > 组内该档标准实现；缺档/不可用显式报错）
   → 上传参考图（画布节点 media 或资产库图片 → /upload/image）
@@ -203,7 +210,7 @@ Agent 调用 comfy_generate_video(prompt, ref_nodes=[角色卡,场景卡], tier=
 ```
 画布节点「入库」按钮（人工）→ POST /api/assets → registerAsset（拷图到 .dsh-assets/images/ + 索引）
 → 新会话 asset_list() → 命中 asset_to_canvas(id) → 物化为画布 image 节点（params.assetId 溯源）
-→ comfy_generate_video(ref_nodes=[资产 id]) 直接复用同一张图，保证一致性且不重复生成
+→ comfy_generate_video(type='r2v', ref_nodes=[资产 id]) 直接复用同一张图，保证一致性且不重复生成
 ```
 
 ---
@@ -299,7 +306,7 @@ Agent 调用 comfy_generate_video(prompt, ref_nodes=[角色卡,场景卡], tier=
 | 模型名 | ① `GUIDANCE`（「图片默认 flux-text2image」）② `SKILL.md` 正文括号备注 |
 
 两个漂移放大器：
-1. **skill 是独立副本且不随插件升级更新**——`installBundledSkills()`（`lib/index.js`）是「目标已存在则跳过」，装进 `~/.dsh/skills/` 后升级插件改 `SKILL.md` 不会同步，散文与工具必然漂移。
+1. ~~**skill 是独立副本且不随插件升级更新**~~ **已解决（版本戳刷新）**：`syncBundledSkills()` 会按内容哈希判断「用户改过没有」，没改过的副本随插件升级自动刷新。**遗留**：用户改过的副本**故意不覆盖**（正确行为，但意味着"改过就永久漂移"）——想拿新版必须自己删目录或 `DSH_SVS_SKILL_REFRESH=force`；插件只在启动日志里提示一次，用户容易忽略。
 2. **references 里仍写死 workflow id 作「当前默认」**（`model-selection.md`：「当前 `video.reference2video` → `minimax-h3-ref2v`」）——用户改 `preferred` / 设置页策略后该备注即过时（行为上已用「Do not preselect a named alternative」兜底，但文字 stale 仍在）。**注**：H3 视频能力现已分档，默认不再由 `preferred` 决定而是由档位策略解析，这类「写死当前默认」的备注更易漂移；技能侧只写 `tier=`，不写实现 id。
 
 ### 9.3 解耦：把「复述」改成「引用」

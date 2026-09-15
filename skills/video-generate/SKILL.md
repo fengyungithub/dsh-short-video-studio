@@ -49,13 +49,13 @@ whenToUse: |
 
 ## 流程
 
-1. **解析字段**：从任务消息读出参数头各字段与空行后的 prompt 正文。缺字段时先用可用的默认值（档位 quality、比例 16:9、时长 124），关键字段缺失（r2v 缺参考图、i2v 缺首帧、无 prompt）则回报缺什么，不瞎猜。消息里写 `mode=` 也接受（兼容别名，等同 `tier=`），但回报时按 `tier` 口径说。
+1. **解析字段**：从任务消息读出参数头各字段与空行后的 prompt 正文。`type` 是**必填**（r2v / i2v，工具面不接受缺省），缺失就按下方默认值 `r2v` 处理并在回报里点明。其它字段缺省值：档位 quality、比例 16:9、时长 124；关键字段缺失（r2v 缺参考图、i2v 缺首帧、无 prompt）则回报缺什么，不瞎猜。消息里写 `mode=` 也接受（兼容别名，等同 `tier=`），但回报时按 `tier` 口径说。
 2. **校验前置**：`canvas_get_node` 或 `canvas_list_nodes` 确认参考图/首末帧节点存在且为图片节点；缺失就回报用户「请先上传参考图/首帧」。
 3. **分辨率**：直接传消息里的 `尺寸`（`width`/`height`，已 snap32）。若消息没带尺寸，则按比例 + 档位推导：`fast` 长边 832、`balanced`/`quality` 长边 1344，snap32。
 4. **调用生成**（按类型二选一）：
-   - r2v：`comfy_generate_video(prompt, tier=档位, width, height, length=时长, ref_nodes=[参考图节点...], title='手动 r2v · 档位 · 比例', group='手动生成')`
-   - i2v：`comfy_generate_video(prompt, tier=档位, width, height, length=时长, first_frame_node=首帧, last_frame_node=末帧(可选), title='手动 i2v · 档位 · 比例', group='手动生成')`
-   （`tier` 显式传；i2v 无 `balanced`，见上方失败梯度。）
+   - r2v：`comfy_generate_video(prompt, type='r2v', tier=档位, width, height, length=时长, ref_nodes=[参考图节点...], title='手动 r2v · 档位 · 比例', group='手动生成')`
+   - i2v：`comfy_generate_video(prompt, type='i2v', tier=档位, width, height, length=时长, first_frame_node=首帧, last_frame_node=末帧(可选), title='手动 i2v · 档位 · 比例', group='手动生成')`
+   （**`type` 必须原样透传**（r2v/i2v）——它决定用参考绑定还是首末帧串联，工具会据此校验参数：r2v 带首/末帧、i2v 带 `ref_nodes` 都会直接报错。`tier` 也显式传；i2v 无 `balanced`，见上方失败梯度。）
 5. **回报结果**：工具已把产物写回画布；回复里给出视频节点标题、媒体相对路径与「画布」tab 入口。工具返回带 `tier` / `implementation` / `resolution`，**如实回报实际用到的档位与实现 id**（透明化：用户选的策略可能把该档解析到不同实现，别只复述请求的档位）——一句话说明用了哪个能力、哪个档位、哪个实现；有 `warnings` 也一并说明。
 6. **失败不盲重试**：失败先看报错类型——**档位缺失类报错**（如 i2v 请求 `balanced`）直接改请求可用档位；其它失败再改锚点 / 缩时长 / 改档（升档修字准；降档省成本，注意 i2v 无 `balanced`）/ 简化动作后重试。同一请求不要原样重复提交。
 

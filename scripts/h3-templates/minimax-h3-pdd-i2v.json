@@ -2,6 +2,10 @@
   "id": "minimax-h3-pdd-i2v",
   "version": 1,
   "capability": "video.image2video",
+  "lengthGrid": [
+    17,
+    5
+  ],
   "runner": "comfyui",
   "displayName": "MiniMax H3 首末帧生成视频 · PDD 蒸馏",
   "description": "PDD（Parallel Decoding Distillation）8 步：PDD 权重自带 trunk LoRA + head bank，shift 必须 12/3、采样器必须 euler、sigmas 取自 Apply 节点的训练网格；base 用 fl2va（必须与 FL2VA 的 PDD 权重配对，节点有指纹守卫）。**必须移除其它蒸馏 LoRA**（不叠加）。由 scripts/make-pdd-template.mjs 生成，请勿手改。",

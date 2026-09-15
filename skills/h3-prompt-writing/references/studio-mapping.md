@@ -28,7 +28,19 @@
 | 项目简报 BGM 意图 / 情绪音乐 | `non_diegetic_music`（乐器、速度、节奏、动态；无则 `N/A`） |
 | 镜头表 `字幕` 字段 | 对白进 `<d>`；**字幕在 `detailed_description` 的 `<d>` 对白附近以英文双引号 on-screen text 声明**（`a Chinese subtitle "字幕原文" is displayed centered at the bottom of the frame`），**不用末尾中文指令**（实测：六段式下末尾/内嵌中文指令均不烧录；英文 on-screen 声明 + quality 档正确烧录） |
 
+### 1.1 续接镜（r2v + `continuity_from`）的额外要求
+
+续接镜**仍然是参考绑定镜**（同样六段式），但它的**开局约 1 秒是上一镜结尾的延续**（服务端 latent 已钉住上一镜最后约 22 帧画面 + 1 秒音频），因此：
+
+- `summary` 里点明这是**同场景的连续镜头**（continuation of the previous shot），不要写成全新开场；
+- `detailed_description` 的 `[Shot 1]` 起点必须与上一镜结尾的**运动方向、光位、姿态、音量**接得上（从上一镜的动势接着走），不要重新"建立"空间与光线；
+- 本镜要有上一镜结尾没有的角色 / 道具 / 字幕登场时，登场安排在**第 1 秒之后**（前 1 秒仍是上一镜画面）；
+- `subject_definitions` 照常从角色卡 / 场景卡写：**续接不继承身份**（换装、新角色登场都不影响续接资格，认人永远看参考卡）。
+
 ## 2. 首末帧串联镜 / 转场镜（video.image2video）→ I2VA / FL2VA 三段式
+
+> **使用范围**：仅 `brand-promo-video-generator` 等仍使用 i2v 的片型需要本节；
+> `3d-animation-short-generator` 的**正片镜一律 r2v**（连续镜头用 `continuity_from`，走 §1/§1.1 六段式）；**只有两处**走本节：**跨场景转场镜**（双端锚定：前一场景尾镜末帧 + 下一场景首镜首帧）与**锚点式重渲**（上游末帧 + 下游首帧）。
 
 输出顺序（见 `base-en.txt`）：对齐指令（首行，独占一段）→ `integrated_multimodal_description` → `overall_soundscape` → `non_diegetic_music`。
 

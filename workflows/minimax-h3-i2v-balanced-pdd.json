@@ -2,6 +2,10 @@
   "id": "minimax-h3-i2v-balanced-pdd",
   "version": 1,
   "capability": "video.image2video",
+  "lengthGrid": [
+    17,
+    5
+  ],
   "runner": "comfyui",
   "displayName": "MiniMax H3 首末帧生成视频",
   "description": "MiniMax H3 首末帧生成视频 · balanced 档。由 scripts/make-h3-variants.mjs 生成，请勿手改。",

@@ -191,7 +191,8 @@ comfy_render({
 
 ```js
 comfy_generate_image = comfy_render({ capability: "image.text2image", ... })
-comfy_generate_video = comfy_render({ capability: "video.*", 按 refs/first_frame 自动分派 ... })
+comfy_generate_video = comfy_render({ capability: "video.*", 按**显式必填**的 type 分派（r2v→video.reference2video / i2v→video.image2video）... })
+# 形状真值表与校验见 docs/video-shape-contract.md（type 必填；参数与形状冲突显式报错）
 ```
 
 旧工具保留签名不变，内部走 registry 分派。这样现有 skill 与 pipeline **零改动即可继续跑**，

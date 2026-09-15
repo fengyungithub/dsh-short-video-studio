@@ -2,6 +2,10 @@
   "id": "minimax-h3-pdd-ref2v-sol",
   "version": 1,
   "capability": "video.reference2video",
+  "lengthGrid": [
+    17,
+    5
+  ],
   "runner": "comfyui",
   "displayName": "MiniMax H3 参考生成视频 · PDD 蒸馏 · Sol-Attn 加速",
   "description": "[加速工作流 · 需自装自定义节点 cicalooo/ComfyUI-SolAttn-Ampere] 在 MiniMaxH3SigmaShift 之后插入 Sol-Attn MiniMax H3 块稀疏注意力（Ampere/sm_80+，torch>=2.5，纯 torch.compile(flex_attention)），tau=1.2。不装节点会报 node type not found；\"不被选为隐式默认\"由 accel 标注 + 同档排序（非加速优先）保证，priority 不再承担该职责。原清单说明：PDD（Parallel Decoding Distillation）8 步：PDD 权重自带 trunk LoRA + head bank，shift 必须 12/3、采样器必须 euler、sigmas 取自 Apply 节点的训练网格；base 用 ref2va（必须与 Ref2VA 的 PDD 权重配对，节点有指纹守卫）。**必须移除其它蒸馏 LoRA**（不叠加）。由 scripts/make-pdd-template.mjs 生成，请勿手改。",

@@ -1,5 +1,6 @@
 # dsh-short-video-studio 安装标记
-# 本目录由插件安装逻辑复制（幂等，不覆盖用户修改）。
+# 本目录由插件安装逻辑分发：内容未被修改时会随插件升级自动刷新；
+# 一旦内容哈希与安装记录不符（= 用户改过），插件不再覆盖，只在日志里提示。
 # 来源：dsh-short-video-studio bundled skill（参考视频生成 video-generate 适配版）
 name: video-generate
 source: bundled

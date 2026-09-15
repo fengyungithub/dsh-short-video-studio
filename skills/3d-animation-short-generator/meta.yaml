@@ -1,5 +1,5 @@
 display-name-zh: 3D动画短片
-version: 2.0.0
+version: 2.3.0
 tag-en: Animation
 tag-cn: 动画
 complete-tags-en:
@@ -12,7 +12,7 @@ complete-tags-cn:
   - 动画 / 后期处理
 summary-en: Create a unified 3D animated short from a story idea, covering characters, scenes, shots, storyboards, video clips, and final assembly.
 summary-cn: 根据故事创意完成角色场景设定、镜头规划、分镜生成与视频合成，输出风格统一的3D动画短片。
-desc-en: Turns a short story idea into a stylized 3D animated short. It builds the brief, outline, character and environment cards, continuity-safe shot table, text storyboard, single-shot clips, music, assembly, and final quality review. The default video workflow comes from the capability registry (currently MiniMax-H3); another workflow is used only after the user explicitly selects it and its capabilities are checked. Best for coherent cartoon shorts, not single images or unrelated clips.
+desc-en: Turns a short story idea into a stylized 3D animated short. It builds the brief, outline, character and environment cards, seven-column continuity-safe shot table (with a `续接`/continuation column), text storyboard, single-shot clips, music, assembly, and final quality review. The default video workflow comes from the capability registry (currently MiniMax-H3); another workflow is used only after the user explicitly selects it and its capabilities are checked. Best for coherent cartoon shorts, not single images or unrelated clips.
 desc-cn: 面向希望把故事创意制作成完整风格化3D动画短片的创作者。用户提供故事前提、时长、画幅、基调和音频模式后，Skill 依次完成项目简报、故事大纲、角色卡、场景卡、连续性镜头表、文本分镜、单镜头视频、配乐、成片合成与质量复查。默认使用能力注册表的视频工作流（当前 MiniMax-H3）；用户明确指定其他模型/工作流时先用 comfy_list_workflows 检查能力再执行，失败会按原因重试并切换可用工作流。适合动画短片，不适合单图或无关联镜头，强调角色统一与镜头衔接。
 cover: "https://cdn.hailuoai.com/hailuo-video-web/public_assets/96493a75-aa47-4163-9bf0-14ba3e0ee3fe.mp4"
 cover-en: "https://cdn.hailuoai.com/hailuo-video-web/public_assets/96493a75-aa47-4163-9bf0-14ba3e0ee3fe.mp4"

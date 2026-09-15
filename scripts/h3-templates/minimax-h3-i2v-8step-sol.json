@@ -2,6 +2,10 @@
   "id": "minimax-h3-i2v-8step-sol",
   "version": 1,
   "capability": "video.image2video",
+  "lengthGrid": [
+    17,
+    5
+  ],
   "runner": "comfyui",
   "displayName": "MiniMax H3 首末帧生成视频（8 步平衡档） · Sol-Attn 加速",
   "description": "[加速工作流 · 需自装自定义节点 cicalooo/ComfyUI-SolAttn-Ampere] 在 MiniMaxH3SigmaShift 之后插入 Sol-Attn MiniMax H3 块稀疏注意力（Ampere/sm_80+，torch>=2.5，纯 torch.compile(flex_attention)），tau=1.2。不装节点会报 node type not found；\"不被选为隐式默认\"由 accel 标注 + 同档排序（非加速优先）保证，priority 不再承担该职责。原清单说明：i2v 平衡档模板：fl2va base + fl2v 8 步 768p LoRA，shift 6/3 + euler + longSide 1344。",

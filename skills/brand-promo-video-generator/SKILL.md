@@ -93,7 +93,7 @@ whenToUse: |
 
 确认后用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode），**同一次调用一并传 `groupOrder=["brand intake","creative plan","asset plates","shot clips","final delivery"]`**，并写入生产简报。
 
-> **档位必须逐镜显式传**：之后每次 `comfy_generate_video` 都显式写 `tier=fast|balanced|quality`，**不要依赖缺省**——缺省是 `quality`（成本最高档）。
+> **每镜必须显式传 `type` 与 `tier`**：`type=r2v`（参考绑定）/ `type=i2v`（首末帧串联）——**工具面 `type` 必填**，且与参数冲突会报错；`tier=fast|balanced|quality` 同样逐镜显式写，**不要依赖缺省**——缺省是 `quality`（成本最高档）。
 
 画布产物按以下顺序创建，每产出一个立刻上画布，不要把长篇生产内容只丢在对话里：
 
@@ -292,10 +292,10 @@ whenToUse: |
 
 > 以下所有逐镜调用都要显式带 `tier=`（STEP 7 渲染前的门选定），不要依赖缺省。
 
-- **`first-frame` 镜（LOGO / UI 界面锁定）**：`comfy_generate_video(tier=档位, first_frame_node=板节点 id, …)` —— 首帧锁定，身份逐像素继承自帧。
-- **`ref` 镜（产品英雄）**：`comfy_generate_video(tier=档位, ref_nodes=[干净产品图节点 id])` —— 参考绑定。
+- **`first-frame` 镜（LOGO / UI 界面锁定）**：`comfy_generate_video(type='i2v', tier=档位, first_frame_node=板节点 id, …)` —— 首帧锁定，身份逐像素继承自帧。
+- **`ref` 镜（产品英雄）**：`comfy_generate_video(type='r2v', tier=档位, ref_nodes=[干净产品图节点 id])` —— 参考绑定。
 - **`text` 镜（抽象动效层）**：不传参考图，纯文字生成。
-- **同场景续接镜（i2v 首帧串联）**：先 `extract_frame(video_node=上一镜片段节点)` 抽末帧，再 `comfy_generate_video(tier=档位, first_frame_node=末帧节点)` —— 首帧串联，环境直接从真实画面继承。**不传 `ref_nodes`**（i2v 工作流无参考图注入点，传了会被静默忽略）；且仅当上一镜末帧已包含本镜全部在屏主体（产品 / 吉祥物 / 人物）时才可用——末帧缺任一主体（如新主体登场）的镜禁止 i2v，必须改走 `ref` 参考绑定。
+- **同场景续接镜（i2v 首帧串联）**：先 `extract_frame(video_node=上一镜片段节点)` 抽末帧，再 `comfy_generate_video(type='i2v', tier=档位, first_frame_node=末帧节点)` —— 首帧串联，环境直接从真实画面继承。**不传 `ref_nodes`**（i2v 工作流无参考图注入点，传了会**直接报错**）；且仅当上一镜末帧已包含本镜全部在屏主体（产品 / 吉祥物 / 人物）时才可用——末帧缺任一主体（如新主体登场）的镜禁止 i2v，必须改走 `ref` 参考绑定。
 - **跨场景镜绝不带上一镜末帧**（跨场景过渡交给下面的转场镜）。
 - 节点 id 可用画布节点 id 或资产 id（如 `style:acme-brand`）。
 
@@ -342,7 +342,7 @@ whenToUse: |
 
 1. `extract_frame(video_node=前一镜片段, frame_index=-1)` → 前一镜末帧。
 2. `extract_frame(video_node=后一镜片段, frame_index=0)` → 后一镜首帧。
-3. `comfy_generate_video(tier=档位, first_frame_node=末帧节点, last_frame_node=首帧节点, length=…, prompt=过渡意图, group="shot clips", title="S03→S04 转场")` —— 首末帧串联，模型自己补出中间运动，收尾精确落回后一镜首帧。
+3. `comfy_generate_video(type='i2v', tier=档位, first_frame_node=末帧节点, last_frame_node=首帧节点, length=…, prompt=过渡意图, group="shot clips", title="S03→S04 转场")` —— 首末帧串联，模型自己补出中间运动，收尾精确落回后一镜首帧。
 4. 转场镜作为**普通片段**参与 STEP 8 的拼接顺序，插在两镜之间。
 
 转场 prompt 只写镜头运动与光线变化（如「镜头掠过产品边缘滑向生活场景，冷棚光渐变为暖日光」），**不写产品动作、不写文案与旁白**，音频按 `silent` 处理。

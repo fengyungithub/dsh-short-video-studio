@@ -3,12 +3,16 @@ import { apply } from '../lib/index.js'
 
 const registered = { routes: [], tools: [], sections: [] }
 
-const mockCtx = {
+// 宿主 ctx：只实现需要观察的几个 API，其余一律 no-op（宿主演进时本脚本不脆）。
+const noop = () => () => {}
+const mockCtx = new Proxy({
   webServer: {
     register: (route) => { registered.routes.push(route); return () => {} },
   },
   tools: {
     register: (tool) => { registered.tools.push(tool); return () => {} },
+    get: () => undefined,
+    execute: async () => ({}),
   },
   systemPrompt: {
     section: (spec) => { registered.sections.push(spec); return () => {} },
@@ -18,8 +22,10 @@ const mockCtx = {
     list: () => [],
     resolveByPath: async () => undefined,
   },
-  effect: (fn) => fn(),
-}
+  effect: (fn) => { try { const d = fn(); return typeof d === 'function' ? d : () => {} } catch { return () => {} } },
+}, {
+  get(target, prop) { return prop in target ? target[prop] : noop },
+})
 
 try {
   apply(mockCtx)

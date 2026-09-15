@@ -28,6 +28,10 @@
 
 ---
 
+> **⚠️ 2026-09-15 环境变更警告（先读）**：远端已升到 ComfyUI **0.35.2**，容器启用了 **cudaMallocAsync** 分配器。
+> 在该组合下 **Sol-Attn 会让 ComfyUI 硬崩（CUDA_ERROR_INVALID_VALUE → Fatal Python error: Aborted → 容器整机重启）**，
+> 带不带链式续接都崩 —— 所有 `-sol` 清单**当前不可用**，且预检不会置灰。详见 **§9.10**。
+
 ## 1. 背景：H3 慢在哪里，加速有哪几个面
 
 ### 1.1 单序列架构决定了"注意力"是主战场
@@ -578,6 +582,58 @@ node scripts/make-sol-attn-variant.mjs --tau 1.5  # 换 tau 再生成
 **复核命令**：`node scripts/bench-h3.mjs --template=minimax-h3-pdd-ref2v --mode=balanced --ref-input=<图>`（先 `--dry` 核对配方）；结构不变量由 `verify-h3-variants` 断言（nfe↔档位步数、fail-closed 标志、无调度器、无蒸馏 LoRA、base/权重同族），档位契约由 `smoke-tier-resolution` 断言（独立组、两条策略、不隐式默认、缺节点置灰）。
 
 **残留风险**：① PDD 依赖第三方节点 + 第三方重打包权重（权重 Apache-2.0，节点包非官方）；② 画质结论来自单帧/单 seed，未做多镜头一致性验证；③ 不能与 lightx2v 叠加，也不能超过 8 步；④ 块长只能 4 或 8（越界节点直接拒绝，不静默）。
+
+---
+
+## 9.10 ⚠️ Sol-Attn 在 ComfyUI 0.35.2 + cudaMallocAsync 上**硬崩**（2026-09-15 复现两次 · 未解决）
+
+**症状**：ComfyUI 进程直接 abort，不只是这次任务失败——容器整机重启（`RestartCount` 递增），
+**同一台机器上其他人的任务一起被打掉**；客户端看到的是 `comfy-unreachable: fetch failed`（很容易误判成网络/隧道问题）。
+
+**日志原文**：
+
+```
+[Sol-Attn] H3 layout hooks installed
+[Sol-Attn] patched | tau=1.2 min_seq_len=8192 protect_prefix=True dense_first=0% end=100% dense_blocks=2 correction=True
+[Sol-Attn] S=37836 density=0.202 (~5.0x fewer blocks) prefix_blocks=5 tau=1.2
+terminate called after throwing an instance of 'c10::AcceleratorError'
+  what():  CUDA error: invalid argument
+The CUDA driver logged these messages: Returning 1 (CUDA_ERROR_INVALID_VALUE) from cuMemFreeAsync
+Exception raised from free_impl at /__w/pytorch/pytorch/c10/cuda/CUDAMallocAsyncAllocator.cpp:207
+Fatal Python error: Aborted
+```
+
+**环境事实**：`/system_stats` 报出的设备串带 **`: cudaMallocAsync`** 后缀（按本仓库公开口径不点名具体机型）—— 容器启用了
+**cudaMallocAsync 分配器**（PyTorch `backend:cudaMallocAsync`）。崩点正在该分配器的 `free` 路径
+（`cuMemFreeAsync` 返回 `CUDA_ERROR_INVALID_VALUE`），而 Sol-Attn 自己的 attention / `torch.compile` 路径会绕过常规分配器语义。
+
+**复现范围（两次实测）**：
+
+| 测试 | 图 | 结果 |
+|---|---|---|
+| ① 链式续接 + PDD + Sol（1344×768） | 起链镜 | 崩（日志里 `S=37836` 那次） |
+| ② **不带续接**的 PDD + Sol（1344×768，普通渲染） | 单镜 | **同样崩**（13.7s 内 abort） |
+
+⇒ **与 Motion Context / 链式续接无关**，是 Sol-Attn × cudaMallocAsync 的兼容问题。**Sol 变体现在一律不能用**：
+
+- `minimax-h3-ref2v-balanced-sol`、`minimax-h3-ref2v-quality-sol`
+- `minimax-h3-i2v-balanced-sol`、`minimax-h3-i2v-quality-sol`
+- `minimax-h3-ref2v-balanced-pdd-sol`、`minimax-h3-i2v-balanced-pdd-sol`
+- 链式续接组**本来就不提供** Sol 变体（曾生成后撤销，理由写在 `scripts/make-h3-variants.mjs` 注释里）
+
+**注意两个坑**：
+
+1. 这些清单的**可用性预检仍然是"可用"**（`SolAttnMiniMaxH3` 节点确实注册了）——策略里选中它们**不会置灰，只会崩服务**。
+2. 第 4.2/9.x 节里 Sol 的 estSeconds（311.2s / 314.7s / 136.3s …）都是**升核之前**在 0.33.3 上测的，
+   不能再当作当前环境的预期值。
+
+**处置建议（按优先级）**：
+
+1. **立刻把策略从 Sol 变体换掉**：balanced 用 `minimax-h3-ref2v-balanced-pdd`（本轮实测 1344×768 三镜全绿：152.9 / 283.6 / 188.2s），
+   quality 留空（用默认 20 步）。Sol 那 1.2–1.3× 不值得用"随时崩掉整台服务"来换。
+2. 想继续用 Sol：把容器的分配器换回原生 caching allocator（去掉 `PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync` 或设为 `backend:native`）后重启，
+   再用**同 seed 单镜**验证一次 —— 这条路径**尚未验证**（改容器环境是用户侧决定）。
+3. 更彻底：把可用性预检升级为**真实健康检查**（对 Sol 变体做一次极短的自检跑，失败即置灰）—— 未做，属后续工作。
 
 ---
 

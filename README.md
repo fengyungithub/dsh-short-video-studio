@@ -14,7 +14,8 @@
 - **零云端依赖**：默认图片用 FLUX 2、视频用 MiniMax H3 **音视频 AV 模型**（**带声音**、支持**参考图绑定**与**画面内原生字幕**，对白直接写进 prompt，无需后期叠加）——两者都只是内置默认，可整体替换为你自己的任何 ComfyUI 模型/工作流。
 - **画质/速度三档（tier）**：视频 `fast`（调试 / 调构图，长边 832）· `balanced`（日常，画质与耗时平衡，长边 1344）· `quality`（成片，长边 1344）；旧参数 `mode=` 为兼容别名。**加速不暴露到产品层**——设置页每个能力只有一条**内置默认策略**，其余策略由你自己命名与组合（见下）。图生图仍走 `fast` / `quality` 的 mode 轴（图片清单未分档）。分辨率按画布比例自动推导，支持 16:9 / 9:16 / 1:1 等任意画幅，snap32。
 - **图片双模（文生图 / 图生图）**：t2i 用 FLUX 2 直接出卡（角色卡 / 场景卡 / 分镜图），i2i 用 FLUX 2 ReferenceLatent **改绘**——保持主体不变、换背景 / 场景 / 画风 / 去水印；单张参考图、尺寸跟随参考图（≤1MP），`quality`（20 步无 LoRA，保真）/ `fast`（8 步 Turbo LoRA，调试快），可一次出 1–4 张。
-- **完整后处理**：同场景末帧串联（连续性过渡）、生成式转场镜、抽帧、拼接合成（本机有 ffmpeg 走零重编码，否则 ComfyUI 纯节点链路）——一条龙出片。
+- **同场景续接镜「续得上」**：`continuity_from=上一镜节点 id` ⇒ **链式续接**——把上一镜的**服务端 latent 直接钉进本镜**（画面逐帧接住它的结尾、**音频从接缝继续**，实测接缝画面差 **2.6–7.0**，无续接对照 **32–68**），不需要上传图片、也不吃画质。**r2v 与 i2v 两侧都支持**（i2v 链式实现另见下），跨形状续接（上一镜 r2v → 本镜 i2v）同样可用。链的硬约束见[档位与加速策略](#档位tier与加速策略)与 [`docs/shot-chain-continuity.md`](docs/shot-chain-continuity.md)。
+- **完整后处理**：同场景续接（链式 latent 或末帧串联）、生成式转场镜、抽帧、拼接合成（本机有 ffmpeg 走零重编码，否则 ComfyUI 纯节点链路）——一条龙出片。
 
 ### 🎨 可视化画布
 
@@ -27,7 +28,7 @@
 
 ### 🧩 自由扩展：skill 与 workflow
 
-- **skill 可扩展**：生产流程完全由 skill 定义（安装时自动复制到 `~/.dsh/skills/`，可热扫描、可被用户覆盖）。写一个 `SKILL.md` 就能定义你自己的片型流程——**插件本体不认识任何流程、任何片型词汇**。
+- **skill 可扩展 + 随插件升级自动更新**：生产流程完全由 skill 定义（安装时复制到 `~/.dsh/skills/`，带**版本戳**：内容没被你改过就随插件升级自动刷新，你改过就**只提示、不覆盖**）。写一个 `SKILL.md` 就能定义你自己的片型流程——**插件本体不认识任何流程、任何片型词汇**。
 - **workflow 可扩展**：插件退化为「通用 ComfyUI 工作流执行器 + 能力注册表」。**换模型、换工作流 = 增删一份 JSON**，不动 JS、不动工具、不动系统提示。FLUX 2 / MiniMax H3 只是内置默认，你的任何 ComfyUI 工作流（SDXL / Qwen-Image / Wan / CogVideoX / LTX…）都可以**直接导入**并设为默认（见[导入你的 workflow](#导入你自己的-comfyui-workflow)）。
 
 ### 🎬 多场景创作：一套引擎，任意场景
@@ -66,7 +67,7 @@ dsh plugin --profile web add dsh-short-video-studio
 dsh web   # 重启后会话出现「画布」tab；自带 skill 已自动装到 ~/.dsh/skills/
 ```
 
-安装后自动完成三件事：`skills/` 下 skill 复制到 `~/.dsh/skills/`（幂等，不覆盖你的修改）；Web 设置页新增 **ComfyUI** 配置菜单；会话多出「画布」视图 tab。
+安装后自动完成三件事：`skills/` 下 skill 复制到 `~/.dsh/skills/`（**版本戳刷新**：每个副本的 `.dsh-studio-manifest` 记下插件版本 + 内容哈希，内容被你改过就只提示、绝不覆盖，没改过才随插件升级刷新；`DSH_SVS_SKILL_REFRESH=off` 关掉刷新、`=force` 连改过的也覆盖）；Web 设置页新增 **ComfyUI** 配置菜单；会话多出「画布」视图 tab。
 
 开始创作：在会话里说
 
@@ -147,6 +148,8 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 | `flux2-img2img` | `image.image2image` | FLUX 2 参考图改绘（ReferenceLatent，尺寸跟随参考图）。**未分档**：走 `mode` 轴（`quality` 20 步 / `fast` 8 步 Turbo LoRA） |
 | `minimax-h3-ref2v-fast` · `-balanced` · `-balanced-sol` · `-quality` · `-quality-sol` | `video.reference2video` | **组「MiniMax H3 参考生成视频」**：H3 参考绑定，`ref_nodes` 绑定身份/环境，**带声音**。一个 json = 一个档位实现；`fast` 长边 832，`balanced`/`quality` 长边 1344 |
 | `minimax-h3-i2v-fast` · `-balanced` · `-balanced-sol` · `-quality` · `-quality-sol` | `video.image2video` | **组「MiniMax H3 首末帧生成视频」**：H3 首/末帧串联（同场景续接镜 / 转场镜），带声音，**base = FL2VA 变体**。一个 json = 一个档位实现；`fast` 长边 832，`balanced`/`quality` 长边 1344（`balanced` = 8 步 + fl2v 768p LoRA，shift 6/3） |
+| `minimax-h3-ref2v-ctx-fast` · `-balanced` · `-balanced-pdd` · `-quality` | `video.reference2video` | **组「MiniMax H3 参考视频·链式续接」**：与同档标准实现**同一批权重**，只多挂 Motion Context 四节点 ⇒ 传 `continuity_from` 时继承上一镜尾部（22 帧画面 + 1.000s 音频），采样多 22 帧后裁掉。**`priority: -100`**：只被「续接路径」或显式 `workflow=` 选中，不做隐式默认 |
+| `minimax-h3-i2v-ctx-fast` · `-balanced` · `-balanced-pdd` · `-quality` | `video.image2video` | **组「MiniMax H3 首末帧·链式续接」**：i2v 版链式实现（模板由 `scripts/make-h3-ctx-templates.mjs` 从普通 i2v 模板派生）。**实测行为**：链式 i2v 里 **`first_frame_node` 会被丢弃**（钉住的 head 已决定开头约 22 帧）、**`last_frame_node` 保留** ⇒ 转场镜「续接上一场景尾镜 + 末帧锚定下一场景首镜」是当前最优解。同样 `priority: -100` |
 | `minimax-h3-ref2v-balanced-pdd` · `-balanced-pdd-sol` | `video.reference2video` | **PDD 8 步蒸馏**（`nfe=8`）：**8 步拿到成片档以上细节**（ref2v 184.7s / 叠 Sol 137.3s）。就是普通清单，归在同一家族组里；**不做隐式默认**（`priority<0`，依赖第三方节点），要在配置页「新增策略」里组合并自己命名 |
 | `minimax-h3-i2v-balanced-pdd` · `-balanced-pdd-sol` | `video.image2video` | 同上（FL2VA 权重，base 必须 fl2va）。i2v 侧 178.8s / 叠 Sol 134.1s，定位是**成片档的廉价替代**（392.4s → 178.8s） |
 | `extract-frame` | `image.from_video` | 抽帧（末帧 / 首帧 → 图片节点） |
@@ -154,10 +157,12 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 
 ### 档位（tier）与加速策略
 
+- **视频形状 `type` 必填**：`comfy_generate_video(type='r2v', …)`（参考绑定，配 `ref_nodes`）或 `type='i2v'`（首末帧串联，配 `first_frame_node`）。形状与参数冲突**直接报错并给修法**（此前是静默丢弃参数）；形状与续接（`continuity_from`）正交，详见 `docs/video-shape-contract.md`。
 - **产品层档位是受控三档**：`fast`（调试 / 调构图，长边 832）/ `balanced`（日常，画质与耗时平衡，长边 1344）/ `quality`（成片，长边 1344）。呼叫 `comfy_generate_video(tier=…)` / `comfy_render(tier=…)`；**旧参数 `mode=` 保留为兼容别名**（`mode=fast|balanced|quality` 与 `tier` 等价）。缺省是 `quality` —— **成本最高，技能与手工调用都建议显式传 `tier=`**。
 - **请求了不存在的档位不会静默换档**：如 i2v 请求 `tier=balanced` → 工具**显式报错并列出可用档位**，改请求可用档位即可（不要原样重试）。
 - **分辨率读清单（长边）+ 画布比例推导**：`fast` 长边 832、`balanced`/`quality` 长边 1344；工具条会显式传 `size=WxH`（显式优先）。长边由**清单**声明，UI 不按档位名硬编码。
 - **策略与档位的关系**：策略就是把「哪些档用哪份清单」存成一套并起个名；点选后写入配置 `tiers`（快照语义）。**策略声明了它提供哪些档位**——只挑了 balanced 的策略就没有 fast/quality，工具条不显示、请求会显式报错。逐档下拉＝不命名的临时组合（显示为「自定义」，此时未选档位才回退到注册表首选）。两者都随时可改，技能侧始终只传 `tier`。
+- **链式续接（`continuity_from`）怎么用**：同场景后续镜传 `continuity_from=上一镜的视频节点 id`；该镜**必须**用声明了 `chain` 的实现渲染（各能力的 `…-ctx-*` 清单，或配置/显式 `workflow=` 指到它们）——上一镜没有链式序号时会**显式报错**，不会悄悄退化成"另起一镜"。硬约束：① **链的一条内分辨率与档位必须一致**（latent 不能缩放，跨档显式报错）；② **首镜（起链）也得用链式实现**，否则下一镜接不上；③ `length` 填**交付帧数**（续接实现自己多采 22 帧再裁掉）；④ 跨场景**不要**续接，直接换镜。成本：续接镜比同档标准实现慢约 **1.3–1.5×**（i2v `fast` 实测 40.4s vs 30.5s，多采 22 帧 + 多一组上下文 conditioning）。
 - **加速不暴露到产品层**：设置页每个能力默认只放**一条内置默认策略**（跟随注册表首选 = 各档非加速首选实现）。**技能与文档只写 `tier`，不写加速实现 id 或节点名。**
 - **策略由你自己命名与组合**：点「＋ 新增策略（命名 + 逐档组合）」→ 起名 + 逐档从现有清单里挑（可按家族跨清单组合，例如 balanced 用 PDD+Sol、quality 用标准），保存即选用；之后可重命名/删除。**只挑一个或两个档位也行**（≥1 即可）——**没挑的档位不属于这条策略**：配置页的逐档区与工具条档位下拉都会跟着收敛（没这个档位就连行都不显示），**显式**请求那个档位会报错（不会回退到别的实现），**不写档位**时则按这条策略提供的最靠前那档走（并给提示）——所以「只把 balanced 换成 PDD」得到的是一条"只有 balanced"的策略，想三档都能出就用策略行的「编辑档位」把三档都挑上。Sol / PDD 都只是**可选清单**，不会被自动包装成"官方策略"。逐档下拉也随时可用（不保存为策略时显示为「自定义」）。
   - ⚠️ Sol 清单**需自装第三方节点** [ComfyUI-SolAttn-Ampere](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere)（注册名 `SolAttnMiniMaxH3`，没装会报 node type not found）；缺节点时该实现**置灰不可用**（不静默回退到标准实现）。
@@ -171,6 +176,8 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 | i2v（832×480 / 1344×768） | 26.1s | 177.3s | 130.5s | 394.8s | 314.7s |
 
 > 耗时随硬件、驱动、模型文件版本而变，上表只作**量级参考**（决定选哪一档、加速值不值得开）。
+
+**续接镜（`…-ctx-*`）**：同一档位下比标准实现慢约 **1.3–1.5×**（多采 22 帧 + 一组 Motion Context 条件）。i2v `fast` 实测：起链 36.4s / 续接 40.4s（同档标准 i2v `fast` 对照 30.5s）。
 
 **PDD 清单**（长边 1344，需自己在设置页组进策略）：ref2v **184.7s** / 叠加 Sol **137.3s**；i2v **178.8s** / 叠加 Sol **134.1s**。同条件下的 20 步成片档为 394.4s / 392.4s（PDD 的锐度还高 +10.3% / +7.9%）→ **PDD 相当于用 8 步的钱买 20 步的画质**。
 
@@ -209,7 +216,7 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 
 | 场景 | 输入 | skill 定义的编排重点 |
 |---|---|---|
-| 3D 动画短片（内置） | 一句话故事创意 | 角色一致、场景连续、镜头表自检、H3 原生字幕 |
+| 3D 动画短片（内置） | 一句话故事创意 | 角色一致、场景连续（**七列镜头表含「续接」列 + 链式续接**）、镜头表十项自检门、H3 原生字幕 |
 | 品牌宣传短片（内置） | 品牌素材 / 推广目标 | 身份核验、来源清单、LOGO 首帧锁定、H3 原生画面文案 |
 | **电商宣传视频** | 商品 / 卖点文案 | 产品展示分镜、口播逐字稿、卖点高光镜、BGM 与节奏 |
 | **教育课件讲解** | 知识点 / 讲义 | 图解卡片、讲解分镜、字幕与口型绑定、节奏控制 |
@@ -229,7 +236,7 @@ whenToUse: 适用于……不适用于……
 ## 生产流程
 1. 开场：用 canvas_set_state 声明画幅/时长/音频模式与分组展示顺序
 2. 用 comfy_generate_image 建角色卡/场景卡（单视图、零文字）
-3. 用 comfy_generate_video 逐镜生成（mode=fast 调试 → quality 成片）
+3. 用 comfy_generate_video(type=…, tier=…) 逐镜生成（fast 调试 → quality 成片）
 4. 用 video_concat 拼接，交付前把文本要点写进回复（飞书自动送达产物）
 ```
 
@@ -344,8 +351,9 @@ node scripts/import-comfy.mjs exported.json \
 2. **参考图内不得有任何文字**：角色名、FRONT VIEW 之类标注会被视频模型渲进成片。名字只写画布标题与资产元数据。
 3. **多角度对模型无增量价值**：单张正面卡足以支撑转身/走远镜头；多角度时把多张单视图分别放进不同 `ref_nodes` 槽位，绝不拼成一张图。
 4. **原生字幕**：使用带原生字幕能力的视频模型（如内置默认 H3）时，对白字幕写进 prompt 末尾即可端到端渲染（含中文）；换成不带该能力的模型后，此条不适用，字幕需走其它方式。
-5. **末帧串联仅用于同场景续接**；跨场景只放「角色 + 场景」参考。
-6. **角色分状态建卡**：同一角色不同着装分别建单视图卡。
+5. **同场景续接优先用链式续接（`continuity_from`），不是末帧串联**：前者把上一镜的 latent 逐帧钉进本镜、音频也接着走，接缝几乎看不出来；后者只是拿一张静帧当首帧，模型仍要重新猜运动与声音。**跨场景不续接**，只放「角色 + 场景」参考。
+6. **转场镜与锚点式重渲是 i2v 的两处专用场景**：转场镜要精确落回下一镜首帧（末帧锚定），锚点式重渲要在改中段时保住下游首帧。两者都能**再叠**链式续接（用 `…-i2v-ctx-*`）：链式 i2v 里**首帧锚点会被丢弃**（开头由上一镜尾部决定）、**末帧锚点保留** ⇒ 尾部连续 + 精确落点同时拿到。
+7. **角色分状态建卡**：同一角色不同着装分别建单视图卡。
 
 ## H3 结构化 prompt（本地版 H3-Context-IR 替代）
 
@@ -391,6 +399,21 @@ node scripts/import-comfy.mjs exported.json \
 ## 更新日志
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
+
+### v1.3.0 — 形状契约 · 链式续接落地（含 i2v）· skill 版本戳（2026-09-15）
+
+**✨ 新增 / 改进**
+
+- **视频形状 `type` 必填**（`r2v` 参考绑定 / `i2v` 首末帧串联）：形状与参数冲突**直接报错并给修法**，此前是静默丢弃参数；`comfy_generate_video` / `comfy_render` / `POST /generate/video` 共用同一张真值表，校验在**上传参考图之前**完成（非法请求零副作用）。视频节点现在记 `params.type`，画布可辨识转场镜 / 锚点式重渲。
+- **链式续接（`continuity_from`）全面落地**：同场景续接镜把上一镜的**服务端 latent 逐帧钉进本镜**、**音频从接缝继续**（实测接缝画面差 2.6–7.0，无续接对照 32–68；响度台阶稳定变好）。四档覆盖矩阵全绿，附录含测量口径与已知坑。
+- **i2v 也有链式实现**（组「MiniMax H3 首末帧·链式续接」，4 份清单）：模板由 `scripts/make-h3-ctx-templates.mjs` 从普通 i2v 模板**派生**（可复现）。**实测行为契约**：链式 i2v 里 `first_frame_node` **会被丢弃**（钉住的 head 已决定开头约 22 帧）、`last_frame_node` **保留** ⇒ 转场镜「续接上一场景尾镜 + 末帧锚定下一场景首镜」成为当前最优解，锚点式重渲也不再脱离续接链。**fast 档已端到端实测**（链路索引、22 帧 + 1.000s 音频上下文、裁剪与尾对齐补零、非链式反例拒跑全部通过）。
+- **续接变成规划期的一等公民**：`3d-animation-short-generator` v2.3.0 的镜头表从六列扩到**七列**（新增「续接」列：`起链` / `接 S0x` / `锚定 S0x↔S0y`），自检门扩到**十项**（续接链闭合性、续接可行性）；正片镜走 r2v + 续接，i2v 收敛为「转场镜 / 锚点式重渲」两处专用能力。
+- **自带 skill 版本戳刷新**：安装时复制到 `~/.dsh/skills/` 的每个副本带 `.dsh-studio-manifest`（插件版本 + 内容 sha256）；内容没被你改过就**随插件升级自动刷新**，改过就**只提示、不覆盖**（`DSH_SVS_SKILL_REFRESH=off|force` 可关/强制）。
+
+**📝 文档 / 其它**
+
+- 新增 [`docs/shot-chain-continuity.md`](docs/shot-chain-continuity.md)（机制验证矩阵、档位 × 加速件覆盖矩阵、i2v 实测、测量口径与已知坑、复现命令）与 [`docs/video-shape-contract.md`](docs/video-shape-contract.md)（形状真值表、片型对照、i2v ctx 状态与待补项）；[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) 补 skill 安装语义（五种情形 + 环境变量 + 回归入口）。
+- **仍待补（已在文档记录）**：i2v 链式续接的 balanced / balanced-pdd / quality 三档实测、i2v 续接的**对照重设**（现有对照与上一镜同 seed + 同首帧，会把"同种子趋同"混进音频指标）、接缝的**人工听核**、跨形状续接的端到端实跑。
 
 ### v1.2.2 — 字幕写法单源 · I2V/Ref2V 选型文档（2026-09-14）
 
@@ -449,4 +472,4 @@ git push origin main --follow-tags   # 推送即触发自动发布（npm + GitHu
 
 ---
 
-更多设计细节：架构 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · 工作流契约 [`docs/workflow-contract.md`](docs/workflow-contract.md) · 渠道交付 [`docs/channel-delivery.md`](docs/channel-delivery.md)。
+更多设计细节：架构 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · 工作流契约 [`docs/workflow-contract.md`](docs/workflow-contract.md) · **链式续接**（机制验证矩阵 / 档位覆盖矩阵 / i2v 实测 / 测量口径）[`docs/shot-chain-continuity.md`](docs/shot-chain-continuity.md) · **形状与续接契约**（`type` 必填、r2v↔i2v 参数表）[`docs/video-shape-contract.md`](docs/video-shape-contract.md) · 渠道交付 [`docs/channel-delivery.md`](docs/channel-delivery.md)。

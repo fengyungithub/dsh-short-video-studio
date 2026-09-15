@@ -2,6 +2,10 @@
   "id": "minimax-h3-ref2v-fast",
   "version": 1,
   "capability": "video.reference2video",
+  "lengthGrid": [
+    17,
+    5
+  ],
   "runner": "comfyui",
   "displayName": "MiniMax H3 参考生成视频",
   "description": "MiniMax H3 参考生成视频 · fast 档。由 scripts/make-h3-variants.mjs 生成，请勿手改。",

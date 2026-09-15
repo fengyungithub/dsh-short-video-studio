@@ -4,11 +4,23 @@
   "title": "Workflow Manifest",
   "description": "一份「工作流绑定契约」：把一个抽象 capability 绑定到一条具体 ComfyUI 工作流（数据，非代码）。",
   "type": "object",
-  "required": ["id", "version", "capability", "graph", "params"],
+  "required": [
+    "id",
+    "version",
+    "capability",
+    "graph",
+    "params"
+  ],
   "additionalProperties": true,
   "properties": {
-    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
-    "version": { "type": "integer", "minimum": 1 },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
     "capability": {
       "type": "string",
       "enum": [
@@ -21,27 +33,67 @@
         "audio.music"
       ]
     },
-    "runner": { "type": "string", "enum": ["comfyui"], "default": "comfyui" },
-    "displayName": { "type": "string" },
-    "description": { "type": "string" },
-    "modelNode": { "type": "string", "description": "基础模型输出节点 id（$model 哨兵的来源；缺省 '1'）" },
+    "runner": {
+      "type": "string",
+      "enum": [
+        "comfyui"
+      ],
+      "default": "comfyui"
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "modelNode": {
+      "type": "string",
+      "description": "基础模型输出节点 id（$model 哨兵的来源；缺省 '1'）"
+    },
     "output": {
       "type": "object",
       "properties": {
-        "mediaType": { "type": "string", "enum": ["image", "video", "audio"] },
-        "hasAudio": { "type": "boolean" }
+        "mediaType": {
+          "type": "string",
+          "enum": [
+            "image",
+            "video",
+            "audio"
+          ]
+        },
+        "hasAudio": {
+          "type": "boolean"
+        }
       }
     },
     "assets": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
-        "required": ["default"],
+        "required": [
+          "default"
+        ],
         "properties": {
-          "kind": { "type": "string", "enum": ["checkpoint", "clip", "vae", "lora", "other"] },
-          "default": { "type": "string" },
-          "env": { "type": "string", "description": "可覆盖文件名的环境变量名" },
-          "label": { "type": "string" }
+          "kind": {
+            "type": "string",
+            "enum": [
+              "checkpoint",
+              "clip",
+              "vae",
+              "lora",
+              "other"
+            ]
+          },
+          "default": {
+            "type": "string"
+          },
+          "env": {
+            "type": "string",
+            "description": "可覆盖文件名的环境变量名"
+          },
+          "label": {
+            "type": "string"
+          }
         }
       }
     },
@@ -50,10 +102,17 @@
       "description": "ComfyUI API 格式图模板 {nodeId: {class_type, inputs}}。可变字段留 null，由 params 注入；模型资产用 \"$assets.<key>\"；模型连线用 [\"$model\", 0]。",
       "additionalProperties": {
         "type": "object",
-        "required": ["class_type"],
+        "required": [
+          "class_type"
+        ],
         "properties": {
-          "class_type": { "type": "string" },
-          "inputs": { "type": "object", "additionalProperties": true }
+          "class_type": {
+            "type": "string"
+          },
+          "inputs": {
+            "type": "object",
+            "additionalProperties": true
+          }
         }
       }
     },
@@ -64,34 +123,73 @@
         "oneOf": [
           {
             "type": "object",
-            "required": ["inject", "to"],
+            "required": [
+              "inject",
+              "to"
+            ],
             "properties": {
-              "inject": { "type": "string", "const": "scalar" },
-              "to": { "$ref": "#/definitions/targets" },
+              "inject": {
+                "type": "string",
+                "const": "scalar"
+              },
+              "to": {
+                "$ref": "#/definitions/targets"
+              },
               "default": {}
             }
           },
           {
             "type": "object",
-            "required": ["inject", "via", "to"],
+            "required": [
+              "inject",
+              "via",
+              "to"
+            ],
             "properties": {
-              "inject": { "type": "string", "const": "image" },
-              "via": { "type": "string", "enum": ["field", "node"] },
-              "to": { "$ref": "#/definitions/target" },
-              "node": { "type": "string", "description": "via=node 时的 LoadImage 类节点类名，默认 LoadImage" },
+              "inject": {
+                "type": "string",
+                "const": "image"
+              },
+              "via": {
+                "type": "string",
+                "enum": [
+                  "field",
+                  "node"
+                ]
+              },
+              "to": {
+                "$ref": "#/definitions/target"
+              },
+              "node": {
+                "type": "string",
+                "description": "via=node 时的 LoadImage 类节点类名，默认 LoadImage"
+              },
               "preprocess": {
                 "type": "array",
                 "items": {
                   "type": "object",
-                  "required": ["class_type"],
+                  "required": [
+                    "class_type"
+                  ],
                   "properties": {
-                    "class_type": { "type": "string" },
-                    "inputs": { "type": "object", "additionalProperties": true },
-                    "imageInput": { "type": "string", "description": "接收上一节点输出连线的输入字段，默认 image" }
+                    "class_type": {
+                      "type": "string"
+                    },
+                    "inputs": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "imageInput": {
+                      "type": "string",
+                      "description": "接收上一节点输出连线的输入字段，默认 image"
+                    }
                   }
                 }
               },
-              "max": { "type": "integer", "minimum": 1 }
+              "max": {
+                "type": "integer",
+                "minimum": 1
+              }
             }
           }
         ]
@@ -103,7 +201,11 @@
     },
     "tier": {
       "type": "string",
-      "enum": ["fast", "balanced", "quality"],
+      "enum": [
+        "fast",
+        "balanced",
+        "quality"
+      ],
       "description": "档位（受控枚举，锁定三档）。一个清单只服务一个档位；声明了才参与档位解析。契约见 docs/tier-strategy-design.md。"
     },
     "group": {
@@ -116,7 +218,9 @@
     },
     "requiresNodes": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "该实现必需的 ComfyUI 节点 class_type（预检依据）。缺失 → 显式不可用并报错，本插件不会静默替换用户选定的实现。"
     },
     "estSeconds": {
@@ -137,16 +241,29 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
-          "steps": { "type": "integer", "minimum": 1 },
-          "longSide": { "type": "integer" },
+          "steps": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "longSide": {
+            "type": "integer"
+          },
           "loras": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["asset"],
+              "required": [
+                "asset"
+              ],
               "properties": {
-                "asset": { "type": "string", "description": "assets 里的 key（lora 资产）" },
-                "strength": { "type": "number", "default": 1.0 }
+                "asset": {
+                  "type": "string",
+                  "description": "assets 里的 key（lora 资产）"
+                },
+                "strength": {
+                  "type": "number",
+                  "default": 1.0
+                }
               }
             }
           }
@@ -156,12 +273,38 @@
     "resolution": {
       "type": "object",
       "properties": {
-        "policy": { "type": "string", "enum": ["explicit", "aspect-ratio"] },
-        "snap": { "type": "integer", "minimum": 1 },
+        "policy": {
+          "type": "string",
+          "enum": [
+            "explicit",
+            "aspect-ratio"
+          ]
+        },
+        "snap": {
+          "type": "integer",
+          "minimum": 1
+        },
         "default": {
           "oneOf": [
-            { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 },
-            { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 } }
+            {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
           ]
         }
       }
@@ -169,25 +312,89 @@
     "constraints": {
       "type": "object",
       "properties": {
-        "aspectRatios": { "type": "array", "items": { "type": "string" } },
-        "maxDurationFrames": { "type": "integer", "minimum": 1 },
-        "supportsSubtitles": { "type": "boolean" }
+        "aspectRatios": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "maxDurationFrames": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "supportsSubtitles": {
+          "type": "boolean"
+        }
       }
+    },
+    "chain": {
+      "type": "object",
+      "description": "链式续接声明：本实现消费「上一镜」的产物（服务端 latent）以延续画面与音频，专用于同场景续接镜。不声明=不参与链式续接。契约见 docs/shot-chain-continuity.md。",
+      "properties": {
+        "source": {
+          "enum": [
+            "clip-latent"
+          ],
+          "description": "上一镜的来源形态：clip-latent = 上一镜渲染时落盘的服务端 latent（画质无损、无需上传）"
+        },
+        "sampleExtra": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "为继承而多采的帧数：请求 N 帧 → 实际按 N+sampleExtra 采样，交付前裁掉（起链时不加）"
+        },
+        "lengthGrid": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "[步长, 偏移]：模型合法的采样帧数（如 17k+5）"
+        },
+        "indexParam": {
+          "type": "string",
+          "description": "载入序号注入的参数名（默认 context_clip_index）"
+        },
+        "saveIndexParam": {
+          "type": "string",
+          "description": "落盘序号注入的参数名（默认 save_clip_index）"
+        }
+      },
+      "required": [
+        "source",
+        "sampleExtra"
+      ]
     }
   },
   "definitions": {
     "target": {
       "type": "object",
-      "required": ["node", "field"],
+      "required": [
+        "node",
+        "field"
+      ],
       "properties": {
-        "node": { "type": "string" },
-        "field": { "type": "string", "description": "字段名；支持 ${i} 索引占位与 dotted 字段（如 ref_images.ref_image_${i}）" }
+        "node": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string",
+          "description": "字段名；支持 ${i} 索引占位与 dotted 字段（如 ref_images.ref_image_${i}）"
+        }
       }
     },
     "targets": {
       "oneOf": [
-        { "$ref": "#/definitions/target" },
-        { "type": "array", "items": { "$ref": "#/definitions/target" }, "minItems": 1 }
+        {
+          "$ref": "#/definitions/target"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/target"
+          },
+          "minItems": 1
+        }
       ]
     }
   }

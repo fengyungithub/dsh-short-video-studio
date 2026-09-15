@@ -2,6 +2,10 @@
   "id": "minimax-h3-ref2v-8step-sol",
   "version": 1,
   "capability": "video.reference2video",
+  "lengthGrid": [
+    17,
+    5
+  ],
   "runner": "comfyui",
   "displayName": "MiniMax H3 参考绑定 · 8 步平衡档（lightx2v 8-step 768p） · Sol-Attn 加速",
   "description": "[加速工作流 · 需自装自定义节点 cicalooo/ComfyUI-SolAttn-Ampere] 在 MiniMaxH3SigmaShift 之后插入 Sol-Attn MiniMax H3 块稀疏注意力（Ampere/sm_80+，torch>=2.5，纯 torch.compile(flex_attention)），tau=1.2。不装节点会报 node type not found；\"不被选为隐式默认\"由 accel 标注 + 同档排序（非加速优先）保证，priority 不再承担该职责。原清单说明：H3 参考绑定，8 步蒸馏 LoRA（768p 训练域）。★硬约束：本档 shift 必须是 6/3（768p 系 LoRA 的训练 shift）；fast 档那支 4 步 544p 系 LoRA 必须配 12/3，两者不可互换——错配不是画质下降而是结构性崩坏。★分辨率必须贴 768p 训练域（longSide 1344），不要降到 832 复用 fast 档尺寸。采样器按蒸馏 LoRA 参考实现用 euler + simple。带原生音视频。",

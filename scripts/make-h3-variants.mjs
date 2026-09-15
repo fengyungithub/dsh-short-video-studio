@@ -30,6 +30,16 @@ const DRY = process.argv.includes('--dry')
 
 const GROUP_REF2V = { id: 'minimax-h3-ref2v', displayName: 'MiniMax H3 参考生成视频', capability: 'video.reference2video' }
 const GROUP_I2V = { id: 'minimax-h3-i2v', displayName: 'MiniMax H3 首末帧生成视频', capability: 'video.image2video' }
+// 链式续接家族（R3，见 docs/shot-chain-continuity.md）：**同能力**的第三组实现。
+// 与其它组的区别只在于「上一镜从哪来」——它消费上一镜的服务端 latent，画面逐帧钉住上一镜结尾、
+// 音频从接缝继续，专治同场景续接镜的跳变。跨场景/首镜请用普通组（未声明 chain 的实现）。
+// priority 全为负 = **永不做隐式默认**：只有显式 workflow= 或带 continuity_from 的请求才会选到它，
+// 免得默认档位悄悄把一个需要上一镜的实现当成普通参考生成。
+const GROUP_REF2V_CTX = { id: 'minimax-h3-ref2v-ctx', displayName: 'MiniMax H3 参考视频·链式续接', capability: 'video.reference2video' }
+// i2v 版链式续接（2026-09 补齐）：模板由普通的 i2v 模板 + r2v-ctx 的 Motion Context 节点派生
+// （scripts/make-h3-ctx-templates.mjs）。首帧/末帧锚定与"继承上一镜尾部"因此可以同时用——
+// 转场镜（首末帧双端锚定）与锚点式重渲（改中段）从此也能参与续接链，不再因"i2v 没有链式 latent"而断链。
+const GROUP_I2V_CTX = { id: 'minimax-h3-i2v-ctx', displayName: 'MiniMax H3 首末帧·链式续接', capability: 'video.image2video' }
 // PDD 不单列策略组：它就是**四个普通清单**（…-balanced-pdd / …-balanced-pdd-sol），
 // 归在与其它实现同一个家族组里，由用户自己在配置页「新增策略」时组合、命名。
 // 策略由用户命名 ⇒ 注册表不再自动投影出「（PDD 蒸馏）」之类的条目。
@@ -62,6 +72,20 @@ const VARIANTS = [
   // 实测 ref2v：184.7s → 137.3s（1.35×），细节量从"高于 20 步成片档"回落到"与成片档持平"。
   { out: 'minimax-h3-ref2v-balanced-pdd-sol', group: GROUP_REF2V, tier: 'balanced', accel: 'sol', accelOf: 'minimax-h3-ref2v-balanced-pdd', priority: -30, template: 'minimax-h3-pdd-ref2v-sol.json', mode: 'balanced', estSeconds: 137, note: 'PDD + Sol-Attn（tau 1.2）· 实测 137.3s（对 PDD 单独 1.35×；细节量仍与 20 步成片档持平）' },
   { out: 'minimax-h3-i2v-balanced-pdd-sol', group: GROUP_I2V, tier: 'balanced', accel: 'sol', accelOf: 'minimax-h3-i2v-balanced-pdd', priority: -30, template: 'minimax-h3-pdd-i2v-sol.json', mode: 'balanced', estSeconds: 134, note: 'PDD + Sol-Attn（tau 1.2）· 实测 134.1s（对 PDD 单独 1.33×）' },
+  // 链式续接（R3）：与上面同档同模型，只是把「上一镜」接进来。
+  // estSeconds 口径同各档（多采样的 22 帧会被裁掉，实测与不带续接同档几乎同价：fast 实测 50.8s vs 50.1s）。
+  { out: 'minimax-h3-ref2v-ctx-fast', group: GROUP_REF2V_CTX, tier: 'fast', priority: -100, template: 'minimax-h3-ref2v-ctx.json', mode: 'fast', estSeconds: 26, note: '链式续接 · 4 步 LoRA · 长边 832 · 实测接缝：画面 MAD 7.2（无续接对照 62.8）· 采样多 22 帧后裁掉' },
+  { out: 'minimax-h3-ref2v-ctx-balanced', group: GROUP_REF2V_CTX, tier: 'balanced', priority: -100, template: 'minimax-h3-ref2v-8step-ctx.json', mode: 'balanced', estSeconds: 170, note: '链式续接 · 8 步 768p LoRA · shift 6/3 · euler · 采样多 22 帧后裁掉' },
+  { out: 'minimax-h3-ref2v-ctx-balanced-pdd', group: GROUP_REF2V_CTX, tier: 'balanced', priority: -100, template: 'minimax-h3-pdd-ref2v-ctx.json', mode: 'balanced', estSeconds: 190, note: '链式续接 · PDD nfe=8 · 细节量高于 20 步成片档 · 采样多 22 帧后裁掉' },
+  { out: 'minimax-h3-ref2v-ctx-quality', group: GROUP_REF2V_CTX, tier: 'quality', priority: -100, template: 'minimax-h3-ref2v-ctx.json', mode: 'quality', estSeconds: 400, note: '链式续接 · 20 步 · 采样多 22 帧后裁掉' },
+  { out: 'minimax-h3-i2v-ctx-fast', group: GROUP_I2V_CTX, tier: 'fast', priority: -100, template: 'minimax-h3-i2v-ctx.json', mode: 'fast', estSeconds: 28, note: 'i2v 链式续接 · 4 步 LoRA · 长边 832 · 继承上一镜尾部（采样多 22 帧后裁掉）· 实测：首帧锚点被 head 取代、末帧锚点保留' },
+  { out: 'minimax-h3-i2v-ctx-balanced', group: GROUP_I2V_CTX, tier: 'balanced', priority: -100, template: 'minimax-h3-i2v-8step-ctx.json', mode: 'balanced', estSeconds: 190, note: 'i2v 链式续接 · 8 步 fl2v 768p LoRA · 继承上一镜尾部 · 实测：首帧锚点被 head 取代、末帧锚点保留' },
+  { out: 'minimax-h3-i2v-ctx-balanced-pdd', group: GROUP_I2V_CTX, tier: 'balanced', priority: -100, template: 'minimax-h3-pdd-i2v-ctx.json', mode: 'balanced', estSeconds: 195, note: 'i2v 链式续接 · PDD nfe=8 · 继承上一镜尾部 · 实测：首帧锚点被 head 取代、末帧锚点保留' },
+  { out: 'minimax-h3-i2v-ctx-quality', group: GROUP_I2V_CTX, tier: 'quality', priority: -100, template: 'minimax-h3-i2v-ctx.json', mode: 'quality', estSeconds: 420, note: 'i2v 链式续接 · 20 步 · 继承上一镜尾部 · 实测：首帧锚点被 head 取代、末帧锚点保留' },
+  // 注意：**不提供 ctx 的 Sol 变体**。2026-09-15 复现两次：Sol-Attn 在本环境（0.35.2 + cudaMallocAsync）下
+  // 无论带不带续接都会让 ComfyUI 硬崩（CUDA_ERROR_INVALID_VALUE from cuMemFreeAsync → Fatal Python error: Aborted，
+  // 容器整机重启，连别人的任务一起打掉）。模板 scripts/h3-templates/minimax-h3-pdd-ref2v-sol-ctx.json 保留备用，
+  // 但**不生成清单**——详见 docs/minimax-h3-acceleration-lora.md §9.10。
 ]
 
 /**
@@ -98,6 +122,10 @@ function buildVariant(spec, templates) {
   m.estSeconds = spec.estSeconds
   m.note = spec.note
   m.priority = Number.isFinite(spec.priority) ? spec.priority : 0
+  // H3 的合法采样帧数网格：17k+5。声明后 runner 会把请求帧数向上取整到网格并**如实记录交付帧数**
+  // （不声明时模型自己也会取整，但节点上的 length 会比产物少最多一个步长）。
+  if (src.lengthGrid) m.lengthGrid = src.lengthGrid
+  else delete m.lengthGrid
   // 只保留本档的 mode（名称即档位名）
   m.modes = { [spec.tier]: modeCfg }
   if (spec.accel) m.accel = spec.accel

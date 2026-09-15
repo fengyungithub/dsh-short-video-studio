@@ -1,6 +1,7 @@
 // 端到端：真实 ComfyUI 生成 + 画布持久化（临时 workspace 目录）。
 import { mkdir, readFile, readdir, rm } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { _internals } from '../lib/index.js'
 
 // 无法直接 import 非导出的 runImageGeneration，故通过工具定义执行路径来测：
@@ -8,7 +9,8 @@ import { _internals } from '../lib/index.js'
 // 调用 apply 后，从 registered 工具里取 comfy_generate_image / comfy_generate_video 执行。
 const { apply } = await import('../lib/index.js')
 
-const tmpRoot = resolve('/Users/seiue/Workspace/short-video/.tmp-workspace')
+// 临时工作区：默认落在系统临时目录，可用 DSH_SVS_E2E_TMP 指定（不要在公开脚本里写死私人路径）
+const tmpRoot = resolve(process.env.DSH_SVS_E2E_TMP || join(tmpdir(), 'dsh-svs-e2e'))
 await rm(tmpRoot, { recursive: true, force: true })
 await mkdir(tmpRoot, { recursive: true })
 
@@ -45,6 +47,7 @@ async function runVideo() {
   const tool = byName['comfy_generate_video']
   const r = await tool.execute({
     prompt: 'a small fox waves hello, warm 3d animation, locked camera',
+    type: 'r2v',   // 形状必填（r2v=参考绑定；本用例不带参考图，工具会给「一致性无从保证」警告）
     width: 512, height: 512, length: 5, seed: 43, steps: 4,
     title: 'S01 片段', group: 'shot clips', sessionId: SID, workspaceId: 'ws-e2e',
   }, { agent: { id: SID, session: { meta: { cwd: tmpRoot } } } })
