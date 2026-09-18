@@ -1,5 +1,6 @@
 # dsh-short-video-studio
 [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/fengyungithub/dsh-short-video-studio)
+[![DSH](https://img.shields.io/badge/DSH-0.1.6--alpha.2-4c6ef5?style=flat-square&labelColor=454a54)](https://github.com/deepseek-ai/deepseek-harness)
 
 **完全本地 · 免费 · 零云端依赖**的**短剧 / 动画画布工作室**，作为 [DeepSeek Harness](https://github.com/deepseek-ai) 双面插件运行。所有生成都跑在**本地 ComfyUI** 上——不需要任何付费云 API、不消耗额度，装好即用，一次生成、无限出片。
 
