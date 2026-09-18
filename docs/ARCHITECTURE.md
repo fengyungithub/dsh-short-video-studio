@@ -29,8 +29,8 @@ dsh-short-video-studio/
 │   ├── manifest.js              # 工作流绑定契约引擎：校验 / 资产解析 / 图编译 / 注册表加载（M1）
 │   ├── concat.js                # 视频拼接（ffmpeg 优先 / ComfyUI 纯节点退化）
 │   ├── convert.js               # ComfyUI「导出 API」JSON → workflow manifest 转换器
-│   └── assets.js                # 跨会话资产库（角色卡 / 场景卡 / 风格锚点）
-├── client.js → lib/client.js    # 浏览器半：conversation.view「画布」tab + settings.section「ComfyUI」设置
+│   └── assets.js                # 跨会话资产库（type × kind：角色/场景/风格锚点/片段/文本）
+├── client.js → lib/client.js    # 浏览器半：画布的家（conversation.view tab 或右侧栏 tab 类型，由 canvasHome 决定）+ settings.section「ComfyUI」设置
 ├── studio/                      # 画布页（自包含 HTML/CSS/JS，无构建）
 ├── workflows/                   # 内置工作流清单（数据）
 │   ├── flux-text2image.json     # image.text2image：FLUX 2 文生图（未分档）
@@ -157,17 +157,68 @@ comfy_render / comfy_generate_* → runRender(ctx, opts)
 |---|---|---|
 | 画布项目 | `<workspace>/canvas/<sessionId>/project.json` | `schemaVersion:1` + `settings`（aspectRatio / duration / audioMode / mode / groupOrder）+ `nodes[]`；**原子写**（tmp + rename）+ **per-session 写锁**（串行化并发） |
 | 媒体产物 | `<workspace>/canvas/<sessionId>/<filename>` | 节点只存相对路径，经 `/media` 路由带 token 伺服 |
-| 资产库 | `<root>/.dsh-assets/library.json` + `images/` | 跨会话角色/场景/风格锚点，id 规范 `<type>:<name>[/<state>]`，`char:` 是 `character:` 别名 |
-| 插件配置 | `~/.dsh/dsh-short-video-studio.json`（或 `DSH_SVS_CONFIG`） | baseUrl / apiKey / pollMs / timeoutMs / models / assetOverrides / preferred；**优先级 env > 配置 > 默认**，每次调用重读（设置即时生效） |
+| 资产库 | `<root>/.dsh-assets/library.json` + `images/` | 跨会话素材。id 规范 `<type>:<name>[/<state>]`，`char:` 是 `character:` 别名。**type（语义类别）与 kind（载体）正交**：type ∈ character/scene/style/clip/text，kind ∈ image/video/text 由 type 推导（`TYPE_KINDS`）；kind 决定存法（图片/视频拷文件、文本只存 `text`+`title`+`nodeKind`）、取回画布时的节点类型、以及能否作 `ref_nodes` 参考图（只有 image 能）。目录名 `images/` 是历史包袱，视频文件也放这里 |
+| 插件配置 | `~/.dsh/dsh-short-video-studio.json`（或 `DSH_SVS_CONFIG`） | canvasHome / baseUrl / apiKey / pollMs / timeoutMs / models / assetOverrides / preferred；**优先级 env > 配置 > 默认**，每次调用重读（设置即时生效）。例外：`canvasHome`（画布的家）由**浏览器半在插件启动时读一次**，改动后需刷新页面 |
 
 ### 3.4 展示层（浏览器半）
 
-`lib/client.js` 经 `window.__ModuleLoader__.load` 注册（React，无 JSX 语法），两个注入点：
+`lib/client.js` 经 `window.__ModuleLoader__.load` 注册（React，无 JSX 语法），三个注入点：
 
+0. **「画布的家」分支**（配置项 `canvasHome`，设置页「界面」段）：启动时**只注册一个家**，
+   所以两种取值下都只可能有一个 studio iframe 实例（结构上排除双实例，见
+   [`right-sidebar-canvas-research.md`](right-sidebar-canvas-research.md) §13）。同步先注册默认家
+   `'tab'`，异步读到 `'sidebar'` 时注销它并改注册右栏 —— 零回归、配置请求失败即默认、不需要镜像。
+   改动该配置后需刷新页面（启动时读一次），设置页写明并给了一键刷新。
+   - `'tab'`（默认）：注入点 1（`conversation.view`）；
+   - `'sidebar'`：`ctx.sidebarRightTabs` 注册 `short-video-canvas` 类型 + `sidebar.right.pane.tab`
+     正文席位（key 是**实现 id** `dsh-short-video-studio`，不是 kind）+ 引导页胶囊（`guide[].order=5`，
+     files=10 / terminal=20）。入口**照抄 `ui-sidebar-files` 的原生做法**：用户展开右栏后由引导页
+     胶囊进入，不自造入口。`sidebarRightTabs` 走 `ctx.inject` **软注入**，绝不写进 `exports.inject`
+     —— 否则宿主禁用右侧栏插件时整个浏览器半加载失败。
+   两种家复用同一个 `CanvasView`（session 作用域的席位同样拿到 `sessionId`/`useWorkspaces`/`inputActions`）。
 1. **`conversation.view` 槽**（id `short-video-canvas`，order 20，label「画布」）：渲染 iframe 指向宿主伺服的 `/dsh-short-video-studio/?sessionId=&workspaceId=`。iframe 内「重做」按钮通过 `postMessage`（channel `dsh-short-video-studio`，type `ask-ai`）把指令回填父页输入框（`inputActions.setDraft`）。
-2. **`settings.section` 槽**（id `comfyui`，order 120）：ComfyUI 设置卡——连接参数、工作流注册表（按 capability 分组、设默认写回 `preferred`）、资产覆盖（选中工作流后按 manifest 动态渲染 assets 字段）、工作流导入（粘贴 manifest 或 ComfyUI「导出 API」原始 JSON，自动转换）、用户清单删除。
+2. **`settings.section` 槽**（id `comfyui`，order 120）：ComfyUI 设置卡——**界面（画布位置 canvasHome）**、连接参数、工作流注册表（按 capability 分组、设默认写回 `preferred`）、资产覆盖（选中工作流后按 manifest 动态渲染 assets 字段）、工作流导入（粘贴 manifest 或 ComfyUI「导出 API」原始 JSON，自动转换）、用户清单删除。
 
 `studio/` 为**自包含无构建**画布页（index.html + app.js + app.css）：读取 `/api/canvas` 全量渲染节点卡（文本/表格 markdown 解析、图片/视频媒体、参数摘要、状态），支持节点内编辑、重做（回填给 AI）、**入库**（表单选资产类型 + 资产名，AI 不自动入库）、分组改名（自由输入 + datalist 候选）、上移/下移/删除；**分组词汇由流程 skill 自由定义**，展示顺序取 `settings.groupOrder`（skill 经 `canvas_set_state` 声明），未声明的分组按首次出现顺序排在其后，缺省分组为 `ungrouped`。iframe 内禁用原生 alert/confirm/prompt，自绘 DOM 模态框。
+
+顶栏三块内容是 **A 品牌（`.brand`）/ B 工程参数（`.meta`）/ C 按钮（`.topbar-bar`）**，DOM 顺序即 A B C，响应式只改排列方向（`app.css` 的 `.topbar` 及其 `@media (max-width: 960px)`）：
+
+| 宽度 | 排法 |
+|---|---|
+| 宽（> 960） | 一行 A B C：B `flex:1` 吃掉中间剩余空间，C 靠右 |
+| 窄（≤ 960，如右侧面板 ~360） | 竖直 A B C：各占一行，谁都不挤谁 |
+
+断点 960 的依据是三块的内容最小宽度（品牌 ~110 + 参数 ~400 + 按钮 ~450 + 间距），再挤就会让参数在行内折成两三行、按钮贴边。这条是回归断言（`preview-canvas` 的「布局」段，宽栏 1100 + 窄栏 360 两档，量中线对齐 / 左右顺序 / 靠右 / 竖排顺序 / 无横向滚动）。
+
+已知的一处浏览器行为：参数行宽度**正好差几像素**装不下时（实测盒 488.5 / 文 494.1），Chrome 会让它溢出盒子而不是折行——换 `overflow-wrap` / `word-break` / `text-wrap` 都不改变。溢出量落在 B 与 C 之间 10px 的间隙内（实测余 4.5px），压不到按钮也不撑出页面滚动，故保留；断言相应量的是「不压到按钮」（宽栏）与「真折行」（窄栏）。
+
+**画布主题跟随宿主浅/深**（`ui-theme` 的 `active.colorScheme`）。iframe 读不到宿主文档的 CSS 变量，所以：
+
+```
+ui-theme 主题服务
+   │  getTheme().active.colorScheme          ① 首屏：读一次并**冻结**进 iframe 的 src
+   │  on('theme/change')                     ② 运行中：postMessage 下发
+   ▼
+lib/client.js  watchTheme(ctx) → readScheme() / subscribeScheme()
+   │  ?theme=dark            （首屏，避免闪一下另一种底色）
+   │  postMessage {channel, type:'theme'}   （运行中；iframe onLoad 时也补发一次）
+   ▼
+studio/index.html  <head> 内联脚本：?theme= → 否则 prefers-color-scheme → 写 <html data-theme>
+studio/app.js      message 监听（同源 + channel/type 双重校验）→ 改 <html data-theme>
+   ▼
+studio/app.css     两套调色板：:root（浅，默认）/ :root[data-theme="dark"]
+```
+
+- 两套调色板**变量名必须完全对等**、调色板块之外**零颜色字面量**、低透明度底色一律
+  `color-mix()` 从语义色派生（DSH 自身也用这个写法）——三条都由
+  `scripts/smoke-canvas-theme.mjs` 强制，因为这类问题的表现是**静默变色**而不是报错。
+- 宿主读不到主题服务（没装 `ui-theme`）时**不传** `?theme=`，让画布页按系统偏好兜底，不硬猜。
+- 首屏主题**只读一次**：它进了 `src`，跟着变会让 iframe 重载（丢滚动位置）。运行中切换只走
+  `postMessage`。`color-scheme` 两套都声明，原生控件（下拉/滚动条/复选框）跟着走。
+- 真浏览器验证：`scripts/preview-canvas.mjs` 起 stub 服务喂一份覆盖每种节点类型/状态/分区的
+  样例工程，两套主题各跑一遍 `lowContrast()`（合成半透明底后按 WCAG 算），并断言
+  postMessage 切换、非法取值不误改、无 `?theme=` 时跟随系统偏好。
+
 
 ### 3.5 集成层
 
@@ -175,7 +226,7 @@ comfy_render / comfy_generate_* → runRender(ctx, opts)
 - **systemPrompt GUIDANCE 段**（order 150）：基本约定 + 工具契约 + 参考图硬规则（单视图/零文字等实测结论）+ 指向流程 skill 的指针。**不含任何流程、任何片型词汇、任何具体 skill 名**——流程的唯一真相在 skill。
 - **HTTP 路由**（`/dsh-short-video-studio`）：
   - `/api/config`、`/api/workflows`：**显式 tokenless**（设置页调用；威胁模型见 §7）；
-  - `/api/canvas`、`/api/canvas/node`、`/api/canvas/group`、`/api/canvas/reorder`、`DELETE /api/canvas/node`、`/api/assets`（含「入库」）、`/api/generate/image|video`：需 `x-dsh-svs-token` 头；
+  - `/api/canvas`、`/api/canvas/node`、`/api/canvas/group`、`/api/canvas/reorder`、`DELETE /api/canvas/node`、`GET|POST|DELETE /api/assets`（入库 / 列表 / 删除）、`/api/generate/image|video`：需 `x-dsh-svs-token` 头；
   - `/media`：token 走 query（便于 `<img>/<video>` 直接加载），**路径安全五步校验**（`safeRelative` → `resolve` → `inside` → `realpath` → 再 `inside`，连符号链接逃逸都堵）；
   - 静态 `studio/`：index.html 注入 token 后伺服，开发期 no-cache。
 - **skill 自动安装 + 版本戳刷新**：`apply()` 时调 `syncBundledSkills()`（`lib/index.js`，本插件 skill 分发的唯一实现，可注入路径以便测试）把 `<包>/skills/<name>` 同步到 `~/.dsh/skills/<name>`：
@@ -208,10 +259,21 @@ Agent 调用 comfy_generate_video(prompt, type='r2v', ref_nodes=[角色卡,场�
 
 ### 4.3 跨会话资产复用
 ```
-画布节点「入库」按钮（人工）→ POST /api/assets → registerAsset（拷图到 .dsh-assets/images/ + 索引）
-→ 新会话 asset_list() → 命中 asset_to_canvas(id) → 物化为画布 image 节点（params.assetId 溯源）
-→ comfy_generate_video(type='r2v', ref_nodes=[资产 id]) 直接复用同一张图，保证一致性且不重复生成
+画布节点「入库」按钮（人工，图片/视频/文本节点都有）→ POST /api/assets
+  → 服务端按节点 kind 推出载体、校验 type 是否属于该载体（不匹配即 400）
+  → registerAsset：image/video 拷文件到 .dsh-assets/images/ + 索引；text 只存正文（无文件）
+→ 新会话 asset_list() → 命中 asset_to_canvas(id) → 按 kind 物化回画布（image/video→媒体节点，
+  text→text 或 table 节点，看入库时的 nodeKind），节点 params.assetId 溯源
+→ 图片类资产再经 comfy_generate_video(type='r2v', ref_nodes=[资产 id]) 复用同一张图，保证一致性且不重复生成
 ```
+
+**删除（`DELETE /api/assets?id=`）的安全边界**（`removeAsset`）：
+- 索引一定被移除；**文件只在「库里没有别的记录引用同一 rel 路径」时才删**——同图多状态/多别名是常态，这条判断是删除能安全存在的前提。
+- **画布上的副本不受影响**：`asset_to_canvas` 是拷贝而非引用，所以删库不会连带删掉已经取到画布上的卡片（确认弹窗里向用户写明）。
+- 返回值 `{removed, id, file, fileDeleted}`；`fileDeleted` 的语义是**确实删掉了一个文件**（先判存在再删，不用 `rmSync({force})` 的静默成功），所以 `false` 有三种情况：被别的记录引用着、资产本就没有文件（文本）、文件早已不在盘上。
+- 图片/视频是**拷贝**进库的（不是链接）：源会话目录被清掉也不影响跨会话复用，代价是视频会多占一份磁盘。
+
+**kind 的两道闸门**：① 入库时表单下拉按 kind 收窄 + 服务端二次校验，避免出现「视频登记成 `character:luna`」这种记录（agent 会拿它当参考图去驱动生成，必然失败）；② 读取时 `resolveAssetImagePath` 硬性只认 image，视频/文本永远不会被当作 `ref_nodes` 图片传给 ComfyUI（`/media?asset=` 路由改用不限 kind 的 `resolveAssetPath`，否则视频资产会 404）。
 
 ---
 
@@ -240,14 +302,14 @@ Agent 调用 comfy_generate_video(prompt, type='r2v', ref_nodes=[角色卡,场�
 | `lib/index.js` | 宿主入口：配置、ComfyUI 客户端、渲染编排（runRender + legacy）、画布存储、HTTP 路由、13 个工具、GUIDANCE、skill 安装、`_internals` 测试出口 |
 | `lib/manifest.js` | 契约引擎：`CAPABILITIES` 词汇、`validateManifest`、`resolveAssets`、`buildGraphFromManifest`（注入引擎）、`loadBuiltinManifests` |
 | `lib/convert.js` | ComfyUI 导出 → manifest 机械转换（资产抽取、标量注入点、todos 交人工的语义绑定清单） |
-| `lib/assets.js` | 资产库：load/save/register、id 规范化（`normalizeAssetId`）、`isAssetRef` / `canonicalAssetId`、`resolveAssetImagePath`、`slugifyName` |
+| `lib/assets.js` | 资产库：load/save/register/remove、id 规范化（`normalizeAssetId`）、`isAssetRef` / `canonicalAssetId`、kind 派生（`assetKind` / `assetTypesForKind` / `TYPE_KINDS` / `NODE_KINDS`）、`assetStoredFile`、`resolveAssetPath`（任意 kind）/ `resolveAssetImagePath`（只认 image，作 ref 安全闸门）、`slugifyName` |
 | `lib/concat.js` | 视频拼接：`buildConcatGraph`（纯函数，变长左折叠图）、`detectFfmpeg`、`ffmpegConcat`（copy 失败降级重编码） |
-| `lib/client.js` | 浏览器半：`conversation.view` 画布 tab（iframe）+ `settings.section` ComfyUI 设置卡 |
-| `studio/` | 自包含画布页：节点卡渲染、编辑/重做/入库/分组/排序/删除、markdown 表格解析、自绘模态、ask-ai postMessage |
+| `lib/client.js` | 浏览器半：画布的家（`canvasHome` 决定 `conversation.view` tab 或 `sidebar.right.pane.tab` 右栏类型，两者复用同一个 `CanvasView`）+ 画布主题跟随宿主浅/深（读 `ui-theme` + `?theme=` / postMessage 双通道）+ `settings.section` ComfyUI 设置卡 |
+| `studio/` | 自包含画布页：节点卡渲染、编辑/重做/入库/分组/排序/删除、markdown 表格解析、自绘模态、ask-ai postMessage、**双调色板跟随宿主浅/深**（`<html data-theme>`，app.css 两套调色板 + index.html 首屏脚本 + app.js message 监听） |
 | `workflows/` | 4 份内置 manifest（数据） |
 | `schemas/workflow-manifest.schema.json` | manifest 权威 JSON Schema |
 | `skills/3d-animation-short-generator/` | 其中一种片型的生产流程 skill（自包含单文件 SKILL.md + meta.yaml）；插件对它零认知 |
-| `scripts/` | `mock-apply`（装配冒烟）、`smoke-manifest`（M1 图编译等价）、`smoke-render`（M2 纯逻辑）、`smoke-concat`（拼接图拓扑）、`probe-concat` / `probe-extract-frame`（实跑，需 ComfyUI）、`smoke-flux2` / `smoke-submit` / `e2e` / `e2e-comfy`（需 ComfyUI）、`import-comfy`（CLI 转换） |
+| `scripts/` 冒烟与走查 | `mock-apply`（装配冒烟）、`smoke-manifest`（M1 图编译等价）、`smoke-render`（M2 纯逻辑）、`smoke-concat`（拼接图拓扑）、`smoke-canvas-home`（画布的家 + 主题接线的纯逻辑）、`smoke-canvas-theme`（双调色板对等 / 零颜色字面量 / WCAG）、`preview-canvas`（真浏览器：两套主题的实际合成像素对比度 + 宽/窄栏响应式布局 + 资产库对话框三载体与删除交互 + 截图）、`smoke-assets`（真路由：三种载体的入库/删除/物化 + 老库兼容）、`preview-settings` / `preview-toolbar`（离屏渲染截图）、`lib/ui-probe.mjs`（宿主主题变量 + 浏览器内对比度/溢出度量，含 `color(srgb …)` 解析）、`probe-concat` / `probe-extract-frame`（实跑，需 ComfyUI）、`smoke-flux2` / `smoke-submit` / `e2e` / `e2e-comfy`（需 ComfyUI）、`import-comfy`（CLI 转换） |
 | `scripts/` 模板层（H3 一个 json = 一个档位实现） | `h3-templates/`（手写源）→ 三个生成器 → `workflows/`（产物，勿手改）：`make-h3-variants.mjs`（模板 → 单档清单，自动填 `requiresNodes`/`estSeconds`/`note`）、`make-pdd-template.mjs`（从同族 base 生成 PDD 模板，固定 6 处改动：model 直连 UNETLoader 不走 `$model` 哨兵、插 `MiniMaxH3PDDAccApply`、guider 改用其输出、删 `BasicScheduler`、`sigmas` 接该节点的 1 号输出、采样器强制 euler；shift 固定 12/3，`requiresNodes=['MiniMaxH3PDDAccApply']`，`priority=-30` 不做隐式默认）、`make-sol-attn-variant.mjs`（插 Sol 节点；`--after=<锚点>`，遇到 PDD 模板会自动锚定 PDD 节点、Sol id 改用 `2b`，避免与 Apply 节点的 `2a` 撞号） |
 | `scripts/bench-h3.mjs` + `e2e-out/{sharpness,noise-floor,frame-check,crop}.mjs` | 实测工具链：`bench-h3` 由**模板**直接组图跑真机并计时（两条臂只要 ref/seed/length/prompt 一致，差异即只来自配方；`--dry` 先核对配方）；`frame-check` 抽某帧、`sharpness` 比高频能量、`noise-floor` 比 16×16 分块梯度的低分位（**跨臂内容无关的噪声地板判据**：干净渲染里应有接近零的平坦块）。PDD 的"锐度高是细节还是颗粒"就是靠这一对指标判定的 |
 | `cordis.patch.yml` | bundle patch：插件行插入 web profile roster |

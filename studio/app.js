@@ -9,6 +9,30 @@ import { markdownToHtml } from './markdown.js'
   const sessionId = params.get('sessionId') || ''
   const workspaceId = params.get('workspaceId') || ''
 
+  // ---- 主题：跟随 DSH 的浅色/深色 ----
+  // 首屏由 index.html 的 inline 脚本定（?theme= 优先，其次系统偏好），这里只管**运行中**的跟随：
+  // 宿主 lib/client.js 在 DSH 主题变化时 postMessage 过来。监听器在 load() 之前注册，
+  // 所以即使画布数据加载失败，主题跟随仍然有效。
+  const THEME_CHANNEL = 'dsh-short-video-studio'
+  function applyTheme(t) {
+    if (t !== 'light' && t !== 'dark') return
+    if (document.documentElement.getAttribute('data-theme') === t) return
+    document.documentElement.setAttribute('data-theme', t)
+  }
+  window.addEventListener('message', (e) => {
+    // 只认同源消息；再用 channel + type 把主题消息和其他消息区分开
+    if (e.origin !== window.location.origin) return
+    const d = e.data
+    if (d && d.channel === THEME_CHANNEL && d.type === 'theme') applyTheme(d.theme)
+  })
+  // 宿主没给 ?theme=（宿主没装主题服务，或本页被单独打开）时跟随系统，并在系统切换时跟着变
+  if (!params.get('theme') && typeof matchMedia === 'function') {
+    const mq = matchMedia('(prefers-color-scheme: dark)')
+    const syncTheme = () => applyTheme(mq.matches ? 'dark' : 'light')
+    syncTheme()
+    if (typeof mq.addEventListener === 'function') mq.addEventListener('change', syncTheme)
+  }
+
   const DEFAULT_GROUP = 'ungrouped'
 
   // 当前项目里出现过的分组（settings.groupOrder + 节点实际分组），供分组输入框的候选列表用
@@ -65,8 +89,14 @@ import { markdownToHtml } from './markdown.js'
     return ROUTE_ROOT + '/media?' + u.toString()
   }
 
-  const ASSET_TYPE_LABEL = { character: '角色', scene: '场景', style: '风格锚点' }
-  const ASSET_TYPE_ORDER = ['character', 'scene', 'style']
+  const ASSET_TYPE_LABEL = { character: '角色', scene: '场景', style: '风格锚点', clip: '视频片段', text: '文本' }
+  const ASSET_TYPE_ORDER = ['character', 'scene', 'style', 'clip', 'text']
+  // 载体（kind）与语义类别（type）是两个正交概念：kind 决定怎么存/怎么物化，type 决定分组。
+  // 每个 kind 只允许一组 type，服务端也会校验（lib/assets.js TYPE_KINDS），这里保持一致，
+  // 目的只是让下拉框一开始就不给出非法组合。
+  const NODE_ASSET_KIND = { image: 'image', video: 'video', text: 'text', table: 'text' }
+  const ASSET_TYPES_FOR_KIND = { image: ['character', 'scene', 'style'], video: ['clip'], text: ['text'] }
+  const ASSET_KIND_HINT = { image: '角色卡 / 场景卡 / 风格锚点', video: '视频片段', text: '文本（镜头表 / 分镜 / 提示词）' }
   const UPLOAD_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif'
   const UPLOAD_MAX_BYTES = 24 * 1024 * 1024
 
@@ -144,15 +174,14 @@ import { markdownToHtml } from './markdown.js'
     return new Promise((resolve) => {
       const host = ensureModalHost()
       host.innerHTML = ''
-      host.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);z-index:9999;font-family:inherit'
+      host.className = 'svs-modal-host'
       const box = document.createElement('div')
-      box.style.cssText = 'background:#fff;color:#222;border-radius:10px;padding:18px 20px;min-width:280px;max-width:420px;box-shadow:0 10px 40px rgba(0,0,0,.25);font-size:14px'
+      box.className = 'svs-modal'
       const p = document.createElement('p')
-      p.style.cssText = 'margin:0 0 14px;white-space:pre-wrap;line-height:1.5;word-break:break-word'
       p.textContent = message
       box.appendChild(p)
       const actions = document.createElement('div')
-      actions.style.cssText = 'display:flex;gap:8px;justify-content:flex-end'
+      actions.className = 'svs-modal-actions'
       const close = (val) => { host.remove(); resolve(val) }
       if (o.cancel) {
         const no = document.createElement('button')
@@ -162,7 +191,7 @@ import { markdownToHtml } from './markdown.js'
         actions.appendChild(no)
       }
       const yes = document.createElement('button')
-      yes.className = 'btn btn-primary'
+      yes.className = 'btn btn-accent'
       yes.textContent = o.okText || '确定'
       yes.onclick = () => close(true)
       actions.appendChild(yes)
@@ -356,121 +385,182 @@ import { markdownToHtml } from './markdown.js'
     input.click()
   }
 
-  /** 手动添加资产 ②：从跨会话资产库（角色/场景/风格锚点）带缩略图取用。 */
+  /** 手动添加资产 ②：从跨会话资产库带缩略图取用 / 删除。 */
   async function openAssetLibrary() {
-    let assets = []
-    try {
-      const d = await api('/assets')
-      assets = (d && d.assets) || []
-    } catch (e) {
-      alertBox('读取资产库失败：' + (e.message || String(e)))
-      return
-    }
     const dlg = openDialog('跨会话资产库 · 点卡片加入画布')
-    if (!assets.length) {
-      const p = document.createElement('p')
-      p.className = 'lib-empty-hint'
-      p.innerHTML = '资产库还是空的。<br>把图片上传成画布资产卡后，点卡上的「入库」登记（类型 + 小写英文名），<br>之后任意会话都能从这里直接取用到画布。'
-      dlg.body.appendChild(p)
-      dlg.foot.appendChild(dialogBtn('完成', () => dlg.close()))
-      return
-    }
+    const body = dlg.body
+    const foot = dlg.foot
 
-    const grid = document.createElement('div')
-    grid.className = 'asset-grid'
-    const sorted = [...assets].sort((a, b) => {
-      const ta = ASSET_TYPE_ORDER.indexOf(a.type)
-      const tb = ASSET_TYPE_ORDER.indexOf(b.type)
-      return (ta < 0 ? 99 : ta) - (tb < 0 ? 99 : tb) || String(a.name || '').localeCompare(String(b.name || ''), 'zh')
-    })
-    let lastType = ''
-    for (const a of sorted) {
-      if (a.type !== lastType) {
-        lastType = a.type
-        const h = document.createElement('div')
-        h.className = 'asset-group-title'
-        h.textContent = (ASSET_TYPE_LABEL[a.type] || a.type) + ' · ' + (a.state && a.state !== 'default' ? a.state + ' ' : '') + sorted.filter((x) => x.type === a.type).length
-        grid.appendChild(h)
+    async function render() {
+      body.innerHTML = ''
+      foot.innerHTML = ''
+      let assets = []
+      try {
+        const d = await api('/assets')
+        assets = (d && d.assets) || []
+      } catch (e) {
+        const p = document.createElement('p')
+        p.className = 'lib-empty-hint'
+        p.textContent = '读取资产库失败：' + (e.message || String(e))
+        body.appendChild(p)
+        foot.appendChild(dialogBtn('关闭', () => dlg.close()))
+        return
       }
-      const card = document.createElement('div')
-      card.className = 'asset-card'
 
-      const thumb = document.createElement('div')
-      thumb.className = 'thumb'
-      const img = document.createElement('img')
-      img.loading = 'lazy'
-      img.alt = a.id || ''
-      img.src = assetMediaUrl(a.id)
-      img.onerror = () => {
-        img.remove()
-        const m = document.createElement('span')
-        m.className = 'missing'
-        m.textContent = '🖼 图缺失'
-        thumb.appendChild(m)
+      if (!assets.length) {
+        const p = document.createElement('p')
+        p.className = 'lib-empty-hint'
+        p.innerHTML = '资产库还是空的。<br>画布上的图片、视频、文本卡片都能点「入库」登记（选类型 + 填小写英文名），<br>之后任意会话都能从这里直接取用到画布；图片类还能直接当 ref 参考图。'
+        body.appendChild(p)
+        foot.appendChild(dialogBtn('完成', () => dlg.close()))
+        return
       }
-      thumb.appendChild(img)
-      card.appendChild(thumb)
 
-      const info = document.createElement('div')
-      info.className = 'info'
-      const tag = document.createElement('span')
-      tag.className = 'asset-tag ' + (a.type || '')
-      tag.textContent = ASSET_TYPE_LABEL[a.type] || a.type || 'asset'
-      info.appendChild(tag)
-      const name = document.createElement('div')
-      name.className = 'name'
-      name.textContent = a.name || a.id
-      info.appendChild(name)
-      const idLine = document.createElement('div')
-      idLine.className = 'id'
-      idLine.textContent = a.id
-      info.appendChild(idLine)
-      card.appendChild(info)
-
-      const acts = document.createElement('div')
-      acts.className = 'actions'
-      const addBtn = dialogBtn('＋ 加入画布', async () => {
-        addBtn.disabled = true
-        addBtn.textContent = '添加中…'
-        try {
-          await api('/assets/to-canvas', { method: 'POST', body: JSON.stringify({ id: a.id }) })
-          addBtn.textContent = '已添加 ✓'
-        } catch (e) {
-          addBtn.textContent = '重试'
-          addBtn.disabled = false
-          alertBox('添加失败：' + (e.message || String(e)))
+      const grid = document.createElement('div')
+      grid.className = 'asset-grid'
+      const sorted = [...assets].sort((a, b) => {
+        const ta = ASSET_TYPE_ORDER.indexOf(a.type)
+        const tb = ASSET_TYPE_ORDER.indexOf(b.type)
+        return (ta < 0 ? 99 : ta) - (tb < 0 ? 99 : tb) || String(a.name || '').localeCompare(String(b.name || ''), 'zh')
+      })
+      let lastType = ''
+      for (const a of sorted) {
+        if (a.type !== lastType) {
+          lastType = a.type
+          const h = document.createElement('div')
+          h.className = 'asset-group-title'
+          h.textContent = (ASSET_TYPE_LABEL[a.type] || a.type) + ' · ' + (a.state && a.state !== 'default' ? a.state + ' ' : '') + sorted.filter((x) => x.type === a.type).length
+          grid.appendChild(h)
         }
-      }, 'btn-accent')
-      acts.appendChild(addBtn)
-      card.appendChild(acts)
-      grid.appendChild(card)
+        const card = document.createElement('div')
+        card.className = 'asset-card'
+        card.dataset.assetId = a.id
+
+        const kind = a.kind || 'image'
+        const thumb = document.createElement('div')
+        thumb.className = 'thumb'
+        if (kind === 'text') {
+          // 文本资产没有文件：显示正文摘要（取首几行，超出用省略号）
+          const pre = document.createElement('div')
+          pre.className = 'text-preview'
+          const t = String(a.text || '').replace(/\s+/g, ' ').trim()
+          pre.textContent = t.length > 180 ? t.slice(0, 180) + '…' : (t || '（空文本）')
+          thumb.appendChild(pre)
+        } else {
+          const media = kind === 'video' ? document.createElement('video') : document.createElement('img')
+          if (kind === 'video') {
+            media.muted = true
+            media.playsInline = true
+            media.preload = 'metadata'
+            media.controls = false
+          } else {
+            media.loading = 'lazy'
+          }
+          media.alt = a.id || ''
+          media.src = assetMediaUrl(a.id)
+          media.onerror = () => {
+            media.remove()
+            const m = document.createElement('span')
+            m.className = 'missing'
+            m.textContent = kind === 'video' ? '🎬 视频缺失' : '🖼 图缺失'
+            thumb.appendChild(m)
+          }
+          thumb.appendChild(media)
+          if (kind === 'video') {
+            const badge = document.createElement('span')
+            badge.className = 'kind-badge'
+            badge.textContent = '🎬 视频'
+            thumb.appendChild(badge)
+          }
+        }
+        card.appendChild(thumb)
+
+        const info = document.createElement('div')
+        info.className = 'info'
+        const tag = document.createElement('span')
+        tag.className = 'asset-tag ' + (a.type || '')
+        tag.textContent = ASSET_TYPE_LABEL[a.type] || a.type || 'asset'
+        info.appendChild(tag)
+        const name = document.createElement('div')
+        name.className = 'name'
+        name.textContent = a.name || a.id
+        info.appendChild(name)
+        const idLine = document.createElement('div')
+        idLine.className = 'id'
+        idLine.textContent = a.id
+        info.appendChild(idLine)
+        card.appendChild(info)
+
+        const acts = document.createElement('div')
+        acts.className = 'actions'
+        const addBtn = dialogBtn('＋ 加入画布', async () => {
+          addBtn.disabled = true
+          addBtn.textContent = '添加中…'
+          try {
+            await api('/assets/to-canvas', { method: 'POST', body: JSON.stringify({ id: a.id }) })
+            addBtn.textContent = '已添加 ✓'
+          } catch (e) {
+            addBtn.textContent = '重试'
+            addBtn.disabled = false
+            alertBox('添加失败：' + (e.message || String(e)))
+          }
+        }, 'btn-accent')
+        acts.appendChild(addBtn)
+
+        const delBtn = dialogBtn('删除', async () => {
+          const okToDelete = await confirmBox(
+            '从资产库删除 ' + a.id + ' ？\n\n' +
+            '· 库里的索引会被移除' + (kind === 'text' ? '（文本内容一并删除）' : '，文件同时清理') + '\n' +
+            '· 已经取到画布上的卡片**不受影响**（它们各自持有副本）\n' +
+            '· Agent 之后不能再引用这个资产 id'
+          )
+          if (!okToDelete) return
+          delBtn.disabled = true
+          delBtn.textContent = '删除中…'
+          try {
+            await api('/assets?id=' + encodeURIComponent(a.id), { method: 'DELETE' })
+            await render()
+          } catch (e) {
+            delBtn.textContent = '重试'
+            delBtn.disabled = false
+            alertBox('删除失败：' + (e.message || String(e)))
+          }
+        }, 'btn-danger')
+        acts.appendChild(delBtn)
+        card.appendChild(acts)
+        grid.appendChild(card)
+      }
+      body.appendChild(grid)
+      foot.appendChild(dialogBtn('完成（刷新画布）', () => {
+        dlg.close()
+        load()
+      }, 'btn-accent'))
     }
-    dlg.body.appendChild(grid)
-    const done = dialogBtn('完成（刷新画布）', () => {
-      dlg.close()
-      load()
-    }, 'btn-accent')
-    dlg.foot.appendChild(done)
+
+    await render()
   }
 
-  /** 入库表单：资产类型（下拉）+ 资产名（文本）。取消返回 null。 */
-  function assetRegisterBox(defaultName) {
+  /**
+   * 入库表单：资产类型（下拉，按节点载体收窄）+ 资产名（文本）。取消返回 null。
+   * node 决定可选类型：图片→角色/场景/风格锚点；视频→视频片段；文本/表格→文本。
+   */
+  function assetRegisterBox(node, defaultName) {
+    const kind = NODE_ASSET_KIND[node && node.kind] || 'image'
     return new Promise((resolve) => {
       const host = ensureModalHost()
       host.innerHTML = ''
-      host.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);z-index:9999;font-family:inherit'
+      host.className = 'svs-modal-host'
       const box = document.createElement('div')
-      box.style.cssText = 'background:#fff;color:#222;border-radius:10px;padding:18px 20px;min-width:300px;max-width:420px;box-shadow:0 10px 40px rgba(0,0,0,.25);font-size:14px'
-      const fieldCss = 'width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;margin-bottom:14px'
-      const label = (t) => { const l = document.createElement('div'); l.style.cssText = 'margin-bottom:6px;color:#555'; l.textContent = t; return l }
+      box.className = 'svs-modal lg'
+      const label = (t) => { const l = document.createElement('div'); l.className = 'svs-field-label'; l.textContent = t; return l }
 
-      box.appendChild(label('资产类型'))
+      box.appendChild(label('资产类型（该节点是' + (ASSET_KIND_HINT[kind] || kind) + '）'))
       const typeSel = document.createElement('select')
-      typeSel.style.cssText = fieldCss
-      for (const [v, t] of [['character', '角色 character'], ['scene', '场景 scene'], ['style', '风格锚点 style']]) {
+      typeSel.className = 'svs-field'
+      for (const v of (ASSET_TYPES_FOR_KIND[kind] || ['character'])) {
         const o = document.createElement('option')
         o.value = v
-        o.textContent = t
+        o.textContent = ASSET_TYPE_LABEL[v] || v
         typeSel.appendChild(o)
       }
       box.appendChild(typeSel)
@@ -479,11 +569,20 @@ import { markdownToHtml } from './markdown.js'
       const nameInput = document.createElement('input')
       nameInput.type = 'text'
       nameInput.value = String(defaultName || '')
-      nameInput.style.cssText = fieldCss
+      nameInput.className = 'svs-field'
       box.appendChild(nameInput)
 
+      const hint = document.createElement('p')
+      hint.className = 'svs-hint'
+      hint.textContent = kind === 'text'
+        ? '文本资产存正文（不存文件）；复用时可取回画布当参考，不能作 ref 参考图。'
+        : kind === 'video'
+          ? '视频资产拷入库；复用时可取回画布当素材，不能作 ref 参考图。'
+          : '图片资产可作 ref 参考图直接驱动生成。'
+      box.appendChild(hint)
+
       const actions = document.createElement('div')
-      actions.style.cssText = 'display:flex;gap:8px;justify-content:flex-end'
+      actions.className = 'svs-modal-actions'
       const close = (val) => { host.remove(); resolve(val) }
       const no = document.createElement('button')
       no.className = 'btn'
@@ -491,7 +590,7 @@ import { markdownToHtml } from './markdown.js'
       no.onclick = () => close(null)
       actions.appendChild(no)
       const yes = document.createElement('button')
-      yes.className = 'btn btn-primary'
+      yes.className = 'btn btn-accent'
       yes.textContent = '入库'
       yes.onclick = () => {
         const name = nameInput.value.trim()
@@ -621,7 +720,11 @@ import { markdownToHtml } from './markdown.js'
     redoBtn.onclick = () => askAi('重做画布节点 ' + (node.id || '') + '（' + (node.title || node.kind) + '）：请按画布当前参数重新生成/重写该节点。')
     actions.appendChild(redoBtn)
 
-    if (node.kind === 'image') {
+    // 入库：图片（角色/场景/风格锚点）、视频（片段）、文本/表格（镜头表/分镜/提示词）都可登记。
+    // 载体由节点 kind 决定，可选类型随之收窄——避免出现「视频被登记成角色卡」这种语义错位的
+    // 记录（agent 拿到它当 ref 图会直接失败）。
+    const nodeAssetKind = NODE_ASSET_KIND[node.kind]
+    if (nodeAssetKind) {
       const regBtn = document.createElement('button')
       regBtn.className = 'btn'
       if (node.params && node.params.assetId) {
@@ -630,7 +733,7 @@ import { markdownToHtml } from './markdown.js'
         regBtn.disabled = true
       } else {
         regBtn.textContent = '入库'
-        regBtn.title = '一键登记为跨会话资产（角色卡/场景卡）'
+        regBtn.title = '登记为跨会话资产（' + ASSET_KIND_HINT[nodeAssetKind] + '）'
         regBtn.onclick = () => registerAssetToLibrary(node)
       }
       actions.appendChild(regBtn)
@@ -729,7 +832,7 @@ import { markdownToHtml } from './markdown.js'
   }
 
   async function registerAssetToLibrary(node) {
-    const form = await assetRegisterBox(slugify(node.title || ''))
+    const form = await assetRegisterBox(node, slugify(node.title || ''))
     if (!form) return
     try {
       const d = await api('/assets', { method: 'POST', body: JSON.stringify({ nodeId: node.id, type: form.type, name: form.name }) })

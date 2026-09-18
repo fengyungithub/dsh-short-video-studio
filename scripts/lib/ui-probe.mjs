@@ -47,7 +47,16 @@ export const themeCss = (name = 'dark') =>
  */
 export const PROBE_CONTRAST = `
   const parseColor = (c) => {
-    const m = String(c).match(/rgba?\\(([^)]+)\\)/)
+    const s = String(c)
+    // color-mix() 在计算样式里会被解析成 color(srgb r g b / a)，通道值是 **0–1**（不是 0–255）。
+    // 不单独处理的话会被下面的 rgb() 正则顺手匹配到 "srgb(" 上，把 0.05 当成 5/255 读，
+    // 半透明底色就静默算错了。
+    const cm = s.match(/^color\\(srgb\\s+([\\d.eE+-]+)\\s+([\\d.eE+-]+)\\s+([\\d.eE+-]+)(?:\\s*\\/\\s*([\\d.eE+-]+))?\\)$/)
+    if (cm) {
+      const ch = (v) => Math.max(0, Math.min(255, Number(v) * 255))
+      return { r: ch(cm[1]), g: ch(cm[2]), b: ch(cm[3]), a: cm[4] === undefined ? 1 : Number(cm[4]) }
+    }
+    const m = s.match(/rgba?\\(([^)]+)\\)/)
     if (!m) return null
     const p = m[1].split(/[,\\s/]+/).filter(Boolean).map(Number)
     return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }

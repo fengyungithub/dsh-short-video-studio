@@ -1,7 +1,7 @@
 {
   "name": "dsh-short-video-studio",
-  "version": "1.3.0",
-  "description": "基于deepseek harness的短剧/动画画布工作室：会话「画布」视图页 + ComfyUI 生成服务（图片 FLUX / 视频 MiniMax H3 音视频，带声音/参考绑定/原生字幕/fast·balanced·quality 三档）+ Agent 画布工具 + 自带 skill。双面 DSH 插件。",
+  "version": "1.6.0",
+  "description": "基于deepseek harness的短剧/动画画布工作室：画布可挂会话视图页或右侧栏（边看对话边生成，由 canvasHome 配置）+ ComfyUI 生成服务（图片 FLUX / 视频 MiniMax H3 音视频，带声音/参考绑定/原生字幕/fast·balanced·quality 三档）+ Agent 画布工具 + 自带 skill。双面 DSH 插件。",
   "keywords": [
     "dsh",
     "deepseek-harness",
@@ -73,7 +73,7 @@
     "provenance": true
   },
   "scripts": {
-    "smoke": "node scripts/smoke-manifest.mjs && node scripts/smoke-render.mjs && node scripts/smoke-tier-resolution.mjs && node scripts/smoke-video-shape.mjs && node scripts/smoke-skill-install.mjs && node scripts/verify-h3-variants.mjs && node scripts/smoke-client-settings.mjs && node scripts/preview-toolbar.mjs --assert && node scripts/smoke-upload-assets.mjs && node scripts/smoke-preask-deliver.mjs && node scripts/smoke-pdf.mjs",
+    "smoke": "node scripts/smoke-manifest.mjs && node scripts/smoke-render.mjs && node scripts/smoke-tier-resolution.mjs && node scripts/smoke-video-shape.mjs && node scripts/smoke-skill-install.mjs && node scripts/verify-h3-variants.mjs && node scripts/smoke-client-settings.mjs && node scripts/smoke-canvas-home.mjs && node scripts/smoke-canvas-theme.mjs && node scripts/preview-toolbar.mjs --assert && node scripts/preview-canvas.mjs --assert && node scripts/smoke-assets.mjs && node scripts/smoke-upload-assets.mjs && node scripts/smoke-preask-deliver.mjs && node scripts/smoke-pdf.mjs",
     "prepublishOnly": "npm run smoke"
   },
   "dependencies": {
