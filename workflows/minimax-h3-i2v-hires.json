@@ -1,5 +1,5 @@
 {
-  "id": "minimax-h3-i2v-ctx-balanced-pdd",
+  "id": "minimax-h3-i2v-hires",
   "version": 1,
   "capability": "video.image2video",
   "lengthGrid": [
@@ -7,8 +7,8 @@
     5
   ],
   "runner": "comfyui",
-  "displayName": "MiniMax H3 首末帧·链式续接",
-  "description": "MiniMax H3 首末帧·链式续接 · balanced 档。由 scripts/make-h3-variants.mjs 生成，请勿手改。",
+  "displayName": "MiniMax H3 首末帧生成视频·两阶段放大",
+  "description": "MiniMax H3 首末帧生成视频·两阶段放大 · quality 档。由 scripts/make-h3-variants.mjs 生成，请勿手改。 两阶段：首遍 896×512（图分辨率锁定，显式 width/height 不生效）→ 潜空间放大 ×1.5 → 交付约 1344×768。",
   "output": {
     "mediaType": "video",
     "hasAudio": true
@@ -39,11 +39,11 @@
       "env": "DSH_SVS_H3_AUDIO_VAE",
       "label": "H3 音频 VAE"
     },
-    "pdd": {
-      "kind": "other",
-      "default": "minimax_h3_fl2va_pdd_acc_8step_comfyui.safetensors",
-      "env": "DSH_SVS_H3_PDD_FL2VA",
-      "label": "MiniMax-H3 FL2VA PDD Acc 8 步（放 models/pdd_acc/）"
+    "fast_lora": {
+      "kind": "lora",
+      "default": "minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy.safetensors",
+      "env": "DSH_SVS_H3_LORA_FL_FAST",
+      "label": "H3 fl2v fast LoRA（544p，shift 12/3）"
     }
   },
   "graph": {
@@ -58,7 +58,7 @@
       "class_type": "MiniMaxH3SigmaShift",
       "inputs": {
         "model": [
-          "1",
+          "$model",
           0
         ],
         "shift_video": 12,
@@ -105,11 +105,11 @@
       "class_type": "BasicGuider",
       "inputs": {
         "model": [
-          "2a",
+          "2",
           0
         ],
         "conditioning": [
-          "21",
+          "5",
           0
         ]
       }
@@ -117,7 +117,19 @@
     "8": {
       "class_type": "KSamplerSelect",
       "inputs": {
-        "sampler_name": "euler"
+        "sampler_name": "res_multistep"
+      }
+    },
+    "9": {
+      "class_type": "BasicScheduler",
+      "inputs": {
+        "model": [
+          "2",
+          0
+        ],
+        "scheduler": "simple",
+        "steps": null,
+        "denoise": 1
       }
     },
     "10": {
@@ -136,8 +148,8 @@
           0
         ],
         "sigmas": [
-          "2a",
-          1
+          "9",
+          0
         ],
         "latent_image": [
           "5",
@@ -162,12 +174,12 @@
       "class_type": "CreateVideo",
       "inputs": {
         "images": [
-          "23",
+          "11b",
           0
         ],
         "audio": [
-          "23",
-          1
+          "11c",
+          0
         ],
         "fps": null
       }
@@ -184,64 +196,15 @@
         "codec": "h264"
       }
     },
-    "20": {
-      "class_type": "MiniMaxH3MotionContextLoadLatent",
+    "14": {
+      "class_type": "MiniMaxH3AVLatentUpscaleBy",
       "inputs": {
-        "latent_path": "h3_context",
-        "clip_index": null
-      }
-    },
-    "21": {
-      "class_type": "MiniMaxH3MotionContext",
-      "inputs": {
-        "conditioning": [
-          "5",
-          0
-        ],
-        "vae": [
-          "4",
-          0
-        ],
-        "latent": [
-          "5",
-          1
-        ],
-        "context_length": "22",
-        "audio_context_length": 24,
-        "context_latent": [
-          "20",
-          0
-        ]
-      }
-    },
-    "22": {
-      "class_type": "MiniMaxH3MotionContextSaveLatent",
-      "inputs": {
-        "latent": [
+        "samples": [
           "10",
           0
         ],
-        "filename_prefix": "h3_context/clip",
-        "clip_index": null
-      }
-    },
-    "23": {
-      "class_type": "MiniMaxH3MotionContextTrim",
-      "inputs": {
-        "images": [
-          "11",
-          0
-        ],
-        "trim_frames": [
-          "21",
-          1
-        ],
-        "audio": [
-          "11a",
-          0
-        ],
-        "fps": 24,
-        "match_tail": true
+        "upscale_method": "bislerp",
+        "scale_by": 1.5
       }
     },
     "4a": {
@@ -263,21 +226,73 @@
         ]
       }
     },
-    "2a": {
-      "class_type": "MiniMaxH3PDDAccApply",
+    "6b": {
+      "class_type": "RandomNoise",
+      "inputs": {
+        "noise_seed": "${seed + 1000000}"
+      }
+    },
+    "9b": {
+      "class_type": "BasicScheduler",
       "inputs": {
         "model": [
           "2",
           0
         ],
-        "pdd_file": "$assets.pdd",
-        "nfe": "8",
-        "lora_strength": 1,
-        "head_strength": 1,
-        "on_off_grid": "error",
-        "partition": "",
-        "enabled": true,
-        "partition_check": "error"
+        "scheduler": "simple",
+        "steps": null,
+        "denoise": 0.35
+      }
+    },
+    "10b": {
+      "class_type": "SamplerCustomAdvanced",
+      "inputs": {
+        "noise": [
+          "6b",
+          0
+        ],
+        "guider": [
+          "7",
+          0
+        ],
+        "sampler": [
+          "8",
+          0
+        ],
+        "sigmas": [
+          "9b",
+          0
+        ],
+        "latent_image": [
+          "14",
+          0
+        ]
+      }
+    },
+    "11b": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "10b",
+          0
+        ],
+        "vae": [
+          "4",
+          0
+        ]
+      }
+    },
+    "11c": {
+      "class_type": "VAEDecodeAudio",
+      "inputs": {
+        "samples": [
+          "10b",
+          0
+        ],
+        "vae": [
+          "4a",
+          0
+        ]
       }
     }
   },
@@ -315,6 +330,13 @@
       "to": {
         "node": "6",
         "field": "noise_seed"
+      }
+    },
+    "steps": {
+      "inject": "scalar",
+      "to": {
+        "node": "9",
+        "field": "steps"
       }
     },
     "fps": {
@@ -372,88 +394,53 @@
         "field": "filename_prefix"
       }
     },
-    "nfe": {
+    "steps2": {
       "inject": "scalar",
       "to": {
-        "node": "2a",
-        "field": "nfe"
+        "node": "9b",
+        "field": "steps"
       },
-      "default": "8"
-    },
-    "context_length": {
-      "inject": "scalar",
-      "to": {
-        "node": "21",
-        "field": "context_length"
-      },
-      "default": "22"
-    },
-    "audio_context_length": {
-      "inject": "scalar",
-      "to": {
-        "node": "21",
-        "field": "audio_context_length"
-      },
-      "default": 24
-    },
-    "context_clip_index": {
-      "inject": "scalar",
-      "to": {
-        "node": "20",
-        "field": "clip_index"
-      }
-    },
-    "save_clip_index": {
-      "inject": "scalar",
-      "to": {
-        "node": "22",
-        "field": "clip_index"
-      }
+      "default": 6
     }
   },
   "modes": {
-    "balanced": {
-      "steps": 8,
-      "longSide": 1344
+    "quality": {
+      "steps": 20,
+      "longSide": 1344,
+      "loras": []
     }
   },
   "resolution": {
     "policy": "aspect-ratio",
     "snap": 32,
     "default": {
-      "balanced": [
-        1344,
-        768
+      "quality": [
+        896,
+        512
       ]
     }
   },
   "constraints": {
     "aspectRatios": [
-      "16:9",
-      "9:16",
-      "1:1"
+      "16:9"
     ],
     "maxDurationFrames": 310,
     "supportsSubtitles": true
   },
-  "group": "minimax-h3-i2v-ctx",
-  "tier": "balanced",
-  "requiresNodes": [
-    "MiniMaxH3MotionContext",
-    "MiniMaxH3MotionContextLoadLatent",
-    "MiniMaxH3MotionContextSaveLatent",
-    "MiniMaxH3MotionContextTrim",
-    "MiniMaxH3PDDAccApply"
-  ],
-  "priority": -100,
-  "note": "i2v 链式续接 · PDD nfe=8 · 继承上一镜尾部 · 实测：首帧锚点被 head 取代、末帧锚点保留",
-  "chain": {
-    "source": "clip-latent",
-    "sampleExtra": 22,
-    "lengthGrid": [
-      17,
-      5
-    ]
+  "resolutionLock": {
+    "graph": [
+      896,
+      512
+    ],
+    "scale": 1.5,
+    "note": "首遍 896×512 是模型原生 1344×768 的 1/1.5，放大 1.5× 正好落在原生分辨率上——二遍在模型最擅长重建的尺寸上细化，而不是在它没见过的尺寸上重画"
   },
-  "estSeconds": 195
+  "requiresNodes": [
+    "MiniMaxH3AVLatentUpscaleBy"
+  ],
+  "group": "minimax-h3-i2v-hires",
+  "tier": "quality",
+  "estSeconds": 480,
+  "note": "两阶段放大 · 首遍 896×512 20 步 → latent ×1.5 → 二遍 denoise 0.35 · 交付 1344×768 · 耗时待实测",
+  "priority": -50
 }

@@ -1,0 +1,144 @@
+{
+  "id": "video-upscale-x4",
+  "displayName": "视频超分 · 学习式像素放大 ×4",
+  "capability": "video.upscale",
+  "tier": "quality",
+  "group": "video-upscale",
+  "priority": -10,
+  "estSeconds": 241.3,
+  "note": "输入 1344×768（H3 原生）→ 自然 5376×3072；给 target_width=4032 时收敛到 4032×2304。实测 124 帧 241.3s —— **一趟从原生到 4K**，比「U1 到 2K 再 ×2」链路（1671.2+261.6s）便宜一个数量级。**但别凭指标说\"细节更多\"**：有效宽读到 ×1.963（2671px）高于混合路线的 ×1.667，可它的平坦区锐度 362（输入 68.3，5.3×）提示过锐/振铃——这一格必须眼判（`scripts/compare-crops.py`）。倍率写死在权重里：换权重必须换同倍率的文件（否则交付尺寸与 factor 声明不符）。",
+  "description": "视频超分 · 学习式像素放大 ×4。输入是**画布上已存在的视频**（不是提示词）：源片上传到 ComfyUI input，像素空间超分 ×4，音轨原样带回（从不经过模型）。交付尺寸 = 源尺寸 × 4，可用 target_width 收敛到指定宽度（按 32 对齐）。逐帧独立 ⇒ 代价线性、长片可分块（runner 按像素-帧预算自动分块并拼接）。模型走资产槽 $assets.upscale_x4，可在设置页/env 覆盖（必须换成同倍率的权重）。",
+  "upscale": {
+    "factor": 4,
+    "align": 32,
+    "note": "交付尺寸 = 源视频尺寸 × 4（可被 target_width 收敛，按 32 对齐）。**比例永远跟源片**：源片是 H3 族的 1.75:1，所以 4032 宽对应 4032×2304（不是 16:9 的 3840×2160）——把 4032×2304 叫「4K 级」只是宽度口径。调用方传的 width/height 与画布比例都不适用——超分的尺寸跟着输入视频走。"
+  },
+  "assets": {
+    "upscale_x4": {
+      "kind": "other",
+      "default": "RealESRGAN_x4.pth",
+      "env": "DSH_SVS_UPSCALE_X4",
+      "label": "像素空间超分权重（×4，放 models/upscale_models/）"
+    }
+  },
+  "params": {
+    "source_video": {
+      "inject": "scalar",
+      "to": {
+        "node": "1",
+        "field": "file"
+      }
+    },
+    "out_width": {
+      "inject": "scalar",
+      "to": {
+        "node": "5",
+        "field": "width"
+      }
+    },
+    "out_height": {
+      "inject": "scalar",
+      "to": {
+        "node": "5",
+        "field": "height"
+      }
+    },
+    "prefix": {
+      "inject": "scalar",
+      "to": {
+        "node": "7",
+        "field": "filename_prefix"
+      }
+    }
+  },
+  "requiresNodes": [
+    "LoadVideo",
+    "GetVideoComponents",
+    "UpscaleModelLoader",
+    "ImageUpscaleWithModel",
+    "ImageScale",
+    "CreateVideo",
+    "SaveVideo"
+  ],
+  "output": {
+    "mediaType": "video"
+  },
+  "graph": {
+    "1": {
+      "class_type": "LoadVideo",
+      "inputs": {
+        "file": "${source_video}"
+      }
+    },
+    "2": {
+      "class_type": "GetVideoComponents",
+      "inputs": {
+        "video": [
+          "1",
+          0
+        ]
+      }
+    },
+    "3": {
+      "class_type": "UpscaleModelLoader",
+      "inputs": {
+        "model_name": "$assets.upscale_x4"
+      }
+    },
+    "4": {
+      "class_type": "ImageUpscaleWithModel",
+      "inputs": {
+        "upscale_model": [
+          "3",
+          0
+        ],
+        "image": [
+          "2",
+          0
+        ]
+      }
+    },
+    "5": {
+      "class_type": "ImageScale",
+      "inputs": {
+        "image": [
+          "4",
+          0
+        ],
+        "upscale_method": "area",
+        "width": 32,
+        "height": 32,
+        "crop": "disabled"
+      }
+    },
+    "6": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": [
+          "5",
+          0
+        ],
+        "fps": [
+          "2",
+          2
+        ],
+        "audio": [
+          "2",
+          1
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": [
+          "6",
+          0
+        ],
+        "filename_prefix": "${prefix}",
+        "format": "mp4",
+        "codec": "h264"
+      }
+    }
+  }
+}

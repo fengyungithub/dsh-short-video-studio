@@ -309,6 +309,30 @@
         }
       }
     },
+    "resolutionLock": {
+      "type": "object",
+      "description": "分辨率声明：两阶段实现（首遍采样 → 放大/精修 → 交付）的尺寸契约，两种形态。① 图锁定（给 graph）：首遍尺寸是图结构的一部分，显式 width/height 与画布 aspectRatio 都不得覆盖它。② 只锁倍率（只给 scale，省略 graph）：首遍尺寸不锁，按「显式宽高 → 画布比例 × 档位长边 → resolution.default」推导；图内目标尺寸用算术模板（如 \"${width * 2}\"）跟着首遍走，因此天然支持任意画幅比例。两种形态的交付分辨率一律 = 首遍 × scale。至少声明 graph / scale 之一。",
+      "properties": {
+        "graph": {
+          "type": "array",
+          "description": "首遍采样分辨率（图内 width/height 注入值）。省略 = 不锁首遍，只按 scale 声明交付倍率",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "scale": {
+          "type": "number",
+          "description": "二遍潜空间放大倍率；交付分辨率 = 首遍 × scale（缺省 1）",
+          "exclusiveMinimum": 0
+        },
+        "note": {
+          "type": "string",
+          "description": "为什么这样声明（会拼进解析警告，让调用方知道首遍与交付尺寸的关系）"
+        }
+      }
+    },
     "constraints": {
       "type": "object",
       "properties": {
@@ -321,6 +345,14 @@
         "maxDurationFrames": {
           "type": "integer",
           "minimum": 1
+        },
+        "maxDurationFramesByRatio": {
+          "type": "object",
+          "description": "按画幅比例声明的建议帧数上限（**只声明、不强制**：渲染不会被拦，供 UI/文档/排障提示用）。键是比例（如 \"1:1\"），值是帧数。用于「同一实现在某些比例下显存余量很小」的情况——例如两阶段放大族 1:1 的交付像素量是 16:9 的 1.78 倍。缺省比例回落到 maxDurationFrames。",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "supportsSubtitles": {
           "type": "boolean"

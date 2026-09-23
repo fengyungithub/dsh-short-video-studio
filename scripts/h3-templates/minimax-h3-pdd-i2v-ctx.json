@@ -439,6 +439,7 @@
   "group": "minimax-h3-i2v-pdd",
   "tier": "balanced",
   "requiresNodes": [
+    "MiniMaxH3PDDAccApply",
     "MiniMaxH3MotionContext",
     "MiniMaxH3MotionContextLoadLatent",
     "MiniMaxH3MotionContextSaveLatent",

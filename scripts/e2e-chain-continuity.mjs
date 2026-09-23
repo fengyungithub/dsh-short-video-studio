@@ -31,7 +31,11 @@ const arg = (k, d) => {
 const TIER = arg('tier', 'fast')
 const SUFFIX = arg('workflow-suffix', '')
 const CHAIN_WF = `minimax-h3-ref2v-ctx-${TIER}${SUFFIX}`
-const PLAIN_WF = `minimax-h3-ref2v-${TIER}${SUFFIX}`
+// ③ 用的「非链式上一镜」：必须是**不声明 chain** 的实现（默认同族普通实现）。
+// ④ 用的「不续接对照镜」：默认同上；跑放大族时要显式指到**同交付尺寸**的实现，
+//    否则接缝指标会被分辨率差异污染 —— 见 --control-workflow=。
+const PLAIN_WF = arg('plain', `minimax-h3-ref2v-${TIER}${SUFFIX}`)
+const CONTROL_WF = arg('control-workflow', PLAIN_WF)
 const LENGTH = Number(arg('length', '124'))
 const SEED = Number(arg('seed', '20260915'))
 const W = Number(arg('width', '832'))
@@ -111,7 +115,7 @@ if (nextNode.params.length !== expectSampled - CTX_EXTRA) fail(`交付帧数记�
 if (nextNode.params.continuityFrom !== headNode.id) fail('没记 continuityFrom')
 
 // ③ 反向：上一镜没有链序号时显式报错
-const plain = await _internals.runRender(ctx, { ...common, workflow: PLAIN_WF, prompt: PROMPT_NEXT, length: nextNode.params.length, title: 'S02 对照（不续接）' })
+const plain = await _internals.runRender(ctx, { ...common, workflow: PLAIN_WF, prompt: PROMPT_NEXT, length: nextNode.params.length, title: 'S02 对照（非链式实现）' })
 try {
   await _internals.runRender(ctx, { ...common, workflow: CHAIN_WF, prompt: PROMPT_NEXT, length: LENGTH, continuity_from: plain.node.id, title: '不该成功' })
   fail('上一镜没有链序号也跑通了——应当显式报错')
@@ -120,6 +124,18 @@ try {
   console.log('✓ ③ 非链式上一镜 → 显式拒跑')
 }
 console.log('✓ ④ 对照镜 %s · 交付 %d 帧 · seed %d', plain.implementation, plain.node.params.length, plain.node.params.seed)
+
+// ④b 接缝对照镜：**同一个链式实现**、同 prompt、同 seed，只是不传 continuity_from。
+// 只有它和续接镜同尺寸，接缝指标才干净（跨尺寸比较会把放大差异误读成"接缝变差"）。
+const control = CONTROL_WF === PLAIN_WF
+  ? plain
+  : await _internals.runRender(ctx, { ...common, workflow: CONTROL_WF, prompt: PROMPT_NEXT, length: nextNode.params.length, title: 'S02 对照（同实现·不续接）' })
+if (CONTROL_WF !== PLAIN_WF) {
+  if (control.node.params.width !== nextNode.params.width || control.node.params.height !== nextNode.params.height) {
+    fail(`接缝对照镜与续接镜尺寸不同：${control.node.params.width}×${control.node.params.height} vs ${nextNode.params.width}×${nextNode.params.height}`)
+  }
+  console.log('✓ ④b 接缝对照镜 %s · 交付 %d×%d', control.implementation, control.node.params.width, control.node.params.height)
+}
 
 // ⑤ 抽帧产物必须**不是**源视频回显（LoadVideo 会把输入文件回显成 images/type=input；
 //    旧 comfyOutputs 会把它当产物，导致抽帧节点存成源 mp4）。链式实现里的上一镜尤其致命。
@@ -139,5 +155,6 @@ console.log('\n画布节点 %d 个：%s', readNodes().length, readNodes().map((n
 console.log('\n上一镜（起链）：%s', join(workspace, headNode.media))
 console.log('续接镜        ：%s', join(workspace, nextNode.media))
 console.log('对照镜(不续接)：%s', join(workspace, plain.node.media))
+if (CONTROL_WF !== PLAIN_WF) console.log('对照镜(同实现·不续接)：%s', join(workspace, control.node.media))
 console.log('\n服务端 latent 槽位应为 clip_%05d（上一镜）与 clip_%05d（本镜）。', headNode.params.clipIndex, nextNode.params.clipIndex)
 console.log('接缝量化：把这三条交给 e2e-out/ctx-test/measure_seam.py（在 ComfyUI 容器里跑）。')

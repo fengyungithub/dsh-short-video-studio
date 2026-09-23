@@ -81,7 +81,9 @@ for (const { out, from } of DERIVATIONS) {
   // ⑤ 声明链式续接：runner 据此注入 Load/Save 序号、多采 sampleExtra 帧再裁掉
   m.chain = { source: ctxRef.chain.source, sampleExtra: ctxRef.chain.sampleExtra, lengthGrid: ctxRef.chain.lengthGrid }
   if (ctxRef.lengthGrid && !m.lengthGrid) m.lengthGrid = ctxRef.lengthGrid
-  m.requiresNodes = [...CHAIN_REQUIRES]
+  // 合并而不是覆盖：base 自己可能已经依赖别的第三方节点（如 PDD 基座的 MiniMaxH3PDDAccApply），
+  // 覆盖会让可用性预检漏判——2026-09 修：pdd-i2v-ctx 曾因此丢掉 PDDAccApply。
+  m.requiresNodes = [...new Set([...(src.requiresNodes || []), ...CHAIN_REQUIRES])]
 
   // ⑥ provenance
   m.description = `${src.description || src.id}（链式续接：继承上一镜尾部画面与音频）`

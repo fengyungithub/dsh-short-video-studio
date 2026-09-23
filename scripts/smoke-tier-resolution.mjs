@@ -291,7 +291,9 @@ console.log('\n[10] 拆分迁移：新 id 继承旧配置（不丢用户的 int8
 {
   const I = _internals
   const reg = I.getRegistry()
-  const h3 = reg.manifests.filter((m) => m.tier && !m.internal)
+  // 只针对 H3 族：这里查的是「id 拆分后新 id 能否继承旧 id 的配置」，
+  // 新能力（如 video.upscale）没有旧 id，不该被要求造一个假的继承入口。
+  const h3 = reg.manifests.filter((m) => m.tier && !m.internal && m.id.startsWith('minimax-h3-'))
   ok('内置 H3 档位清单 ≥ 8 份', h3.length >= 8, `实际 ${h3.length}`)
   const missingAlias = h3.filter((m) => !(I.ASSET_OVERRIDE_ALIASES[m.id] || []).length).map((m) => m.id)
   ok('每份档位清单都有旧 id 的 assetOverrides 继承入口', missingAlias.length === 0, missingAlias.join(', '))
