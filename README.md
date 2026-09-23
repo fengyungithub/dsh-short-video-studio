@@ -4,6 +4,8 @@
 
 **完全本地 · 免费 · 零云端依赖**的**短剧 / 动画画布工作室**，作为 [DeepSeek Harness](https://github.com/deepseek-ai) 双面插件运行。所有生成都跑在**本地 ComfyUI** 上——不需要任何付费云 API、不消耗额度，装好即用，一次生成、无限出片。
 
+**画质已可达 2K / 4K 交付**：生成侧有**两阶段潜空间放大**（hires：首遍 896×512 → latent ×1.5 → 二遍重建，交付 1344×768）与**学习式 3D latent 放大**（`…-2k` 族：×2 → 交付 **2688×1536**）；后处理侧有独立的**视频超分**能力 `video.upscale`（逐帧 CNN ×2 / ×4，**音轨原样带回**）——原生片段一趟 ×4 即到 **4032×2304**（124 帧实测 **241.3s**），或 2K 再 ×2 到同样尺寸（**261.6s**）。三条路线怎么选见[分辨率与画质（2K / 4K）](#分辨率与画质2k--4k)。
+
 > 一句话：**Agent 按你定义的 skill 编排流程，把生成请求派发到本地 ComfyUI 执行，产物落进可视化画布，还能通过飞书远程操控创作。**
 
 > **🌟 模型无关**：FLUX 2 / MiniMax H3 只是插件随附的**内置默认工作流**，不是产品边界。本插件是通用的 ComfyUI 工作流执行器 + 能力注册表——**任何 ComfyUI 能跑的模型**（SDXL / SD3.5 / Qwen-Image / Wan / CogVideoX / LTX / 本地 Kling 等，图片或视频、带不带声音都可以）都能通过[导入一份工作流清单](#导入你自己的-comfyui-workflow)接入，skill 与工具契约无需任何改动。换模型 = 加一份 JSON。
@@ -16,7 +18,8 @@
 - **画质/速度三档（tier）**：视频 `fast`（调试 / 调构图，长边 832）· `balanced`（日常，画质与耗时平衡，长边 1344）· `quality`（成片，长边 1344）；旧参数 `mode=` 为兼容别名。**加速不暴露到产品层**——设置页每个能力只有一条**内置默认策略**，其余策略由你自己命名与组合（见下）。图生图仍走 `fast` / `quality` 的 mode 轴（图片清单未分档）。分辨率按画布比例自动推导，支持 16:9 / 9:16 / 1:1 等任意画幅，snap32。
 - **图片双模（文生图 / 图生图）**：t2i 用 FLUX 2 直接出卡（角色卡 / 场景卡 / 分镜图），i2i 用 FLUX 2 ReferenceLatent **改绘**——保持主体不变、换背景 / 场景 / 画风 / 去水印；单张参考图、尺寸跟随参考图（≤1MP），`quality`（20 步无 LoRA，保真）/ `fast`（8 步 Turbo LoRA，调试快），可一次出 1–4 张。
 - **同场景续接镜「续得上」**：`continuity_from=上一镜节点 id` ⇒ **链式续接**——把上一镜的**服务端 latent 直接钉进本镜**（画面逐帧接住它的结尾、**音频从接缝继续**，实测接缝画面差 **2.6–7.0**，无续接对照 **32–68**），不需要上传图片、也不吃画质。**r2v 与 i2v 两侧都支持**（i2v 链式实现另见下），跨形状续接（上一镜 r2v → 本镜 i2v）同样可用。链的硬约束见[档位与加速策略](#档位tier与加速策略)与 [`docs/shot-chain-continuity.md`](docs/shot-chain-continuity.md)。
-- **完整后处理**：同场景续接（链式 latent 或末帧串联）、生成式转场镜、抽帧、拼接合成（本机有 ffmpeg 走零重编码，否则 ComfyUI 纯节点链路）——一条龙出片。
+- **画质可上 2K / 4K**：三条路线都在本地跑通——生成内两阶段放大（hires，交付 1344×768）、生成内**学习式 latent ×2**（`…-2k` 族，交付 **2688×1536**，可与链式续接叠用，见下）、以及独立**视频超分** `video.upscale`（画布片段 → 逐帧 CNN ×2/×4，**音轨原样带回**，原生一趟到 **4032×2304** 只需 **241.3s**/124 帧）。**超分建议按分镜做**（失败只毁一镜、可断点重跑）。详见[分辨率与画质（2K / 4K）](#分辨率与画质2k--4k)。
+- **完整后处理**：同场景续接（链式 latent 或末帧串联）、生成式转场镜、抽帧、拼接合成（本机有 ffmpeg 走零重编码，否则 ComfyUI 纯节点链路）、**超分提分辨率**——一条龙出片。
 
 ### 🎨 可视化画布
 
@@ -117,10 +120,41 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 | 层 | 内容 | 载体 |
 |---|---|---|
 | ① 任务契约 | Agent 只描述「要什么」：capability + 类型化输入 | Agent 工具参数 |
-| ② 能力契约 | 抽象作业词汇表：`image.text2image` / `video.reference2video` / `audio.tts`…（开放集合） | `CAPABILITIES` |
+| ② 能力契约 | 抽象作业词汇表：`image.text2image` / `video.reference2video` / `video.upscale` / `audio.tts`…（开放集合） | `CAPABILITIES` |
 | ③ 工作流绑定契约 | 一份清单 = 一个 capability → 一个 ComfyUI 图 + 注入点 + 资产 + 质量档（**JSON 数据**） | `workflows/*.json` |
 
 清单里的 `$assets.<key>` 占位让「换模型文件只改配置」；`["$model", 0]` 哨兵让「按质量档插 LoRA 链」由编译期自动完成。**注册表来源优先级**：内置 `workflows/` < 用户 `~/.dsh/dsh-short-video-studio/workflows/`（同名遮蔽）< `assetOverrides` / 环境变量（换模型文件名，不动图结构）。
+
+## 分辨率与画质（2K / 4K）
+
+**现在的方案可以做到 2K 与 4K 交付。** 但要分清一件事：**开源版 H3 的原生采样上限就是 768p（1344×768）**，往更高分辨率直接采样会出复制伪影——所以 1344×768 以上的每一个像素都是**放大路线合成出来的**。下面三条都是本机实测跑通的路径：
+
+| 路线 | 能力 / 档位 | 机制 | 交付尺寸 | 代价（124 帧，本机 A800 实测） |
+|---|---|---|---|---|
+| **生成内两阶段（hires）** | `image2video` / `reference2video` 的该档实现 | 首遍 896×512 解运动/构图/声音 → 视频 latent 插值 **×1.5** → 二遍重建 | **1344×768**（把放大后的画面拉回原生 768p） | 分钟级 |
+| **生成内学习式放大（>2K）** | `…-2k` 族的档位实现 | 原生 **1344×768** → 学习式 3D latent **×2** → 低 σ 精修 | **2688×1536**（`fast` 档 1664×960） | 二遍精修在 ≈500k token 上超线性：**620–2700s**（分档） |
+| **独立视频超分（U3）** | `video.upscale` 能力 + `video_upscale` 工具 | 画布上**已有视频** → 逐帧 CNN ×2 / ×4 → 收敛到交付尺寸 | **2K：2688×1536**（原生 ×2）<br>**4K 级：4032×2304**（原生 ×4，或 2K 再 ×2） | 逐帧线性、最便宜：**2K 155.7s**（比生成内两阶段便宜 **10.7×**）；4K 241.3s（原生 ×4）/ 261.6s（2K ×2） |
+
+**怎么选（产品口径）**：**要让已生成的片段提分辨率，默认用 `video_upscale`（U3）**——同交付尺寸下它比生成内两阶段便宜 **6–10×**，且在唯一「干净可比」的格子（2K、同网格、无二次缩放）里有效细节更高（有效宽 ×1.65 vs ×1.425）。生成内两阶段放大（U1）的价值在别处：**能与链式续接叠用**（链上流动的是首遍 latent，交付尺寸不参与续接），且放大后的 latent 还能被第二次采样消费——**但不要再把它当成「上 2K 的手段」**，那条路由已被 U3 取代。**超分建议按分镜做、不要对成片做**：分镜 ≤124 帧落在已验证的显存包线内，失败只毁一镜、可断点重跑。
+
+**诚实边界（必读）**：2K/4K 的**像素尺寸是真的、容器元数据可验**（MP4 `vide` 轨实测 2688×1536），但**「交付 2K」≠「细节等于 2K 渲染」**。U3 是逐帧 CNN、**没有跨帧先验**，它造出来的高频不等于真实细节：实测 2K 交付的**有效细节约 1.9K**，即比原生 1344 多约 **1.4× 线性**（面积 ≈2×）的真细节，但没到 2048、更远没到 2688。所以：**倍数放大适合交付规格与观感，不适合「找回本来没有的细节」**；两条 4K 路线哪个更好**必须眼判**（本机提供了 1:1 裁切对照图，见文档）。另外，极高分辨率下 h264 默认档会出现可见块效应，要更干净可先收敛到 4032 或分两步 ×2。
+
+**怎么用**：超分不写提示词，输入是画布上的一个视频节点——
+
+```js
+// 最便宜的真 2K：原生片段 ×2 → 2688×1536
+video_upscale({ video_node: '<S01 画布视频节点 id>' })                 // 倍率取该实现的自然尺寸
+
+// 4K 级：显式选 ×4 实现并收敛到 4032 宽（高度按比例、32 对齐）
+video_upscale({ video_node: '<S01 节点 id>', workflow: 'video-upscale-x4', target_width: 4032 })
+
+// 长素材：手动指定每块帧数（缺省按像素-帧预算自动分块）
+video_upscale({ video_node: '<长片节点 id>', target_width: 4032, chunk_frames: 120 })
+```
+
+产物写回画布（`kind: video`），记 `width/height/length/fps`（拼接与续接的兼容性判据要用）、`upscaleFrom`（溯源）、`factor/naturalWidth`（倍率）与 `assets`（用了哪个权重）；输出的音轨是**原样带回**的。生成内两阶段那条路则在**配置页把某一档指向带放大的实现**即可——不用改 prompt、不用改调用。
+
+选型取舍的完整实测见 [`docs/video-upscale.md`](docs/video-upscale.md)（U1 × U3 取舍、诚实边界、复现命令）、[`docs/learned-latent-upscale-2k.md`](docs/learned-latent-upscale-2k.md)（2K 有效性测量）与 [`docs/hires-two-pass-upscale.md`](docs/hires-two-pass-upscale.md)（两阶段放大图结构）。
 
 ## 目录结构
 
@@ -129,6 +163,7 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 │   ├── index.js          # 宿主半：ComfyUI 客户端、渲染编排、画布存储、路由、Agent 工具、GUIDANCE
 │   ├── manifest.js       # 契约引擎：能力词汇、manifest 校验、图编译、注册表加载
 │   ├── concat.js         # 视频拼接（ffmpeg 优先 / ComfyUI 纯节点退化）
+│   ├── upscale.js        # 视频超分的纯逻辑（MP4 自解析探尺寸、尺寸规划、分块切片）
 │   ├── convert.js        # ComfyUI「导出 API」JSON → workflow manifest 转换器
 │   ├── assets.js         # 跨会话资产库（type=角色/场景/风格锚点/片段/文本 × kind=image/video/text）
 │   ├── pdf.js            # 文本节点 → PDF（puppeteer-core 优先，CLI 兜底）
@@ -155,6 +190,10 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 | `minimax-h3-i2v-ctx-fast` · `-balanced` · `-balanced-pdd` · `-quality` | `video.image2video` | **组「MiniMax H3 首末帧·链式续接」**：i2v 版链式实现（模板由 `scripts/make-h3-ctx-templates.mjs` 从普通 i2v 模板派生）。**实测行为**：链式 i2v 里 **`first_frame_node` 会被丢弃**（钉住的 head 已决定开头约 22 帧）、**`last_frame_node` 保留** ⇒ 转场镜「续接上一场景尾镜 + 末帧锚定下一场景首镜」是当前最优解。同样 `priority: -100` |
 | `minimax-h3-ref2v-balanced-pdd` · `-balanced-pdd-sol` | `video.reference2video` | **PDD 8 步蒸馏**（`nfe=8`）：**8 步拿到成片档以上细节**（ref2v 184.7s / 叠 Sol 137.3s）。就是普通清单，归在同一家族组里；**不做隐式默认**（`priority<0`，依赖第三方节点），要在配置页「新增策略」里组合并自己命名 |
 | `minimax-h3-i2v-balanced-pdd` · `-balanced-pdd-sol` | `video.image2video` | 同上（FL2VA 权重，base 必须 fl2va）。i2v 侧 178.8s / 叠 Sol 134.1s，定位是**成片档的廉价替代**（392.4s → 178.8s） |
+| `minimax-h3-ref2v-hires` | `video.reference2video` | **组「两阶段放大」**：**开源版 H3 原生上限就是 768p（1344×768）**，往更高直接采样会出复制伪影 ⇒ 首遍 896×512 解运动/构图/声音 → 视频 latent **×1.5** → 二遍 **denoise 0.35** 重建细节，交付 **1344×768 带声音**（音频 latent 全程未被放大、二遍不进音频分支）。**图分辨率被 `resolutionLock` 锁死**：显式 `width/height` 与画布比例都不生效，并带 warning 如实说明。只提供 `quality` 档、`priority: -50`（不做隐式默认），要在配置页「新增策略」里显式选中。详见 [`docs/hires-two-pass-upscale.md`](docs/hires-two-pass-upscale.md) |
+| `minimax-h3-i2v-hires` | `video.image2video` | 同上（走 FL2VA 权重）。模板由 `scripts/make-hires-template.mjs` 从 ref2v/i2v 两个 base 各自派生，两阶段尾段逐字节一致 |
+| `minimax-h3-{ref2v,i2v}-ctx-{quality,balanced-pdd,fast}-2k` | `video.reference2video` / `video.image2video` | **组「链式续接 + 学习式放大（>2K）」**：ctx 图 + 学习式 latent ×2 放大器（`minimax_h3_latent_upscaler_3d_conv_v1_bf16`）+ denoise 0.3 精修，交付 **2688×1536 带声音**（fast 档 **1664×960** —— 各档保留自己的首遍尺寸：quality/pdd 首遍 1344×768、fast 首遍 832×480）。**关键结论：放大发生在链式存档之后**（`MiniMaxH3MotionContextSaveLatent` 读的是首遍采样器输出）⇒ **交付尺寸不参与续接**，同一条链内只要**首遍尺寸一致**就能续——甚至能和「非放大」的同档实现互接；首遍不同则显式拒跑。`priority: -60`（不做隐式默认）、**三档各有自己的清单**：`fast` 首遍 832×480 → 交付 1664×960、`balanced-pdd` 与 `quality` 首遍 1344×768 → 交付 2688×1536（本族唯一的非 2688 交付是 fast）。每份清单都带 `aspectRatios: ["16:9"]` + `maxDurationFrames: 124`（精修在 ≈500k token 上超线性，不支持竖版 / 长片）。实测（fast 档 56 帧）：起链 114.0s / 续接 246.3s；接缝画面差 **13.33** vs 同实现不续接 **79.57**，响度台阶 **+0.68 dB** vs **−6.34 dB**。有效分辨率（自校准频谱）：2688 网格 ≈1949px。模板 `scripts/make-2k-template.mjs` 从 ctx base 派生，见 [`docs/shot-chain-continuity.md`](docs/shot-chain-continuity.md) 附 F |
+| `video-upscale-x2` · `video-upscale-x4` | `video.upscale` | **视频超分（像素空间，U3）**：输入是画布上**已有的视频节点**（不是提示词），逐帧 CNN ×2 / ×4，**音轨原样带回**（全程不经过模型）。交付尺寸 = 源尺寸 × 倍率，可用 `target_width` 收敛（按 32 对齐）；**比例永远跟源片**——H3 族是 1.75:1，所以 4032 宽对应 **4032×2304**（不是 16:9 的 3840×2160）。逐帧独立 ⇒ 代价线性、**天然可分块**（超预算的长片按 `ImageFromBatch` + `TrimAudioDuration` 切块再拼回，不需要 ffmpeg）。实测 124 帧：原生 →×4→ 4032 **241.3s**；U1 的 2K →×2→ 4032 **261.6s**；U1 的 2K →×2→ 5376 **317.5s**；248 帧 5376 一次过 **551.4s**（无 OOM）。工具入口 `video_upscale`；模型走资产槽 `upscale_x2`/`upscale_x4`（**换权重必须换成同倍率的**）；x4 `priority: -10` 需显式选中。有效分辨率（自校准尺子，**同时看闪烁与平坦区锐度**才敢下判断）：同网格 + 无二次缩放的「原生→×2→2688」读到 ×1.65，优于 U1 单独 2K 的 ×1.45，而耗时只有 1/10.7；4032 上两臂读数接近（×1.96 / ×1.67），但原生×4 那臂平坦区锐度 362 vs 197（输入 68）提示**过锐/振铃**，所以那一格的读数不能当作"细节更多"。眼判对照图见 `e2e-out/4k/compare-4arms-1to1.png`。详见 [`docs/video-upscale.md`](docs/video-upscale.md) |
 | `extract-frame` | `image.from_video` | 抽帧（末帧 / 首帧 → 图片节点） |
 | `minimax-h3-ref2v-sol-stats` | `video.reference2video` | **内部诊断清单**（`internal: true`）：跑 Sol 时输出统计用于复核。**不参与档位解析、不进 UI 与技能选项**，只能显式 `workflow=` 调用 |
 
@@ -164,8 +203,10 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 - **产品层档位是受控三档**：`fast`（调试 / 调构图，长边 832）/ `balanced`（日常，画质与耗时平衡，长边 1344）/ `quality`（成片，长边 1344）。呼叫 `comfy_generate_video(tier=…)` / `comfy_render(tier=…)`；**旧参数 `mode=` 保留为兼容别名**（`mode=fast|balanced|quality` 与 `tier` 等价）。缺省是 `quality` —— **成本最高，技能与手工调用都建议显式传 `tier=`**。
 - **请求了不存在的档位不会静默换档**：如 i2v 请求 `tier=balanced` → 工具**显式报错并列出可用档位**，改请求可用档位即可（不要原样重试）。
 - **分辨率读清单（长边）+ 画布比例推导**：`fast` 长边 832、`balanced`/`quality` 长边 1344；工具条会显式传 `size=WxH`（显式优先）。长边由**清单**声明，UI 不按档位名硬编码。
+- **`resolutionLock`：有些实现的尺寸不能被调用方改写**。两阶段放大类清单（`…-hires` / `…-2k`）的**首遍尺寸是图结构的一部分**（放大倍率写死在节点上），所以它们声明 `resolutionLock: { graph, scale }`：显式 `width`/`height` 与画布 `aspectRatio` **都不生效**，交付尺寸 = `graph × scale`，并且**一定带一条 `warnings` 如实说明尺寸被改写**。这不是"忽略参数"，是清单在保护自己的底片——从错的尺寸起放大，交付尺寸会与调用方以为的静默不一致。校验 `node scripts/smoke-hires-lock.mjs`；契约见 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md) §2、[`docs/hires-two-pass-upscale.md`](docs/hires-two-pass-upscale.md)。
+- **`video.upscale` 是另一条尺寸语义**：超分不进采样器、不占 H3 的 token，**尺寸跟着输入视频走**（`交付 = 源 × factor`），所以它**必须**声明 `upscale.factor` 且**不得**声明 `resolutionLock`（两者互斥，校验器会拒）。想要固定比例/尺寸的生成用生成类能力，想给已有片段提分辨率用 `video.upscale`。
 - **策略与档位的关系**：策略就是把「哪些档用哪份清单」存成一套并起个名；点选后写入配置 `tiers`（快照语义）。**策略声明了它提供哪些档位**——只挑了 balanced 的策略就没有 fast/quality，工具条不显示、请求会显式报错。逐档下拉＝不命名的临时组合（显示为「自定义」，此时未选档位才回退到注册表首选）。两者都随时可改，技能侧始终只传 `tier`。
-- **链式续接（`continuity_from`）怎么用**：同场景后续镜传 `continuity_from=上一镜的视频节点 id`；该镜**必须**用声明了 `chain` 的实现渲染（各能力的 `…-ctx-*` 清单，或配置/显式 `workflow=` 指到它们）——上一镜没有链式序号时会**显式报错**，不会悄悄退化成"另起一镜"。硬约束：① **链的一条内分辨率与档位必须一致**（latent 不能缩放，跨档显式报错）；② **首镜（起链）也得用链式实现**，否则下一镜接不上；③ `length` 填**交付帧数**（续接实现自己多采 22 帧再裁掉）；④ 跨场景**不要**续接，直接换镜。成本：续接镜比同档标准实现慢约 **1.3–1.5×**（i2v `fast` 实测 40.4s vs 30.5s，多采 22 帧 + 多一组上下文 conditioning）。
+- **链式续接（`continuity_from`）怎么用**：同场景后续镜传 `continuity_from=上一镜的视频节点 id`；该镜**必须**用声明了 `chain` 的实现渲染（各能力的 `…-ctx-*` 清单，或配置/显式 `workflow=` 指到它们）——上一镜没有链式序号时会**显式报错**，不会悄悄退化成"另起一镜"。硬约束：① **一条链内首遍尺寸必须一致**（= 采样器实际跑的尺寸，**不是交付尺寸**——链上传递的是首遍 latent，latent 不能缩放；交付尺寸可以不同，所以放大档与同首遍的非放大档能互接，首遍不同则显式报错）；② **首镜（起链）也得用链式实现**，否则下一镜接不上；③ `length` 填**交付帧数**（续接实现自己多采 22 帧再裁掉）；④ 跨场景**不要**续接，直接换镜。成本：续接镜比同档标准实现慢约 **1.3–1.5×**（i2v `fast` 实测 40.4s vs 30.5s，多采 22 帧 + 多一组上下文 conditioning）。
 - **加速不暴露到产品层**：设置页每个能力默认只放**一条内置默认策略**（跟随注册表首选 = 各档非加速首选实现）。**技能与文档只写 `tier`，不写加速实现 id 或节点名。**
 - **策略由你自己命名与组合**：点「＋ 新增策略（命名 + 逐档组合）」→ 起名 + 逐档从现有清单里挑（可按家族跨清单组合，例如 balanced 用 PDD+Sol、quality 用标准），保存即选用；之后可重命名/删除。**只挑一个或两个档位也行**（≥1 即可）——**没挑的档位不属于这条策略**：配置页的逐档区与工具条档位下拉都会跟着收敛（没这个档位就连行都不显示），**显式**请求那个档位会报错（不会回退到别的实现），**不写档位**时则按这条策略提供的最靠前那档走（并给提示）——所以「只把 balanced 换成 PDD」得到的是一条"只有 balanced"的策略，想三档都能出就用策略行的「编辑档位」把三档都挑上。Sol / PDD 都只是**可选清单**，不会被自动包装成"官方策略"。逐档下拉也随时可用（不保存为策略时显示为「自定义」）。
   - ⚠️ Sol 清单**需自装第三方节点** [ComfyUI-SolAttn-Ampere](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere)（注册名 `SolAttnMiniMaxH3`，没装会报 node type not found）；缺节点时该实现**置灰不可用**（不静默回退到标准实现）。
@@ -207,7 +248,7 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 | 组 | 工具 |
 |---|---|
 | 生成 | `comfy_generate_image` · `comfy_generate_video` · `comfy_render`（通用入口，模型无关）· `comfy_list_workflows`（查能力/工作流） |
-| 后处理 | `extract_frame`（抽帧）· `video_concat`（拼接成片） |
+| 后处理 | `extract_frame`（抽帧）· `video_concat`（拼接成片）· `video_upscale`（超分：画布视频节点 → 像素空间 ×2/×4，可换模型与工作流） |
 | 画布 | `canvas_list_nodes` · `canvas_write_node` · `canvas_get_node` · `canvas_group_nodes` · `canvas_reorder` · `canvas_get_state` · `canvas_set_state` |
 | 资产 | `asset_list`（列出跨会话资产，含 kind）· `asset_to_canvas`（物化回画布：图片/视频→媒体节点，文本→text/table 节点） |
 
@@ -404,6 +445,27 @@ node scripts/import-comfy.mjs exported.json \
 ## 更新日志
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
+
+### v1.7.0 — 两阶段放大（hires / >2K）· 视频超分（U3）· `resolutionLock`（2026-09-23）
+
+**✨ 新增**
+
+- **视频超分 `video.upscale`（U3）**：新能力 + 新工具 `video_upscale(video_node, …)`。输入是**画布上已有的视频节点**（不是提示词），逐帧 CNN ×2 / ×4，**音轨原样带回**（全程不经过模型，也不占 H3 的 token）。内置 `video-upscale-x2`（`RealESRGAN_x2.pth`）/ `video-upscale-x4`（`RealESRGAN_x4.pth`），模型走资产槽 `upscale_x2` / `upscale_x4`（**换权重必须换同倍率的**，倍率写死在权重里）。交付尺寸 = **源尺寸 × factor**，可用 `target_width` 收敛（按 32 对齐）；**比例永远跟源片**——H3 族是 1.75:1，所以 4032 宽对应 **4032×2304**，不是 16:9 的 3840×2160。逐帧独立 ⇒ 代价线性、**天然可分块**，长片按 `ImageFromBatch` + `TrimAudioDuration` 切块再拼回（**不需要 ffmpeg**）。实测 124 帧：原生→×4→4032 **241.3s**；U1 的 2K→×2→4032 **261.6s**；248 帧 5376 一次过 **551.4s**（无 OOM）。详见 [`docs/video-upscale.md`](docs/video-upscale.md)。
+- **两阶段潜空间放大（hires）**：`minimax-h3-ref2v-hires` / `minimax-h3-i2v-hires`（仅 `quality`，`priority: -50`）。**开源版 H3 原生上限就是 768p**，往更高直接采样会出复制伪影 ⇒ 首遍 **896×512** 解运动/构图/声音 → 视频 latent **×1.5** → 二遍 **denoise 0.35** 重建细节，交付 **1344×768 带声音**（音频 latent 全程未被放大、二遍不进音频分支）。模板由 `scripts/make-hires-template.mjs` 从 ref2v/i2v 两个 base 各自派生，两阶段尾段逐字节一致。详见 [`docs/hires-two-pass-upscale.md`](docs/hires-two-pass-upscale.md)。
+- **>2K：学习式潜空间放大 + 链式续接**：`minimax-h3-{ref2v,i2v}-ctx-{quality,quality-pdd2,balanced,fast}-2k`（8 份在役；`-balanced-pdd-2k` 一对已弃用）。hires 的插值放大器只能把首遍**拉回**原生 768p，要**超过**原生上限，放大器必须在 latent 空间真造细节 —— 用 `MinimaxH3LatentUpscaler3DRefineHandoff`（`custom_nodes.Comfyui_Minimax_h3_latent_Upscaler`，权重 `minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors`，本机已装）做 ×2 放大 + 低 σ（denoise 0.3）精修。**首遍尺寸不锁**（`resolutionLock: { scale: 2 }`）：图内目标尺寸是算术模板 `"${width * 2}"`，跟着画布比例 × 档位长边走 ⇒ **16:9 / 9:16 / 1:1 都支持**——16:9 交付 **2688×1536**（`fast` **1664×960**）、9:16 交付 **1536×2688**（`fast` **960×1664**）、1:1 交付 **2688×2688**（`fast` 1664×1664，像素量为 16:9 的 **1.78×**，最重）。`priority: -60`、各档一份清单、`maxDurationFrames: 124`（精修在 ≈500k token 上超线性）。跨比例**不能**链式续接（判据是首遍尺寸一致）。⚠️ **1:1 显存余量薄**：`fast` 档 124 帧实测峰值 72.6/79.2 GiB（余量 6.6 GiB）且另有一次被中断 ⇒ 1:1 尽量压帧数；高分辨率档的 1:1（2688×2688）未实测。详见 [`docs/learned-latent-upscale-2k.md`](docs/learned-latent-upscale-2k.md)。
+- **`resolutionLock` 清单字段**（两种形态）：① **图锁定** `{ graph, scale, note }` —— 首遍尺寸是图结构的一部分，不能被显式 `width`/`height` 或画布 `aspectRatio` 覆盖（hires 族用这种，只支持 16:9）；② **只锁倍率** `{ scale, note }` —— 首遍照常推导，交付 = 首遍 × scale（2K 族用这种，支持任意比例）。两种形态都**交付 = 首遍 × `scale`**，并**强制带一条 `warnings`** 如实说明首遍与交付的关系（不静默）。`video.upscale` 则相反：尺寸跟着输入视频走，**必须**声明 `upscale.factor` 且**不得**声明 `resolutionLock`（两者语义互斥，校验器会拒）。契约见 [`docs/tier-strategy-design.md`](docs/tier-strategy-design.md) §2。另新增 `constraints.maxDurationFramesByRatio`（如 `{"1:1": 56}`，**只声明不强制**：渲染不被拦，供 UI/文档/排障提示）——`maxDurationFrames` 是单一数字，表达不了「同一实现在某些比例下余量更小」，所以给 1:1 单独留了个结构化出处；只对实测过的档声明，未实测的不编数字。校验器对比例键做 fail-closed（写错会被判非法，否则静默失效）。
+
+**🔧 修正**
+
+- **「两阶段放大不能与链式续接叠用」是错的**：正确判据是「**同一条链内首遍尺寸一致**」。放大发生在链式存档**之后**（`MiniMaxH3MotionContextSaveLatent` 读的是首遍采样器输出）⇒ 链上流动的永远是首遍 latent，**交付尺寸不参与续接**——一条链里可以有「首遍相同、交付不同」的镜（`-ctx-quality` 1344×768 接 `-ctx-quality-2k` 2688×1536），首遍不同则显式拒跑。runner 按此实现（`chainGraphMismatch`，纯函数）。
+- **PDD 清单补 `MiniMaxH3PDDAccApply` 依赖声明**：`minimax-h3-i2v-ctx-balanced-pdd` 及其模板此前漏声明该第三方节点，缺节点时可用性预检会**假装可用**。现已在 `requiresNodes` 补上（缺节点如实置灰，不静默回退）。
+
+**✅ 验证**
+
+- 新增 `scripts/smoke-hires-lock.mjs`（`resolutionLock` 语义 + 插值/学习式两阶段图结构 + 通用契约块：枚举所有带锁的实现）、`scripts/e2e-hires.mjs`、`scripts/e2e-upscale.mjs`、`scripts/smoke-upscale.mjs`、`scripts/probe-2k.mjs`、`scripts/probe-2k-aspect.mjs`（画幅比例出片探针，独立进程直连 ComfyUI 以绕开插件的模块缓存）、`scripts/probe-pdd-sigmas.mjs`、`scripts/analyze-2k-detail.mjs`、`scripts/compare-crops.py`。
+- `scripts/smoke-tier-resolution.mjs` **109 断言**、`scripts/verify-h3-variants.mjs` **154 断言**（各份单档清单的 id/档位/尺寸/可编译性），全部通过。
+- 新增实测报告：[`docs/2k-pdd-ab-verdict.md`](docs/2k-pdd-ab-verdict.md)（2K + PDD 的 56/124 帧 A/B：全长 **2.02×**、画质持平且判据略优、**音轨逐样本相同**）。
+- **画幅比例实机出片**（`fast` 档，产物尺寸从 mp4 box 直读，不信工具自报）：**9:16 → 960×1664 带音轨，638.5s**（首遍 480×832；像素量与 16:9 相同 ⇒ 解比例零代价，耗时落在 `estSeconds` 口径上）；**1:1 → 1664×1664 带音轨，992.8s**（22 / 56 / 124 帧都出片）。⚠️ 1:1 峰值显存 72.6/79.2 GiB（余量仅 6.6 GiB，另有一次运行被中断），且耗时是 `estSeconds` 的 **1.6×**——`estSeconds` 是 16:9 · 124 帧口径，UI 原样显示、**不按帧数或画幅修正**；高分辨率档的 1:1（2688×2688）与 9:16 未实测。
 
 ### v1.6.0 — 资产库支持三种载体 · 可删除（2026-09-18）
 
