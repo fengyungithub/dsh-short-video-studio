@@ -1,0 +1,249 @@
+{
+  "id": "video-upscale-seedvr2-3b",
+  "displayName": "视频超分 · SeedVR2 3B（扩散式恢复 / 放大）",
+  "capability": "video.upscale",
+  "tier": "quality",
+  "group": "video-upscale",
+  "priority": -20,
+  "note": "SeedVR2 = 一步扩散式视频恢复（ICLR 2026，字节 Seed），ComfyUI **原生支持**（PR #14424），不需要任何自定义节点包；权重走资产槽 $assets.seedvr2_dit / $assets.seedvr2_vae。与像素链路的三处关键差别：①**进采样器**（一步 KSampler，denoise=1 全量恢复）⇒ 工具口径不是「不经过模型」；②**自带跨帧语义**（VAE temporal tiling + 多帧 restoration）⇒ 声明 chunking=\"internal\"，外层不自动切；③**target_width 真正驱动模型**——图里先把输入重采样到交付尺寸再恢复，不会「渲染大了再缩」。音轨照旧不进模型（GetVideoComponents.audio → CreateVideo.audio）。长片建议按分镜做；要更长可改用图内的 SeedVR2TemporalChunk/Merge（本清单未接，先跑通基线）。**实测（124 帧 · 1344×768 → 2688×1536）**：483.4s；同源同交付下像素链路 video-upscale-x2 只要 69.0s（**7.0×**）。画质（同一把自校准尺子）：有效宽 2654（×1.975）> U3 的 2218（×1.65），1:1 眼判也确实更实（砖墙/伞布/霓虹边缘）；**但平坦区注入了可见细颗粒**（平坦区锐度 311 = 输入的 4.6×，与 4032 那格被判「过锐/振铃」的 362 同档），平坦区闪烁比 1.045（U3 是 0.958）⇒ 是「细节更多但会加颗粒」的一档，不是无代价的升级。",
+  "description": "视频超分/恢复 · SeedVR2 3B（扩散式，一步推理）。输入是**画布上已存在的视频**：先把帧重采样到交付尺寸，再由 SeedVR2 在该尺寸上做一步扩散恢复（比逐帧 CNN 更吃细节，但慢得多、显存也高）。音轨原样带回（不经过模型）；交付尺寸 = 源尺寸 × 2（可用 target_width 改，且**会真正驱动模型**，按 32 对齐）。显存由实现自己管（chunking=internal），`chunk_frames=` 会被警告。权重走资产槽可替换。**比 video-upscale-x2 慢且重**，只在需要「恢复/重塑细节」时选它。",
+  "upscale": {
+    "sizing": "factor",
+    "chunking": "internal",
+    "factor": 2,
+    "align": 32,
+    "note": "交付尺寸 = 源尺寸 × 2（缺省），可用 target_width 收敛到任意宽度（按 32 对齐）。**与像素链路不同的关键点**：图里第 3 个节点先把帧重采样到交付尺寸，SeedVR2 在该尺寸上做恢复 ⇒ target_width 是**真驱动**（不会先渲染到某个倍率再降采样丢掉高频）；但也因此**代价随交付像素量上升**（不像逐帧 CNN 那样近似线性——它是 DiT 前向 + VAE 编解码）。`sizing=\"factor\"` 在这里的含义是「默认倍率 2」，倍率不再写死在权重里（SeedVR2 接受任意尺寸）。`chunking=\"internal\"`：模型自带跨帧时间窗与 VAE temporal tiling ⇒ runner 不自动分块，显存交给它自己（`tile_size` / `temporal_size` / `overlap` 在图里）。**比例永远跟源片**（H3 族 1.75:1 ⇒ 4032 宽 = 4032×2304）。"
+  },
+  "assets": {
+    "seedvr2_dit": {
+      "kind": "other",
+      "default": "seedvr2_3b_int8_convrot.safetensors",
+      "env": "DSH_SVS_SEEDVR2_DIT",
+      "label": "SeedVR2 DiT 权重（放 models/diffusion_models/；3B int8 起，7B int8 更强）"
+    },
+    "seedvr2_vae": {
+      "kind": "other",
+      "default": "seedvr2_ema_vae_fp16.safetensors",
+      "env": "DSH_SVS_SEEDVR2_VAE",
+      "label": "SeedVR2 VAE 权重（放 models/vae/，各档共用）"
+    }
+  },
+  "params": {
+    "source_video": {
+      "inject": "scalar",
+      "to": {
+        "node": "1",
+        "field": "file"
+      }
+    },
+    "out_width": {
+      "inject": "scalar",
+      "to": {
+        "node": "3",
+        "field": "width"
+      }
+    },
+    "out_height": {
+      "inject": "scalar",
+      "to": {
+        "node": "3",
+        "field": "height"
+      }
+    },
+    "prefix": {
+      "inject": "scalar",
+      "to": {
+        "node": "13",
+        "field": "filename_prefix"
+      }
+    }
+  },
+  "requiresNodes": [
+    "LoadVideo",
+    "GetVideoComponents",
+    "ImageScale",
+    "SeedVR2Preprocess",
+    "UNETLoader",
+    "VAELoader",
+    "VAEEncodeTiled",
+    "SeedVR2Conditioning",
+    "KSampler",
+    "VAEDecodeTiled",
+    "SeedVR2PostProcessing",
+    "CreateVideo",
+    "SaveVideo"
+  ],
+  "output": {
+    "mediaType": "video"
+  },
+  "graph": {
+    "1": {
+      "class_type": "LoadVideo",
+      "inputs": {
+        "file": "${source_video}"
+      }
+    },
+    "2": {
+      "class_type": "GetVideoComponents",
+      "inputs": {
+        "video": [
+          "1",
+          0
+        ]
+      }
+    },
+    "3": {
+      "class_type": "ImageScale",
+      "inputs": {
+        "image": [
+          "2",
+          0
+        ],
+        "upscale_method": "lanczos",
+        "width": 32,
+        "height": 32,
+        "crop": "disabled"
+      }
+    },
+    "4": {
+      "class_type": "SeedVR2Preprocess",
+      "inputs": {
+        "resized_images": [
+          "3",
+          0
+        ]
+      }
+    },
+    "5": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "$assets.seedvr2_dit",
+        "weight_dtype": "default"
+      }
+    },
+    "6": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "$assets.seedvr2_vae"
+      }
+    },
+    "7": {
+      "class_type": "VAEEncodeTiled",
+      "inputs": {
+        "pixels": [
+          "4",
+          0
+        ],
+        "vae": [
+          "6",
+          0
+        ],
+        "tile_size": 512,
+        "overlap": 64,
+        "temporal_size": 64,
+        "temporal_overlap": 8
+      }
+    },
+    "8": {
+      "class_type": "SeedVR2Conditioning",
+      "inputs": {
+        "model": [
+          "5",
+          0
+        ],
+        "vae_conditioning": [
+          "7",
+          0
+        ]
+      }
+    },
+    "9": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "5",
+          0
+        ],
+        "seed": 1,
+        "steps": 1,
+        "cfg": 1,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "positive": [
+          "8",
+          0
+        ],
+        "negative": [
+          "8",
+          1
+        ],
+        "latent_image": [
+          "7",
+          0
+        ],
+        "denoise": 1
+      }
+    },
+    "10": {
+      "class_type": "VAEDecodeTiled",
+      "inputs": {
+        "samples": [
+          "9",
+          0
+        ],
+        "vae": [
+          "6",
+          0
+        ],
+        "tile_size": 512,
+        "overlap": 64,
+        "temporal_size": 64,
+        "temporal_overlap": 8
+      }
+    },
+    "11": {
+      "class_type": "SeedVR2PostProcessing",
+      "inputs": {
+        "images": [
+          "10",
+          0
+        ],
+        "original_resized_images": [
+          "3",
+          0
+        ],
+        "color_correction_method": "none"
+      }
+    },
+    "12": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": [
+          "11",
+          0
+        ],
+        "fps": [
+          "2",
+          2
+        ],
+        "audio": [
+          "2",
+          1
+        ]
+      }
+    },
+    "13": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": [
+          "12",
+          0
+        ],
+        "filename_prefix": "${prefix}",
+        "format": "mp4",
+        "codec": "h264"
+      }
+    }
+  },
+  "estSeconds": 483
+}

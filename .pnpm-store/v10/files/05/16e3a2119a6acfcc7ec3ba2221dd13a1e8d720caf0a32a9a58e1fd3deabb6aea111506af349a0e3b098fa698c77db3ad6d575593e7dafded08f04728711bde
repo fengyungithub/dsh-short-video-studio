@@ -1,0 +1,17 @@
+display-name-zh: 图片生成
+version: 1.1.0
+tag-en: Image
+tag-cn: 图片
+complete-tags-en:
+  - Image / Generation
+  - Image / Text-to-Image
+  - Image / Image-to-Image
+complete-tags-cn:
+  - 图片 / 生成
+  - 图片 / 文生图
+  - 图片 / 图生图
+summary-en: Turn a prompt (plus ratio/size/count) into images via text-to-image, or edit an existing canvas image via reference image-to-image (FLUX.2). For the input-box manual path.
+summary-cn: 把「提示词 + 参数」经本地 ComfyUI 生图：t2i 文生图（无参考），或 i2i 参考图生图（基于画布参考图改绘，FLUX.2）。面向输入框手动链路。
+desc-en: The simplest image generation flow for the input-box manual path. Parses a structured task message (prompt, t2i/i2i type, ratio, size, count, optional reference node id), validates prerequisites, then calls comfy_generate_image (text2image) or comfy_render with capability image.image2image (reference edit) and reports the canvas artifact. i2i keeps the reference's size (scaled to ≤1MP) and edits per the prompt description. Not for full short-drama/animation pipelines.
+desc-cn: 面向「输入框手动生成图片」的最简流程。解析结构化任务消息（prompt、t2i/i2i 类型、比例、尺寸、张数、参考图节点 id），校验前置条件后经本地 ComfyUI 能力注册表调用 comfy_generate_image（文生图）或 comfy_render（capability image.image2image，参考图改绘）出图并回报画布产物。i2i 尺寸跟随参考图（缩放到 ≤1MP），按 prompt 描述改绘。不适用于完整短剧/动画片型流程。
+source: bundled

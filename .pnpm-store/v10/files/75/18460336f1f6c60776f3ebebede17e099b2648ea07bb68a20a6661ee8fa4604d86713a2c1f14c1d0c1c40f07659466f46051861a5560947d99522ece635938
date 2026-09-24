@@ -1,0 +1,356 @@
+{
+  "id": "minimax-h3-pdd-i2v",
+  "version": 1,
+  "capability": "video.image2video",
+  "lengthGrid": [
+    17,
+    5
+  ],
+  "runner": "comfyui",
+  "displayName": "MiniMax H3 首末帧生成视频 · PDD 蒸馏",
+  "description": "PDD（Parallel Decoding Distillation）8 步：PDD 权重自带 trunk LoRA + head bank，shift 必须 12/3、采样器必须 euler、sigmas 取自 Apply 节点的训练网格；base 用 fl2va（必须与 FL2VA 的 PDD 权重配对，节点有指纹守卫）。**必须移除其它蒸馏 LoRA**（不叠加）。由 scripts/make-pdd-template.mjs 生成，请勿手改。",
+  "output": {
+    "mediaType": "video",
+    "hasAudio": true
+  },
+  "modelNode": "1",
+  "assets": {
+    "unet": {
+      "kind": "checkpoint",
+      "default": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "env": "DSH_SVS_H3_MODEL_FL",
+      "label": "H3 FL2VA UNet"
+    },
+    "clip": {
+      "kind": "clip",
+      "default": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "env": "DSH_SVS_H3_CLIP",
+      "label": "H3 CLIP"
+    },
+    "vae": {
+      "kind": "vae",
+      "default": "minimax_h3_video_vae_fp16.safetensors",
+      "env": "DSH_SVS_H3_VAE",
+      "label": "H3 视频 VAE（int8_convrot 为可选加速件，经配置/assetOverrides 切换）"
+    },
+    "audio_vae": {
+      "kind": "vae",
+      "default": "minimax_h3_audio_vae_fp32.safetensors",
+      "env": "DSH_SVS_H3_AUDIO_VAE",
+      "label": "H3 音频 VAE"
+    },
+    "pdd": {
+      "kind": "other",
+      "default": "minimax_h3_fl2va_pdd_acc_8step_comfyui.safetensors",
+      "env": "DSH_SVS_H3_PDD_FL2VA",
+      "label": "MiniMax-H3 FL2VA PDD Acc 8 步（放 models/pdd_acc/）"
+    }
+  },
+  "graph": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "$assets.unet",
+        "weight_dtype": "default"
+      }
+    },
+    "2": {
+      "class_type": "MiniMaxH3SigmaShift",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "shift_video": 12,
+        "shift_audio": 3
+      }
+    },
+    "3": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "$assets.clip",
+        "type": "minimax"
+      }
+    },
+    "4": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "$assets.vae"
+      }
+    },
+    "5": {
+      "class_type": "MiniMaxH3ImageToVideo",
+      "inputs": {
+        "clip": [
+          "3",
+          0
+        ],
+        "vae": [
+          "4",
+          0
+        ],
+        "prompt": null,
+        "width": null,
+        "height": null,
+        "length": null
+      }
+    },
+    "6": {
+      "class_type": "RandomNoise",
+      "inputs": {
+        "noise_seed": null
+      }
+    },
+    "7": {
+      "class_type": "BasicGuider",
+      "inputs": {
+        "model": [
+          "2a",
+          0
+        ],
+        "conditioning": [
+          "5",
+          0
+        ]
+      }
+    },
+    "8": {
+      "class_type": "KSamplerSelect",
+      "inputs": {
+        "sampler_name": "euler"
+      }
+    },
+    "10": {
+      "class_type": "SamplerCustomAdvanced",
+      "inputs": {
+        "noise": [
+          "6",
+          0
+        ],
+        "guider": [
+          "7",
+          0
+        ],
+        "sampler": [
+          "8",
+          0
+        ],
+        "sigmas": [
+          "2a",
+          1
+        ],
+        "latent_image": [
+          "5",
+          1
+        ]
+      }
+    },
+    "11": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "10",
+          0
+        ],
+        "vae": [
+          "4",
+          0
+        ]
+      }
+    },
+    "12": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": [
+          "11",
+          0
+        ],
+        "audio": [
+          "11a",
+          0
+        ],
+        "fps": null
+      }
+    },
+    "13": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": [
+          "12",
+          0
+        ],
+        "filename_prefix": null,
+        "format": "mp4",
+        "codec": "h264"
+      }
+    },
+    "4a": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "$assets.audio_vae"
+      }
+    },
+    "11a": {
+      "class_type": "VAEDecodeAudio",
+      "inputs": {
+        "samples": [
+          "10",
+          0
+        ],
+        "vae": [
+          "4a",
+          0
+        ]
+      }
+    },
+    "2a": {
+      "class_type": "MiniMaxH3PDDAccApply",
+      "inputs": {
+        "model": [
+          "2",
+          0
+        ],
+        "pdd_file": "$assets.pdd",
+        "nfe": "8",
+        "lora_strength": 1,
+        "head_strength": 1,
+        "on_off_grid": "error",
+        "partition": "",
+        "enabled": true,
+        "partition_check": "error"
+      }
+    }
+  },
+  "params": {
+    "prompt": {
+      "inject": "scalar",
+      "to": {
+        "node": "5",
+        "field": "prompt"
+      }
+    },
+    "width": {
+      "inject": "scalar",
+      "to": {
+        "node": "5",
+        "field": "width"
+      }
+    },
+    "height": {
+      "inject": "scalar",
+      "to": {
+        "node": "5",
+        "field": "height"
+      }
+    },
+    "length": {
+      "inject": "scalar",
+      "to": {
+        "node": "5",
+        "field": "length"
+      }
+    },
+    "seed": {
+      "inject": "scalar",
+      "to": {
+        "node": "6",
+        "field": "noise_seed"
+      }
+    },
+    "fps": {
+      "inject": "scalar",
+      "to": {
+        "node": "12",
+        "field": "fps"
+      },
+      "default": 24
+    },
+    "first_frame": {
+      "inject": "image",
+      "via": "node",
+      "node": "LoadImage",
+      "to": {
+        "node": "5",
+        "field": "first_frame"
+      },
+      "preprocess": [
+        {
+          "class_type": "ImageScale",
+          "inputs": {
+            "upscale_method": "lanczos",
+            "width": "${width}",
+            "height": "${height}",
+            "crop": "disabled"
+          }
+        }
+      ]
+    },
+    "last_frame": {
+      "inject": "image",
+      "via": "node",
+      "node": "LoadImage",
+      "to": {
+        "node": "5",
+        "field": "last_frame"
+      },
+      "preprocess": [
+        {
+          "class_type": "ImageScale",
+          "inputs": {
+            "upscale_method": "lanczos",
+            "width": "${width}",
+            "height": "${height}",
+            "crop": "disabled"
+          }
+        }
+      ]
+    },
+    "prefix": {
+      "inject": "scalar",
+      "to": {
+        "node": "13",
+        "field": "filename_prefix"
+      }
+    },
+    "nfe": {
+      "inject": "scalar",
+      "to": {
+        "node": "2a",
+        "field": "nfe"
+      },
+      "default": "8"
+    }
+  },
+  "modes": {
+    "balanced": {
+      "steps": 8,
+      "longSide": 1344
+    }
+  },
+  "resolution": {
+    "policy": "aspect-ratio",
+    "snap": 32,
+    "default": {
+      "balanced": [
+        1344,
+        768
+      ]
+    }
+  },
+  "constraints": {
+    "aspectRatios": [
+      "16:9",
+      "9:16",
+      "1:1"
+    ],
+    "maxDurationFrames": 310,
+    "supportsSubtitles": true
+  },
+  "group": "minimax-h3-i2v-pdd",
+  "tier": "balanced",
+  "requiresNodes": [
+    "MiniMaxH3PDDAccApply"
+  ],
+  "priority": -30,
+  "note": "PDD 8 步 · shift 12/3 · euler · CFG 1.0"
+}

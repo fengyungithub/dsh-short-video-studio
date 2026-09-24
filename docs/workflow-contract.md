@@ -306,8 +306,8 @@ comfy_render(capability, hints…):
 
   // 未分档清单的固定选择：capability -> 有序 workflowId 列表（第 1 个 = 默认，其余 = fallback 顺序）
   "preferred": {
-    "image.text2image": ["flux-text2image", "sdxl-text2image"],
-    "image.image2image": ["flux2-img2img"]
+    "image.text2image": ["qwen-image-21-t2i", "flux-text2image"],   // 写**家族名**：该家族在各档的实现都被优先选中
+    "image.image2image": ["qwen-image-21-i2i", "flux2-img2img"]
   }
 }
 ```

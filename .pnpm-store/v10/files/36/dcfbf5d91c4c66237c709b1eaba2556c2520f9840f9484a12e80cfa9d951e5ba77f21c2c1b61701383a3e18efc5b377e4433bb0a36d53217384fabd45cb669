@@ -1,0 +1,15 @@
+display-name-zh: 参考视频生成
+version: 1.1.0
+tag-en: Video
+tag-cn: 视频
+complete-tags-en:
+  - Video / Generation
+  - Video / Single-shot
+complete-tags-cn:
+  - 视频 / 生成
+  - 视频 / 单镜头
+summary-en: Turn a prompt plus reference/first-frame images and size/tier/duration/ratio params into one single-shot video (r2v reference-to-video or i2v first/last-frame).
+summary-cn: 把「提示词 + 参考图/首帧图 + 尺寸/档位/时长/比例」参数生成为一段单镜头视频（r2v 参考图生成 / i2v 首末帧生成）。
+desc-en: The simplest single-shot video generation flow for the input-box manual path. Parses a structured task message (prompt, r2v/i2v type, tier, ratio, size, duration, reference/first-frame canvas node ids), validates prerequisites, then calls comfy_generate_video via the local ComfyUI capability registry and reports the canvas artifact. r2v binds identity/environment from reference images; i2v starts from a first frame (optionally converges to a last frame). Not for full short-drama/animation pipelines.
+desc-cn: 面向「输入框手动生成一段视频」的最简流程。解析结构化任务消息（prompt、r2v/i2v 类型、档位、比例、尺寸、时长、参考图/首帧画布节点 id），校验前置条件后经本地 ComfyUI 能力注册表调用 comfy_generate_video 出片并回报画布产物。r2v 由参考图绑定身份/环境，i2v 由首帧起笔（可选末帧收尾）。不适用于完整短剧/动画片型流程。
+source: bundled

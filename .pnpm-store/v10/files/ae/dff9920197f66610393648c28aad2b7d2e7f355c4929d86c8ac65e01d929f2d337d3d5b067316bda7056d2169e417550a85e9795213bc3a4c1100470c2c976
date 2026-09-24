@@ -1,0 +1,35 @@
+{
+  "name": "webdriver-bidi-protocol",
+  "version": "0.4.3",
+  "description": "",
+  "main": "out/index.js",
+  "types": "out/index.d.ts",
+  "files": [
+    "out/**/*",
+    "src/**/*",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "webdriver",
+    "bidi",
+    "protocol"
+  ],
+  "author": "The Chromium Authors",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "./tools/build.sh",
+    "format": "prettier -w 'out/**/*' 'src/**/*' 'test-d/**/*'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GoogleChromeLabs/webdriver-bidi-protocol.git"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "parse5": "^8.0.1",
+    "prettier": "3.9.6",
+    "tsd": "0.33.0",
+    "typescript": "6.0.3",
+    "ts-morph": "28.0.0"
+  }
+}

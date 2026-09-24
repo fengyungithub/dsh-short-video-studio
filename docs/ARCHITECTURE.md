@@ -33,7 +33,7 @@ dsh-short-video-studio/
 ├── client.js → lib/client.js    # 浏览器半：画布的家（conversation.view tab 或右侧栏 tab 类型，由 canvasHome 决定）+ settings.section「ComfyUI」设置
 ├── studio/                      # 画布页（自包含 HTML/CSS/JS，无构建）
 ├── workflows/                   # 内置工作流清单（数据）
-│   ├── flux-text2image.json     # image.text2image：FLUX 2 文生图（未分档）
+│   ├── flux-text2image-*.json   # image.text2image：FLUX 2 文生图（一档一清单，fast/balanced/quality）
 │   ├── minimax-h3-ref2v-<tier>.json  # video.reference2video：H3 参考绑定（带声音），一档一 json：fast/balanced/balanced-sol/quality/quality-sol
 │   ├── minimax-h3-i2v-<tier>.json    # video.image2video：H3 首/末帧串联（带声音）：fast/balanced/balanced-sol/quality/quality-sol
 │   └── extract-frame.json       # image.from_video：抽帧（末帧/首帧 → 图片）
@@ -281,7 +281,7 @@ Agent 调用 comfy_generate_video(prompt, type='r2v', ref_nodes=[角色卡,场�
 
 | 清单 | 能力 | 图骨架（关键节点） | 质量档 | 分辨率策略 |
 |---|---|---|---|---|
-| `flux-text2image` | image.text2image | UNETLoader → ModelSamplingFlux → CLIPTextEncode(flux2) → FluxGuidance → EmptyFlux2LatentImage → Flux2Scheduler → SamplerCustomAdvanced → VAEDecode → SaveImage | （无 modes，默认 20 步） | explicit，默认 1344×768 |
+| `flux-text2image-{fast,balanced,quality}` | image.text2image | UNETLoader → ModelSamplingFlux → CLIPTextEncode(flux2) → FluxGuidance → EmptyFlux2LatentImage → Flux2Scheduler → SamplerCustomAdvanced → VAEDecode → SaveImage | （无 modes，默认 20 步） | explicit，默认 1344×768 |
 | `minimax-h3-ref2v-fast` / `-balanced` / `-balanced-sol` / `-quality` / `-quality-sol` | video.reference2video | UNETLoader → SigmaShift → **MiniMaxH3ReferenceToVideo**（ref_images dotted）→ SamplerCustomAdvanced → VAEDecode + **VAEDecodeAudio** → **CreateVideo(audio)** → SaveVideo(mp4/h264) | **组「MiniMax H3 参考生成视频」**：一个 json = 一个档位；`fast` 4 步 + LoRA / `balanced` 8 步 + 768p LoRA（shift 6/3） / `quality` 20 步无 LoRA | aspect-ratio，longSide 1344（fast 为 832） |
 | `minimax-h3-i2v-fast` / `-quality` / `-quality-sol` | video.image2video | 同上，但 **MiniMaxH3ImageToVideo** + first/last_frame 经 LoadImage→ImageScale preprocess 链 | **组「MiniMax H3 首末帧生成视频」**：`fast` 4 步 + LoRA / `quality` 20 步；**`balanced` 档空缺**（缺 i2v 8 步 LoRA 资产，请求该档显式报错） | aspect-ratio，longSide 1344（fast 为 832） |
 | `minimax-h3-ref2v-sol-stats` | video.reference2video | 同上 + Sol-Attn 统计诊断节点 | **内部诊断清单**（`internal: true`）：不参与档位解析、不进 UI/技能选项 | 同上 |

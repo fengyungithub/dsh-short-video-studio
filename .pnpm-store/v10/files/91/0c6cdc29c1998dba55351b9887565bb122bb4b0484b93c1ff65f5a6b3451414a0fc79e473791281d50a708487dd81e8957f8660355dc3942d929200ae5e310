@@ -1,0 +1,94 @@
+{
+  "id": "probe-upscale-shortside-geom",
+  "displayName": "【契约探针】短边驱动几何实现（等比缩放，不产细节）",
+  "capability": "video.upscale",
+  "tier": "quality",
+  "group": "video-upscale-probe",
+  "priority": -100,
+  "internal": true,
+  "estSeconds": 1,
+  "note": "**这不是画质实现，是契约探针。** 存在的唯一目的：在真机上验证 `upscale.sizing=\"short-side\"` 那条链路——runner 按 `shortSide` 推出交付尺寸、把解析出的短边经 `params.out_short_side` 注入图、产物容器尺寸与预测一致、画布 params 如实记 `sizing/shortSide`（`factor` 记 null）。图里只有一个等比 `ImageScale`（没有模型、不产生任何细节）。`internal: true` ⇒ 不进档位解析、不会被隐式选中，只能显式 `workflow=` 调用。跑它的是 `scripts/e2e-upscale-shortside.mjs`。",
+  "description": "【契约探针】短边驱动的等比缩放（**不产细节**）。输入是画布上已有的视频；交付尺寸由 `upscale.shortSide`（目标短边，可选 `maxEdge` 上限）推导，`target_width` 会反解出短边并回注实现。仅供 `scripts/e2e-upscale-shortside.mjs` 验证契约链路，不要用于生产出片。",
+  "upscale": {
+    "sizing": "short-side",
+    "shortSide": 1080,
+    "align": 32,
+    "chunking": "internal",
+    "note": "短边驱动：交付 = 短边按 align 对齐后按源片比例推出长边（竖版时短边就是宽）。`chunking=\"internal\"` 表示显存归实现自己管 ⇒ runner 不按像素-帧预算自动分块（本探针没有时间维处理，声明它是为了验证那条分支的真实行为：显式 chunk_frames 仍照办但会告警）。"
+  },
+  "params": {
+    "source_video": { "inject": "scalar", "to": { "node": "1", "field": "file" } },
+    "out_short_side": { "inject": "scalar", "to": { "node": "3", "field": "width" } },
+    "out_height": { "inject": "scalar", "to": { "node": "3", "field": "height" } },
+    "prefix": { "inject": "scalar", "to": { "node": "5", "field": "filename_prefix" } }
+  },
+  "requiresNodes": [
+    "LoadVideo",
+    "GetVideoComponents",
+    "ImageScale",
+    "CreateVideo",
+    "SaveVideo"
+  ],
+  "output": {
+    "mediaType": "video"
+  },
+  "graph": {
+    "1": {
+      "class_type": "LoadVideo",
+      "inputs": {
+        "file": "${source_video}"
+      }
+    },
+    "2": {
+      "class_type": "GetVideoComponents",
+      "inputs": {
+        "video": [
+          "1",
+          0
+        ]
+      }
+    },
+    "3": {
+      "class_type": "ImageScale",
+      "inputs": {
+        "image": [
+          "2",
+          0
+        ],
+        "upscale_method": "area",
+        "width": 32,
+        "height": 32,
+        "crop": "disabled"
+      }
+    },
+    "4": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": [
+          "3",
+          0
+        ],
+        "fps": [
+          "2",
+          2
+        ],
+        "audio": [
+          "2",
+          1
+        ]
+      }
+    },
+    "5": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": [
+          "4",
+          0
+        ],
+        "filename_prefix": "${prefix}",
+        "format": "mp4",
+        "codec": "h264"
+      }
+    }
+  }
+}

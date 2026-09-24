@@ -169,7 +169,7 @@ video.reference2video
 | `minimax-h3-ref2v-hires` / `minimax-h3-i2v-hires` | `-hires`（仅 `quality`） | 两阶段潜空间放大（首遍 896×512 → latent ×1.5 → 二遍 denoise 0.35，交付 1344×768）；`priority<0` 不做隐式默认；带 `resolutionLock` |
 | `minimax-h3-{ref2v,i2v}-ctx` | `-ctx-fast` / `-ctx-balanced` / `-ctx-balanced-pdd` / `-ctx-quality` | 链式续接（Motion Context 四节点）；`priority=-100`，不做隐式默认 |
 | `minimax-h3-{ref2v,i2v}-ctx-*-2k` | `-ctx-quality-2k` / `-ctx-quality-pdd2-2k` / `-ctx-balanced-2k` / `-ctx-fast-2k`（`-ctx-balanced-pdd-2k` **已弃用**：PDD 接在**首遍**更慢且闪烁 +150%，改接二遍的 `-quality-pdd2-2k`；走 `internal` 退场，仍可显式 `workflow=` 复现） | **学习式**潜空间放大，从 **ctx base** 派生 ⇒ 与链式续接可叠用（判据＝**首遍尺寸一致**，交付尺寸不锁）。**只声明倍率、不锁首遍**：首遍按画布比例 × 档位长边推导（`quality`/`balanced` 长边 1344、`fast` 长边 832），图内目标尺寸是算术模板 `"${width * 2}"` ⇒ **16:9 / 9:16 / 1:1 都支持**（9:16 与 16:9 像素量相同；**1:1 = 1.78×**，最重）。16:9 交付：`quality`/`balanced` **2688×1536**、`fast` **1664×960**；9:16 = **1536×2688** / **960×1664**。各档一份清单、`priority=-60` 不做隐式默认、`maxDurationFrames: 124`。⚠️ 1:1 显存余量薄（见 §9 实测），尽量压帧数 |
-| `video-upscale-x2` / `-x4` | `video.upscale`（仅 `quality`） | **像素空间**逐帧超分（`RealESRGAN_x2/x4`），尺寸跟输入视频走 ⇒ 声明 `upscale.factor`、**不得**带 `resolutionLock`；`x4` `priority=-10` 需显式选中 |
+| `video-upscale-x2` / `-x4` | `video.upscale`（仅 `quality`） | **像素空间**逐帧超分（`RealESRGAN_x2/x4`），尺寸跟输入视频走 ⇒ 声明 `upscale.sizing="factor"` + `upscale.factor`、**不得**带 `resolutionLock`；`upscale.chunking="caller"`（逐帧独立 ⇒ runner 可切）；`x4` `priority=-10` 需显式选中 |
 | 诊断 | `-sol-stats`（`internal: true`） | 永不进 UI/技能 |
 
 **json 是产物**：由 `scripts/make-h3-variants.mjs` 从一份 base 定义产出（自动填 `requiresNodes`/`estSeconds`/`note`），人只改 base。孪生实现（同档 -sol 与标准版）保持同步是生成器的责任。
@@ -232,7 +232,7 @@ video.reference2video
   ⚠️ **hires 族保持图锁定形态不变**（它的放大倍率是插值节点上的字面量，且首遍必须落在原生 ÷1.5）。
 - ~~**「像素空间超分（U3）」**~~ → **已实现**（2026）：能力 `video.upscale` + 工具 `video_upscale`，
   清单 `video-upscale-x2` / `-x4`（`priority` 0 / -10），模型走资产槽 `upscale_x2`/`upscale_x4`。
-  与生成类的差别：**尺寸跟输入视频走**（`交付 = 源 × factor`），声明 `upscale.factor`、**不得**带 `resolutionLock`；
+  与生成类的差别：**尺寸跟输入视频走**，声明**尺寸来源**（`upscale.sizing`：`factor` = 交付源 × 倍率 / `short-side` = 交付由实现的目标短边推导）与**分块归属**（`upscale.chunking`：`caller` 可由 runner 切 / `internal` 显存归实现自己管），**不得**带 `resolutionLock`；
   逐帧独立 ⇒ 代价线性、天然可分块（长片切块再拼回，不需要 ffmpeg）。纯逻辑在 `lib/upscale.js`，编排在 `lib/index.js` 的 `runUpscale`。
   详见 `docs/video-upscale.md`；验收 `scripts/smoke-upscale.mjs` + `scripts/e2e-upscale.mjs`。**推荐对单个分镜放大**（成片先拼后放会让失败代价与显存峰值都放大到全片）。
 - **PDD 的多镜头一致性未验**：现有画质结论来自单帧/单 seed；同一部片子若混用 PDD 与非 PDD 档，观感是否漂移未知（与 Sol 的"不逐镜混用"同理需要一部完整片子验证）。

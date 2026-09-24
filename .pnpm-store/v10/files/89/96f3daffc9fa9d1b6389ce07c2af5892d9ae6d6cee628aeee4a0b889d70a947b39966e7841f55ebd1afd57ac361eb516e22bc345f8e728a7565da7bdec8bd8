@@ -1,0 +1,201 @@
+{
+  "id": "qwen-image-21-t2i-fast",
+  "version": 1,
+  "capability": "image.text2image",
+  "runner": "comfyui",
+  "displayName": "Qwen-Image 2.1 文生图（调试 1MP）",
+  "description": "本地 Qwen-Image 2.1（7B MMDiT）文生图：原生支持 2K 出图与 RGBA 透明背景，官方模板默认加载 int8_convrot 权重。图结构对应 ComfyUI 官方模板 image_qwen_image_2_1_t2i（UNETLoader → TextEncodeQwenImage21 → KSampler → VAEDecode），走 euler/simple + cfg=1 的官方路径。",
+  "note": "需要 ComfyUI ≥ v0.37.0（TextEncodeQwenImage21 是 0.37 起的新节点）与三个权重（见 assets）。cfg 固定 1（官方路径）；官方 pipeline 建议 40-50 步 euler，模板从 25 步起，故三档取 20/30/40 步。2048 档实测（A800·int8·40 步）：2048×2048 = 63.4s、2752×1536 = 64.5s、1536×2752 = 65.2s（像素量都在 4.2MP 左右 ⇒ 成本由像素量而非比例决定）。透明背景：提示词写成「This is an RGBA format image with transparency. <主体描述>. The image has an alpha channel and a transparent background.」并以 PNG 保存。",
+  "tier": "fast",
+  "group": "qwen-image-21-t2i",
+  "estSeconds": 3,
+  "requiresNodes": [
+    "TextEncodeQwenImage21"
+  ],
+  "output": {
+    "mediaType": "image",
+    "hasAudio": false
+  },
+  "modelNode": "1",
+  "assets": {
+    "unet": {
+      "kind": "checkpoint",
+      "default": "qwen_image_2.1_int8_convrot.safetensors",
+      "env": "DSH_SVS_QWEN21_UNET",
+      "label": "Qwen-Image 2.1 UNet"
+    },
+    "clip": {
+      "kind": "clip",
+      "default": "qwen3vl_8b_int8_convrot.safetensors",
+      "env": "DSH_SVS_QWEN21_CLIP",
+      "label": "Qwen3-VL 8B 文本编码器"
+    },
+    "vae": {
+      "kind": "vae",
+      "default": "qwen_image_2.1_vae_bf16.safetensors",
+      "env": "DSH_SVS_QWEN21_VAE",
+      "label": "Qwen-Image 2.1 VAE"
+    }
+  },
+  "graph": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "$assets.unet",
+        "weight_dtype": "default"
+      }
+    },
+    "2": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "$assets.clip",
+        "type": "qwen_image",
+        "device": "default"
+      }
+    },
+    "3": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "$assets.vae"
+      }
+    },
+    "4": {
+      "class_type": "TextEncodeQwenImage21",
+      "inputs": {
+        "clip": [
+          "2",
+          0
+        ],
+        "prompt": null,
+        "negative_prompt": "",
+        "resolution": 1024
+      }
+    },
+    "5": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": null,
+        "height": null,
+        "batch_size": 1
+      }
+    },
+    "6": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": null,
+        "steps": null,
+        "cfg": 1,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1,
+        "model": [
+          "$model",
+          0
+        ],
+        "positive": [
+          "4",
+          0
+        ],
+        "negative": [
+          "4",
+          1
+        ],
+        "latent_image": [
+          "5",
+          0
+        ]
+      }
+    },
+    "7": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "6",
+          0
+        ],
+        "vae": [
+          "3",
+          0
+        ]
+      }
+    },
+    "8": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "7",
+          0
+        ],
+        "filename_prefix": null
+      }
+    }
+  },
+  "params": {
+    "prompt": {
+      "inject": "scalar",
+      "to": {
+        "node": "4",
+        "field": "prompt"
+      }
+    },
+    "width": {
+      "inject": "scalar",
+      "to": {
+        "node": "5",
+        "field": "width"
+      }
+    },
+    "height": {
+      "inject": "scalar",
+      "to": {
+        "node": "5",
+        "field": "height"
+      }
+    },
+    "seed": {
+      "inject": "scalar",
+      "to": {
+        "node": "6",
+        "field": "seed"
+      }
+    },
+    "steps": {
+      "inject": "scalar",
+      "to": {
+        "node": "6",
+        "field": "steps"
+      }
+    },
+    "prefix": {
+      "inject": "scalar",
+      "to": {
+        "node": "8",
+        "field": "filename_prefix"
+      }
+    }
+  },
+  "modes": {
+    "fast": {
+      "steps": 20,
+      "longSide": 1024
+    }
+  },
+  "resolution": {
+    "policy": "aspect-ratio",
+    "snap": 32,
+    "longSide": 1024,
+    "default": [
+      1024,
+      576
+    ]
+  },
+  "constraints": {
+    "aspectRatios": [
+      "16:9",
+      "9:16",
+      "1:1",
+      "4:3",
+      "3:2"
+    ]
+  }
+}

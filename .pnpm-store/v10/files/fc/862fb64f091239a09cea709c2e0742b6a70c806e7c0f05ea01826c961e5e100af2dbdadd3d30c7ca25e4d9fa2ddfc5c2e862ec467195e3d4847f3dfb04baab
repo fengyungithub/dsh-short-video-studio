@@ -1,0 +1,30 @@
+{
+  "id": "extract-frame",
+  "displayName": "抽帧（视频 → 图片）",
+  "capability": "image.from_video",
+  "runner": "comfyui",
+  "version": 1,
+  "output": { "mediaType": "image" },
+  "graph": {
+    "1": { "class_type": "LoadVideo", "inputs": { "file": null } },
+    "2": { "class_type": "GetVideoComponents", "inputs": { "video": ["1", 0] } },
+    "3": { "class_type": "ImageFromBatch", "inputs": { "image": ["2", 0], "batch_index": -1, "length": 1 } },
+    "4": { "class_type": "SaveImage", "inputs": { "images": ["3", 0], "filename_prefix": null } }
+  },
+  "params": {
+    "source_video": {
+      "inject": "video",
+      "via": "field",
+      "to": { "node": "1", "field": "file" }
+    },
+    "frame_index": {
+      "inject": "scalar",
+      "to": { "node": "3", "field": "batch_index" },
+      "default": -1
+    },
+    "prefix": {
+      "inject": "scalar",
+      "to": { "node": "4", "field": "filename_prefix" }
+    }
+  }
+}

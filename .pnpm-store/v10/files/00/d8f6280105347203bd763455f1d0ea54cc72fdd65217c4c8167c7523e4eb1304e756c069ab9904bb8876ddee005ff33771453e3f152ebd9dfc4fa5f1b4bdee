@@ -1,0 +1,16 @@
+display-name-zh: H3 提示词优化
+version: 1.0.0
+tag-en: Prompt
+tag-cn: 提示词
+complete-tags-en:
+  - Video / Prompt Engineering
+  - Video / Pre-processing
+complete-tags-cn:
+  - 视频 / 提示词工程
+  - 视频 / 预处理
+summary-en: Rewrite multimodal inputs into MiniMax H3 structured prompts (Ref2VA six-section or T2VA/I2VA/FL2VA/L2VA three-section), locally reproducing the core output of the official H3-Context-IR.
+summary-cn: 把多模态输入重写为 MiniMax H3 结构化 prompt（Ref2VA 六段式 / T2VA·I2VA·FL2VA·L2VA 三段式），本地复刻官方 H3-Context-IR 的核心产物。
+desc-en: Official h3-prompt-writing skill adapted for dsh-short-video-studio. Rewrites canvas shot-table rows, storyboard sections, reference bindings, and audio mode into H3 structured prompts (subject_definitions/summary/retention_analysis/detailed_description/overall_soundscape/non_diegetic_music for Ref2VA; alignment instruction + integrated_multimodal_description/overall_soundscape/non_diegetic_music for I2VA/FL2VA). Applies only when the resolved workflow id has the minimax-h3- prefix; other workflows fall back to free-form prompts.
+desc-cn: dsh-short-video-studio 适配版官方 h3-prompt-writing。把画布镜头表行、分镜章节、参考绑定与音频模式重写为 H3 结构化 prompt（Ref2VA 六段式 / I2VA·FL2VA 三段式 + 对齐指令）。仅当解析工作流 id 前缀为 minimax-h3- 时启用；其他模型回退自由格式。
+source: official-adapted
+source-original: https://github.com/MiniMax-AI/MiniMax-H3/tree/main/skills/h3-prompt-writing

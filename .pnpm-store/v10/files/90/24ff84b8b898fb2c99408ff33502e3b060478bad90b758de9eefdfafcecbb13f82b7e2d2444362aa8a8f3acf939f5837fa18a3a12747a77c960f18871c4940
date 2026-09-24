@@ -1,0 +1,10 @@
+# dsh-short-video-studio bundle patch: 把双面插件行插入 web profile roster。
+# 作为 profile bundle layer（dsh.bundle.patch 清单字段）套在 dsh-base 之上；
+# 安装：dsh plugin --profile web add file:<本包路径>
+#
+# 行为裸插件按包名：node 半（exports "."）跑在宿主进程（ComfyUI 引擎、
+# /dsh-short-video-studio 路由、Agent 工具），package.json 里的 dsh.client
+# 声明让浏览器半（exports "./client"）以 /plugins/<id>/client.js 载入 Web GUI。
+- insert:
+    - id: short-video-studio
+      name: 'dsh-short-video-studio'

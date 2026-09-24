@@ -1,0 +1,577 @@
+/* ---- 调色板：跟随 DSH 的浅色/深色 ----
+   本页跑在 iframe 里，**读不到宿主文档的 CSS 变量**，所以自带两套调色板，
+   由 <html data-theme> 选择（首屏由 index.html 的 inline 脚本按 ?theme= 定，
+   运行时由 app.js 收宿主的 postMessage 切换）。
+
+   两条硬规矩（由 scripts/smoke-canvas-theme.mjs 强制）：
+   1. 两个调色板块必须定义**完全相同**的变量名，否则切主题会「少一个变量」而静默变色；
+   2. **调色板块之外不得出现任何颜色字面量** —— 色值只在这里出现，
+      低透明度底色一律用 color-mix() 从语义色派生（DSH 自身也用这个写法）。
+   改了底色记得重跑 preview-canvas-theme.mjs：它用真浏览器按 WCAG 量对比度。 */
+:root {
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --panel-2: #eef1f5;
+  --border: #d7dbe2;
+  --text: #1f2329;
+  --muted: #5c6470;
+  --accent: #2f5fd0;
+  --accent-2: #5b3fd0;
+  --accent-ink: #1e46ad;
+  --on-accent: #0f1115;
+  --ok: #0d6b47;
+  --danger: #c02020;
+  --warn: #8a4a00;
+  --tag-character: #1e46ad;
+  --tag-scene: #0d6b47;
+  --tag-style: #8a4a00;
+  --media-bg: #000000;
+  /* 缩略图底色两套主题都是纯黑，占位文字因此不能借用 --muted
+     （浅色主题的 --muted 在黑底上只有 3.5:1，实测不达 AA）。这是与主题无关的「黑底前景色」。 */
+  --media-fg: #aab2bf;
+  --overlay: color-mix(in srgb, #0b0d12 45%, transparent);
+  --shadow-dialog: 0 16px 60px color-mix(in srgb, #0b0d12 25%, transparent);
+  --shadow-float: 0 4px 18px color-mix(in srgb, #0b0d12 20%, transparent);
+  --lane-bg: color-mix(in srgb, var(--panel-2) 55%, transparent);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #12141a;
+  --panel: #1b1e27;
+  --panel-2: #232734;
+  /* 比原来的 #2e3342 略亮一档：原值压在 --panel-2 上只有 1.18:1，
+     chip（.node-kind / .asset-tag / .lane-count）的 1px 边框几乎看不见。
+     由 smoke-canvas-theme 的「边框与底色可分」断言卡住。 */
+  --border: #363c4d;
+  --text: #e8eaf0;
+  --muted: #9aa1b1;
+  --accent: #5b8cff;
+  --accent-2: #7c5cff;
+  --accent-ink: #cfe0ff;
+  --on-accent: #ffffff;
+  --ok: #3ddc97;
+  --danger: #ff6b6b;
+  --warn: #ffb454;
+  --tag-character: #8ab6ff;
+  --tag-scene: #7ddc9f;
+  --tag-style: #ffb454;
+  --media-bg: #000000;
+  --media-fg: #aab2bf;
+  --overlay: color-mix(in srgb, #000000 55%, transparent);
+  --shadow-dialog: 0 16px 60px color-mix(in srgb, #000000 50%, transparent);
+  --shadow-float: 0 4px 18px color-mix(in srgb, #000000 40%, transparent);
+  --lane-bg: color-mix(in srgb, var(--panel) 45%, transparent);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+}
+
+body { display: flex; flex-direction: column; }
+
+/* 顶栏三块：A 品牌(.brand) / B 参数(.meta) / C 按钮(.topbar-bar)
+   宽 → 一行 A B C（B 是 flex:1，吃掉中间剩余空间把 C 推到右端）
+   窄 → 竖直 A B C
+   断点取 960px：三块的内容最小宽度大致是 品牌 ~110 + 参数 ~400 + 按钮 ~450 +
+   gap，再挤就会让参数在行内折成两三行、按钮贴到边缘，不如直接竖排。 */
+.topbar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+/* A 品牌：不参与收缩，也不许折行 */
+.brand { font-weight: 700; font-size: 15px; flex: none; white-space: nowrap; }
+/* B 参数：吃掉剩余空间（因此 C 靠右）；min-width:0 让它可收缩，break-word 兜底防长串
+   （节点多的工程那串「画幅… · 时长… · 节点 141（主线 35 · 抽帧 104 …）」）。
+   实测注意：当这一行的宽度**正好差几像素**装不下时（如盒 488.5 / 文 494.1），Chrome 会让
+   它溢出盒子而不是折行（换 anywhere / break-word / word-break / text-wrap 都不改变）。
+   溢出量落在 B 与 C 之间 10px 的间隙里，压不到按钮、也不会撑出页面横向滚动，故保留此行为；
+   回归断言量的是「不压到按钮 + 不撑破页面」，不是「严格不溢出」。 */
+.meta {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: break-word;
+}
+/* C 按钮 */
+.topbar-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+@media (max-width: 960px) {
+  /* 竖直 A B C：各占一行，谁都不挤谁 */
+  .topbar { flex-direction: column; align-items: stretch; }
+  .brand { white-space: normal; }
+  /* 按钮在自己这一行内换行 */
+  .topbar-bar { flex-wrap: wrap; min-width: 0; }
+}
+
+.btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: .5; cursor: default; }
+
+/* 顶栏手动添加资产（上传 / 资产库）*/
+.btn-accent {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--accent-2) 16%, transparent));
+  color: var(--accent-ink);
+}
+.btn-accent:hover { border-color: var(--accent); color: var(--on-accent); }
+
+/* ---- 自绘对话框（上传分组 / 资产库取用） ---- */
+.dialog-host {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--overlay);
+  z-index: 9999;
+  padding: 20px;
+  font-family: inherit;
+}
+.dialog {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: min(760px, 94vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-dialog);
+}
+.dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.dialog-x { margin-left: auto; }
+.dialog-body { padding: 14px 16px; overflow: auto; }
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  flex: none;
+  flex-wrap: wrap;
+}
+.dialog-body .field-label { display: block; margin: 10px 0 6px; color: var(--muted); font-size: 12.5px; }
+.dialog-body input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.dialog-body input[type="text"]:focus { outline: none; border-color: var(--accent); }
+.file-list { margin: 0; padding-left: 20px; max-height: 110px; overflow: auto; font-size: 12.5px; color: var(--muted); }
+.file-list li { margin: 1px 0; }
+.form-note { margin: 10px 0 0; font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+/* 资产库缩略图网格 */
+/* 最小列宽 190px 是量出来的：168px 时卡片 172.5px，扣掉内边距与「删除」只够 92.5px，
+   「＋ 加入画布」会被挤成两行（实测行数 2）。190px 起主按钮有 ~112px，单行放得下。
+   窄视口（如右侧栏 360px）会自动退化成单列，卡片更宽，不会反过来溢出。 */
+.asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.asset-group-title {
+  grid-column: 1 / -1;
+  margin: 6px 0 0;
+  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-bottom: 1px dashed var(--border);
+}
+.asset-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.asset-card .thumb {
+  position: relative; /* 视频角标 .kind-badge 以此为定位基准 */
+  background: var(--media-bg);
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.asset-card .thumb img { max-width: 100%; max-height: 130px; object-fit: contain; }
+.asset-card .thumb .missing { color: var(--media-fg); font-size: 12px; }
+.asset-card .info { padding: 8px 10px; flex: 1; }
+.asset-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.asset-tag.character { color: var(--tag-character); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.asset-tag.scene { color: var(--tag-scene); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.asset-tag.style { color: var(--tag-style); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+.asset-tag.clip { color: var(--tag-character); border-color: color-mix(in srgb, var(--accent-2) 45%, transparent); }
+.asset-tag.text { color: var(--muted); border-color: var(--border); }
+/* 视频缩略图：占位尺寸与图片一致，右上角挂一个载体角标 */
+.asset-card .thumb video { max-width: 100%; max-height: 130px; object-fit: contain; }
+.asset-card .thumb .kind-badge {
+  position: absolute; top: 6px; right: 6px;
+  font-size: 10px; line-height: 1; padding: 3px 5px; border-radius: 4px;
+  color: var(--text); background: color-mix(in srgb, var(--bg) 75%, transparent);
+  border: 1px solid var(--border);
+}
+/* 文本资产没有缩略图：显示正文摘要（左对齐、可折行、最多几行） */
+.asset-card .thumb .text-preview {
+  font-size: 11px; line-height: 1.5; color: var(--muted);
+  padding: 8px 10px; text-align: left; overflow: hidden; width: 100%;
+  display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+.asset-card .name { font-weight: 600; font-size: 13px; word-break: break-all; }
+.asset-card .id { font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace; word-break: break-all; margin-top: 2px; }
+.asset-card .actions { display: flex; gap: 6px; padding: 0 10px 10px; }
+/* nowrap：宁可让浏览器压缩字距，也不要「＋ 加入画布」断成两行（见上面列宽说明） */
+.asset-card .actions .btn { flex: 1; white-space: nowrap; }
+.asset-card .actions .btn-danger { flex: 0 0 auto; }
+.btn-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.lib-empty-hint { color: var(--muted); text-align: center; line-height: 1.8; padding: 26px 10px; }
+/* 表单里的说明性小字（入库表单：载体对应的复用方式） */
+.svs-hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 2px 0 0; }
+
+.empty-actions { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
+
+/* 跟随最新模式 checkbox */
+.follow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s, box-shadow .15s;
+}
+.follow input { margin: 0; accent-color: var(--accent); cursor: pointer; }
+.follow:hover { border-color: var(--accent); color: var(--text); }
+.follow.on {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ok) 25%, transparent);
+}
+
+.canvas {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.group {}
+.group-title {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0 0 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+}
+
+.node {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.node-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.node-kind {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+.node-title { flex: 1; font-weight: 600; }
+.status { font-size: 11px; padding: 2px 8px; border-radius: 20px; }
+.status.ready { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.status.failed { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.status.pending { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.node-id { font-size: 10px; color: var(--muted); font-family: ui-monospace, monospace; }
+
+.node-body { padding: 12px 14px; }
+
+.media { display: block; max-width: 100%; border-radius: 8px; background: var(--media-bg); }
+video.media { max-height: 420px; }
+
+.text-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+  line-height: 1.55;
+  max-height: 360px;
+  overflow: auto;
+}
+/* markdown 渲染结果（studio/markdown.js） */
+.text-content h1, .text-content h2, .text-content h3, .text-content h4 {
+  margin: 10px 0 6px;
+  line-height: 1.35;
+  color: var(--text);
+}
+.text-content h1 { font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.text-content h2 { font-size: 14px; }
+.text-content h3, .text-content h4 { font-size: 13px; }
+.text-content p { margin: 6px 0; }
+.text-content ul, .text-content ol { margin: 6px 0; padding-left: 22px; }
+.text-content li { margin: 2px 0; }
+.text-content pre {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  white-space: pre;
+  font-size: 12px;
+}
+.text-content code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.92em;
+  background: var(--panel-2);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.text-content pre code { background: none; padding: 0; }
+.text-content blockquote {
+  border-left: 3px solid var(--border);
+  margin: 8px 0;
+  padding: 2px 10px;
+  color: var(--muted);
+}
+.text-content strong { font-weight: 600; }
+.text-content table { margin: 8px 0; }
+textarea.edit {
+  width: 100%;
+  min-height: 200px;
+  resize: vertical;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  font-family: ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+table.node-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.node-table th, .node-table td {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.node-table th { background: var(--panel-2); color: var(--muted); font-weight: 600; }
+
+.node-actions { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.node-actions select, .node-actions input[type="text"] {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.node-actions .group-input { width: 140px; }
+.node-actions .spacer { flex: 1; }
+
+.params { color: var(--muted); font-size: 11px; margin-top: 8px; font-family: ui-monospace, monospace; word-break: break-all; }
+
+.empty { text-align: center; color: var(--muted); padding: 60px 20px; }
+.empty h2 { color: var(--text); font-size: 16px; }
+.empty code { background: var(--panel-2); padding: 2px 6px; border-radius: 4px; }
+
+.error-line { color: var(--danger); font-size: 12px; }
+
+/* ---- 主线优先：页尾折叠收纳区（作废/否定 · 抽帧/检查帧） ---- */
+.lane {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--lane-bg);
+  overflow: hidden;
+}
+.lane > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+.lane > summary::-webkit-details-marker { display: none; }
+.lane > summary:hover { color: var(--text); background: var(--panel-2); }
+.lane[open] > summary {
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent);
+}
+.lane-icon { font-size: 13px; }
+.lane-count {
+  margin-left: auto;
+  font-size: 11px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  padding: 1px 8px;
+  border-radius: 20px;
+  color: var(--muted);
+}
+.lane-body { padding: 10px 12px 2px; }
+.lane-body .node { margin-bottom: 10px; }
+.lane-discard > summary { color: var(--warn); }
+.lane-frames > summary { color: var(--accent); }
+
+/* 作废卡片：整体降噪，标题划线，chip 琥珀色 */
+.node.deprecated { opacity: .6; filter: saturate(.4); }
+.node.deprecated .node-title { text-decoration: line-through; text-decoration-color: var(--muted); }
+.status.deprecated { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+
+/* ---- 悬浮 top/bottom 按钮 ---- */
+.jump-btn {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  display: none;
+  appearance: none;
+  border: 1px solid var(--accent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 28%, transparent), color-mix(in srgb, var(--accent-2) 24%, transparent));
+  color: var(--text);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: .03em;
+  border-radius: 999px;
+  padding: 9px 15px;
+  cursor: pointer;
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(4px);
+}
+.jump-btn.show { display: inline-block; }
+.jump-btn:hover { border-color: var(--on-accent); }
+
+/* 定位最新主线节点时的卡片闪烁 */
+@keyframes node-flash {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  25% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 50%, transparent); border-color: var(--accent); }
+  70% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 12%, transparent); border-color: var(--accent); }
+}
+.node.flash { animation: node-flash 1.3s ease; }
+
+/* ---- iframe 内自绘的小模态（app.js 的 modal / assetRegisterBox）----
+   这两处原先写的是白色内联样式，深色主题下会跳出一块白板；改走调色板。 */
+.svs-modal-host {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--overlay);
+  z-index: 9999;
+  font-family: inherit;
+  padding: 20px;
+}
+.svs-modal {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  min-width: 280px;
+  max-width: 420px;
+  box-shadow: var(--shadow-dialog);
+  font-size: 14px;
+}
+.svs-modal.lg { min-width: 300px; }
+.svs-modal p { margin: 0 0 14px; white-space: pre-wrap; line-height: 1.5; word-break: break-word; }
+.svs-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.svs-field-label { margin-bottom: 6px; color: var(--muted); }
+.svs-field {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 14px;
+}

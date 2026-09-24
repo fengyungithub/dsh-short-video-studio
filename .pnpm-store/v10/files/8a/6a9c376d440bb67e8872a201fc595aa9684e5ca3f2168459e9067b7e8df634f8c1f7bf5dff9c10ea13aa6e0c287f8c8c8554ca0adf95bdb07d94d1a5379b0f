@@ -1,0 +1,40 @@
+{
+  "family": "qwen-image-21-i2i",
+  "capability": "image.image2image",
+  "displayName": "Qwen-Image 2.1 图生图（参考图改绘）",
+  "description": "本地 Qwen-Image 2.1 参考图改绘：参考图经 TextEncodeQwenImage21 同时喂给视觉塔与 VAE 潜空间（reference_latents），prompt 描述改动（换装 / 改背景 / 风格迁移 / 构图微调）。图结构对应 ComfyUI 官方模板 image_qwen_image_2_1_image_edit。",
+  "note": "需要 ComfyUI ≥ v0.37.0（TextEncodeQwenImage21 / QwenImage21Cache）。**输出尺寸跟随第一张参考图**（显式 width/height 不注入）：节点按本档「参考图预算」等比缩放参考图（32 对齐），latent 与该尺寸一致。预算 768/1056/2048 ⇒ **quality 档可出 2K 改绘**。resolution=1056 一档是官方模板起步值 0 与 1024/1536 网格上有锐化噪点/指令失效的已知 issue（ComfyUI #16435，未修复）的规避值。图上最多 10 张参考图（image_1 是编辑目标，其余为参考），prompt 里用 <image1>…<image10> 指代。QwenImage21Cache 把「文本+参考图前缀」KV cache 量化到 int8。cfg 固定 1。",
+  "requiresNodes": ["TextEncodeQwenImage21", "QwenImage21Cache"],
+  "output": { "mediaType": "image", "hasAudio": false },
+  "modelNode": "1",
+  "assets": {
+    "unet": { "kind": "checkpoint", "default": "qwen_image_2.1_int8_convrot.safetensors", "env": "DSH_SVS_QWEN21_UNET", "label": "Qwen-Image 2.1 UNet" },
+    "clip": { "kind": "clip", "default": "qwen3vl_8b_int8_convrot.safetensors", "env": "DSH_SVS_QWEN21_CLIP", "label": "Qwen3-VL 8B 文本编码器" },
+    "vae": { "kind": "vae", "default": "qwen_image_2.1_vae_bf16.safetensors", "env": "DSH_SVS_QWEN21_VAE", "label": "Qwen-Image 2.1 VAE" }
+  },
+  "graph": {
+    "1": { "class_type": "UNETLoader", "inputs": { "unet_name": "$assets.unet", "weight_dtype": "default" } },
+    "2": { "class_type": "CLIPLoader", "inputs": { "clip_name": "$assets.clip", "type": "qwen_image", "device": "default" } },
+    "3": { "class_type": "VAELoader", "inputs": { "vae_name": "$assets.vae" } },
+    "4": { "class_type": "QwenImage21Cache", "inputs": { "model": ["$model", 0], "device": "auto", "dtype": "int8" } },
+    "5": { "class_type": "TextEncodeQwenImage21", "inputs": { "clip": ["2", 0], "vae": ["3", 0], "prompt": null, "negative_prompt": "", "resolution": 1056 } },
+    "6": { "class_type": "KSampler", "inputs": { "seed": null, "steps": null, "cfg": 1, "sampler_name": "euler", "scheduler": "simple", "denoise": 1, "model": ["4", 0], "positive": ["5", 0], "negative": ["5", 1], "latent_image": ["5", 2] } },
+    "7": { "class_type": "VAEDecode", "inputs": { "samples": ["6", 0], "vae": ["3", 0] } },
+    "8": { "class_type": "SaveImage", "inputs": { "images": ["7", 0], "filename_prefix": null } }
+  },
+  "params": {
+    "prompt": { "inject": "scalar", "to": { "node": "5", "field": "prompt" } },
+    "seed": { "inject": "scalar", "to": { "node": "6", "field": "seed" } },
+    "steps": { "inject": "scalar", "to": { "node": "6", "field": "steps" } },
+    "prefix": { "inject": "scalar", "to": { "node": "8", "field": "filename_prefix" } },
+    "refs": { "inject": "image", "via": "node", "node": "LoadImage", "to": { "node": "5", "field": "images.image_${i+1}" }, "max": 10 }
+  },
+  "refTarget": { "node": "5", "field": "resolution", "param": "reference_pixels", "unit": "side" },
+  "refBudget": { "fast": 589824, "balanced": 1115136, "quality": 4194304 },
+  "tiers": {
+    "fast": { "steps": 20, "estSeconds": 4, "label": "调试 768 预算" },
+    "balanced": { "steps": 30, "estSeconds": 8, "label": "日常 1056 预算" },
+    "quality": { "steps": 40, "estSeconds": 60, "label": "成片 2K 预算" }
+  },
+  "constraints": { "aspectRatios": [] }
+}

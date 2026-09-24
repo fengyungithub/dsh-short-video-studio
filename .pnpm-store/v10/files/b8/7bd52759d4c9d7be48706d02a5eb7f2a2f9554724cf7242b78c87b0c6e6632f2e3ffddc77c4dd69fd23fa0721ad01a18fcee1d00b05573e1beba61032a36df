@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>短视频画布</title>
+  <script>
+    /* 首屏前定主题，避免「先闪一下浅色再变深色」。
+       宿主（lib/client.js）把 DSH 当前的浅/深写进 ?theme=；没有该参数时（宿主没装主题服务，
+       或本页被单独打开）退回系统偏好。运行中宿主切换主题由 app.js 的 message 监听接手。 */
+    (function () {
+      var t = null
+      try { t = new URLSearchParams(location.search).get('theme') } catch (e) {}
+      if (t !== 'light' && t !== 'dark') {
+        t = (typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'
+      }
+      document.documentElement.setAttribute('data-theme', t)
+    })()
+  </script>
+  <link rel="stylesheet" href="./app.css?v=8">
+</head>
+<body>
+  <script>window.__DSH_SVS_TOKEN__ = "__DSH_SVS_TOKEN_VALUE__";</script>
+  <header class="topbar">
+    <!-- 三块内容：A = 品牌、B = 工程参数、C = 按钮。
+         响应式规则（app.css 的 .topbar）：
+           宽 → 一行 A B C（B 吃掉中间剩余空间，C 靠右）
+           窄 → 竖直 A B C（右侧面板 ~360px 时各占一行，互不挤压）
+         DOM 顺序就是 A B C，横竖两种排法都不需要 order 覆盖。 -->
+    <div class="brand">🎬 短视频画布</div>
+    <div class="meta" id="meta"></div>
+    <div class="topbar-bar">
+      <button class="btn btn-accent" id="add-upload" type="button" title="从本机选择图片（png/jpg/webp/gif，可多选），直接成为画布上的角色卡/场景卡等资产">＋ 上传图片</button>
+      <button class="btn" id="add-assets" type="button" title="把已入库的跨会话资产（角色/场景/风格锚点）取到当前画布">📚 资产库</button>
+      <label class="follow" id="follow-toggle" title="勾选后：进入画布自动定位到最新主线节点；Agent 对话期间新增主线节点会自动滚动跟随（按会话记忆勾选状态）">
+        <input type="checkbox" id="autofollow">
+        <span>跟随最新</span>
+      </label>
+      <button class="btn" id="locate" type="button" title="定位到最新主线节点（主线资产优先展示）">📍 最新主线</button>
+      <button class="btn" id="refresh" type="button">刷新</button>
+    </div>
+  </header>
+  <main id="canvas" class="canvas"></main>
+  <button id="jump" class="jump-btn" type="button" title="返回顶端">↑ TOP</button>
+  <script type="module" src="./app.js?v=8"></script>
+</body>
+</html>

@@ -1,0 +1,276 @@
+{
+  "id": "flux-text2image-quality",
+  "version": 1,
+  "capability": "image.text2image",
+  "runner": "comfyui",
+  "displayName": "FLUX 2 文生图（成片 2K）",
+  "description": "本地 FLUX 2 dev 文生图（flux2_dev）。图结构与旧 buildFluxImageWorkflow 等价；三档只差长边与步数。",
+  "note": "档位差异只有「长边 + 步数」：fast 1MP 调试、balanced 1344 日常、quality 2048 成片。分辨率按**画布 aspectRatio × 本档长边**推导（snap32），显式 width/height 可覆盖；只传一边时另一边按画布比例补出来。",
+  "tier": "quality",
+  "group": "flux-text2image",
+  "estSeconds": 45,
+  "output": {
+    "mediaType": "image",
+    "hasAudio": false
+  },
+  "modelNode": "1",
+  "assets": {
+    "unet": {
+      "kind": "checkpoint",
+      "default": "flux2_dev_fp8mixed.safetensors",
+      "env": "DSH_SVS_FLUX_MODEL",
+      "label": "FLUX UNet"
+    },
+    "clip": {
+      "kind": "clip",
+      "default": "mistral_3_small_flux2_bf16.safetensors",
+      "env": "DSH_SVS_FLUX_CLIP",
+      "label": "FLUX CLIP"
+    },
+    "vae": {
+      "kind": "vae",
+      "default": "flux2-vae.safetensors",
+      "env": "DSH_SVS_FLUX_VAE",
+      "label": "FLUX VAE"
+    }
+  },
+  "graph": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "$assets.unet",
+        "weight_dtype": "default"
+      }
+    },
+    "2": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "$assets.clip",
+        "type": "flux2"
+      }
+    },
+    "3": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "$assets.vae"
+      }
+    },
+    "4": {
+      "class_type": "ModelSamplingFlux",
+      "inputs": {
+        "model": [
+          "$model",
+          0
+        ],
+        "max_shift": 1.15,
+        "base_shift": 0.5,
+        "width": null,
+        "height": null
+      }
+    },
+    "5": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": null,
+        "clip": [
+          "2",
+          0
+        ]
+      }
+    },
+    "6": {
+      "class_type": "EmptyFlux2LatentImage",
+      "inputs": {
+        "width": null,
+        "height": null,
+        "batch_size": 1
+      }
+    },
+    "7": {
+      "class_type": "Flux2Scheduler",
+      "inputs": {
+        "steps": null,
+        "width": null,
+        "height": null
+      }
+    },
+    "8": {
+      "class_type": "RandomNoise",
+      "inputs": {
+        "noise_seed": null
+      }
+    },
+    "9": {
+      "class_type": "BasicGuider",
+      "inputs": {
+        "model": [
+          "4",
+          0
+        ],
+        "conditioning": [
+          "5b",
+          0
+        ]
+      }
+    },
+    "10": {
+      "class_type": "KSamplerSelect",
+      "inputs": {
+        "sampler_name": "euler"
+      }
+    },
+    "11": {
+      "class_type": "SamplerCustomAdvanced",
+      "inputs": {
+        "noise": [
+          "8",
+          0
+        ],
+        "guider": [
+          "9",
+          0
+        ],
+        "sampler": [
+          "10",
+          0
+        ],
+        "sigmas": [
+          "7",
+          0
+        ],
+        "latent_image": [
+          "6",
+          0
+        ]
+      }
+    },
+    "12": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "11",
+          0
+        ],
+        "vae": [
+          "3",
+          0
+        ]
+      }
+    },
+    "13": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "12",
+          0
+        ],
+        "filename_prefix": null
+      }
+    },
+    "5b": {
+      "class_type": "FluxGuidance",
+      "inputs": {
+        "conditioning": [
+          "5",
+          0
+        ],
+        "guidance": null
+      }
+    }
+  },
+  "params": {
+    "prompt": {
+      "inject": "scalar",
+      "to": {
+        "node": "5",
+        "field": "text"
+      }
+    },
+    "width": {
+      "inject": "scalar",
+      "to": [
+        {
+          "node": "4",
+          "field": "width"
+        },
+        {
+          "node": "6",
+          "field": "width"
+        },
+        {
+          "node": "7",
+          "field": "width"
+        }
+      ]
+    },
+    "height": {
+      "inject": "scalar",
+      "to": [
+        {
+          "node": "4",
+          "field": "height"
+        },
+        {
+          "node": "6",
+          "field": "height"
+        },
+        {
+          "node": "7",
+          "field": "height"
+        }
+      ]
+    },
+    "seed": {
+      "inject": "scalar",
+      "to": {
+        "node": "8",
+        "field": "noise_seed"
+      }
+    },
+    "steps": {
+      "inject": "scalar",
+      "to": {
+        "node": "7",
+        "field": "steps"
+      }
+    },
+    "guidance": {
+      "inject": "scalar",
+      "to": {
+        "node": "5b",
+        "field": "guidance"
+      }
+    },
+    "prefix": {
+      "inject": "scalar",
+      "to": {
+        "node": "13",
+        "field": "filename_prefix"
+      }
+    }
+  },
+  "modes": {
+    "quality": {
+      "steps": 25,
+      "longSide": 2048
+    }
+  },
+  "resolution": {
+    "policy": "aspect-ratio",
+    "snap": 32,
+    "longSide": 2048,
+    "default": [
+      2048,
+      1152
+    ]
+  },
+  "constraints": {
+    "aspectRatios": [
+      "16:9",
+      "9:16",
+      "1:1",
+      "4:3",
+      "3:2"
+    ]
+  }
+}

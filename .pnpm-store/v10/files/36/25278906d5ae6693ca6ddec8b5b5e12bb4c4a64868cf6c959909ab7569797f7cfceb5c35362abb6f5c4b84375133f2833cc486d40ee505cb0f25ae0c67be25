@@ -1,0 +1,6 @@
+# dsh-short-video-studio 安装标记
+# 本目录由插件安装逻辑分发：内容未被修改时会随插件升级自动刷新；
+# 一旦内容哈希与安装记录不符（= 用户改过），插件不再覆盖，只在日志里提示。
+# 来源：dsh-short-video-studio bundled skill（官方 brand-promo-video-generator 适配版）
+name: brand-promo-video-generator
+source: bundled
