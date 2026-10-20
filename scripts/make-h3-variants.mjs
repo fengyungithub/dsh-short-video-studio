@@ -67,40 +67,57 @@ const VARIANTS = [
   // ref2v ───────────────────────────────────────────────────────────────────
   { out: 'minimax-h3-ref2v-fast', group: GROUP_REF2V, tier: 'fast', template: 'minimax-h3-ref2v.json', mode: 'fast', estSeconds: 24.6, note: '4 步 LoRA · 长边 832 · 实测 24.6s' },
   { out: 'minimax-h3-ref2v-balanced', group: GROUP_REF2V, tier: 'balanced', template: 'minimax-h3-ref2v-8step.json', mode: 'balanced', estSeconds: 166.3, note: '8 步 768p LoRA · shift 6/3 · euler · 实测 166.3s' },
-  { out: 'minimax-h3-ref2v-balanced-sol', group: GROUP_REF2V, tier: 'balanced', accel: 'sol', template: 'minimax-h3-ref2v-8step-sol.json', mode: 'balanced', estSeconds: 136.3, note: 'Sol-Attn 加速 · 实测 136.3s（1.23×，tau 1.2）' },
+  { out: 'minimax-h3-ref2v-balanced-sol', group: GROUP_REF2V, tier: 'balanced', accel: 'sol', deprecated: '第三方 Sol-Attn 在 ComfyUI 0.35+（cudaMallocAsync）上会在 cuMemFreeAsync 处 abort 并带崩整机（docs/minimax-h3-acceleration-lora.md §9.10；2026-10-20 在 0.42.1 上再次复现），改用原生 BlockSparseAttention 清单（minimax-h3-ref2v-ctx-balanced-pdd-solattn / i2v 同名）。', template: 'minimax-h3-ref2v-8step-sol.json', mode: 'balanced', estSeconds: 136.3, note: 'Sol-Attn 加速 · 实测 136.3s（1.23×，tau 1.2）' },
   { out: 'minimax-h3-ref2v-quality', group: GROUP_REF2V, tier: 'quality', template: 'minimax-h3-ref2v.json', mode: 'quality', estSeconds: 396.6, note: '20 步 · 实测 396.6s' },
-  { out: 'minimax-h3-ref2v-quality-sol', group: GROUP_REF2V, tier: 'quality', accel: 'sol', template: 'minimax-h3-ref2v-sol.json', mode: 'quality', estSeconds: 311.2, note: 'Sol-Attn 加速 · 实测 311.2s（1.27×）' },
+  { out: 'minimax-h3-ref2v-quality-sol', group: GROUP_REF2V, tier: 'quality', accel: 'sol', deprecated: '第三方 Sol-Attn 在 ComfyUI 0.35+（cudaMallocAsync）上会在 cuMemFreeAsync 处 abort 并带崩整机（docs/minimax-h3-acceleration-lora.md §9.10；2026-10-20 在 0.42.1 上再次复现），改用原生 BlockSparseAttention 清单（minimax-h3-ref2v-ctx-balanced-pdd-solattn / i2v 同名）。', template: 'minimax-h3-ref2v-sol.json', mode: 'quality', estSeconds: 311.2, note: 'Sol-Attn 加速 · 实测 311.2s（1.27×）' },
   // i2v balanced（2026 补齐）：历史上缺的是**清单**不是资产——本机早有 fl2v 8 步 LoRA，
   // 但那是 **544p 版**（配对 shift 12/3），跑不了 1344；补齐时下载了 **768p 版**
   // （`minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16`，配对 shift 6/3），并**另建模板**
   // `minimax-h3-i2v-8step.json`（shift 与 LoRA 必须配对，见 docs §2.1）——不是改现有 i2v 清单。
   { out: 'minimax-h3-i2v-fast', group: GROUP_I2V, tier: 'fast', template: 'minimax-h3-i2v.json', mode: 'fast', estSeconds: 26.1, note: '4 步 LoRA · 长边 832 · 实测 26.1s' },
   { out: 'minimax-h3-i2v-balanced', group: GROUP_I2V, tier: 'balanced', template: 'minimax-h3-i2v-8step.json', mode: 'balanced', estSeconds: 177, note: '8 步 fl2v 768p LoRA（shift 6/3 + euler）· 实测 177.3s' },
-  { out: 'minimax-h3-i2v-balanced-sol', group: GROUP_I2V, tier: 'balanced', accel: 'sol', template: 'minimax-h3-i2v-8step-sol.json', mode: 'balanced', estSeconds: 131, note: 'Sol-Attn 加速 · 实测 130.5s（1.36×，tau 1.2）' },
+  { out: 'minimax-h3-i2v-balanced-sol', group: GROUP_I2V, tier: 'balanced', accel: 'sol', deprecated: '第三方 Sol-Attn 在 ComfyUI 0.35+（cudaMallocAsync）上会在 cuMemFreeAsync 处 abort 并带崩整机（docs/minimax-h3-acceleration-lora.md §9.10；2026-10-20 在 0.42.1 上再次复现），改用原生 BlockSparseAttention 清单（minimax-h3-ref2v-ctx-balanced-pdd-solattn / i2v 同名）。', template: 'minimax-h3-i2v-8step-sol.json', mode: 'balanced', estSeconds: 131, note: 'Sol-Attn 加速 · 实测 130.5s（1.36×，tau 1.2）' },
   { out: 'minimax-h3-i2v-quality', group: GROUP_I2V, tier: 'quality', template: 'minimax-h3-i2v.json', mode: 'quality', estSeconds: 394.8, note: '20 步 · 实测 394.8s' },
-  { out: 'minimax-h3-i2v-quality-sol', group: GROUP_I2V, tier: 'quality', accel: 'sol', template: 'minimax-h3-i2v-sol.json', mode: 'quality', estSeconds: 314.7, note: 'Sol-Attn 加速 · 实测 314.7s（1.25×）' },
+  { out: 'minimax-h3-i2v-quality-sol', group: GROUP_I2V, tier: 'quality', accel: 'sol', deprecated: '第三方 Sol-Attn 在 ComfyUI 0.35+（cudaMallocAsync）上会在 cuMemFreeAsync 处 abort 并带崩整机（docs/minimax-h3-acceleration-lora.md §9.10；2026-10-20 在 0.42.1 上再次复现），改用原生 BlockSparseAttention 清单（minimax-h3-ref2v-ctx-balanced-pdd-solattn / i2v 同名）。', template: 'minimax-h3-i2v-sol.json', mode: 'quality', estSeconds: 314.7, note: 'Sol-Attn 加速 · 实测 314.7s（1.25×）' },
   // PDD（2026 引入）：8 步 nfe=8 就能达到 20 步成片档的细节量，成本约 185s（≈ 2.1× 提速）。
   // priority 为负 = **不做隐式默认**（依赖第三方节点 MiniMaxH3PDDAccApply，须用户显式选策略）。
   { out: 'minimax-h3-ref2v-balanced-pdd', group: GROUP_REF2V, tier: 'balanced', priority: -30, template: 'minimax-h3-pdd-ref2v.json', mode: 'balanced', estSeconds: 185, note: 'PDD nfe=8 · shift 12/3 · euler · 实测 184.7s（细节量高于 20 步成片档）' },
   { out: 'minimax-h3-i2v-balanced-pdd', group: GROUP_I2V, tier: 'balanced', priority: -30, template: 'minimax-h3-pdd-i2v.json', mode: 'balanced', estSeconds: 179, note: 'PDD nfe=8 · shift 12/3 · euler · 实测 178.8s（细节量高于 20 步成片档）' },
   // PDD 组内的第二个策略：叠 Sol-Attn（Sol 只改注意力，PDD 的 sigma 网格与 head bank 不受影响）。
   // 实测 ref2v：184.7s → 137.3s（1.35×），细节量从"高于 20 步成片档"回落到"与成片档持平"。
-  { out: 'minimax-h3-ref2v-balanced-pdd-sol', group: GROUP_REF2V, tier: 'balanced', accel: 'sol', accelOf: 'minimax-h3-ref2v-balanced-pdd', priority: -30, template: 'minimax-h3-pdd-ref2v-sol.json', mode: 'balanced', estSeconds: 137, note: 'PDD + Sol-Attn（tau 1.2）· 实测 137.3s（对 PDD 单独 1.35×；细节量仍与 20 步成片档持平）' },
-  { out: 'minimax-h3-i2v-balanced-pdd-sol', group: GROUP_I2V, tier: 'balanced', accel: 'sol', accelOf: 'minimax-h3-i2v-balanced-pdd', priority: -30, template: 'minimax-h3-pdd-i2v-sol.json', mode: 'balanced', estSeconds: 134, note: 'PDD + Sol-Attn（tau 1.2）· 实测 134.1s（对 PDD 单独 1.33×）' },
+  { out: 'minimax-h3-ref2v-balanced-pdd-sol', group: GROUP_REF2V, tier: 'balanced', accel: 'sol', accelOf: 'minimax-h3-ref2v-balanced-pdd', priority: -30, deprecated: '第三方 Sol-Attn 在 ComfyUI 0.35+（cudaMallocAsync）上会在 cuMemFreeAsync 处 abort 并带崩整机（docs/minimax-h3-acceleration-lora.md §9.10；2026-10-20 在 0.42.1 上再次复现），改用原生 BlockSparseAttention 清单（minimax-h3-ref2v-ctx-balanced-pdd-solattn / i2v 同名）。', template: 'minimax-h3-pdd-ref2v-sol.json', mode: 'balanced', estSeconds: 137, note: 'PDD + Sol-Attn（tau 1.2）· 实测 137.3s（对 PDD 单独 1.35×；细节量仍与 20 步成片档持平）' },
+  { out: 'minimax-h3-i2v-balanced-pdd-sol', group: GROUP_I2V, tier: 'balanced', accel: 'sol', accelOf: 'minimax-h3-i2v-balanced-pdd', priority: -30, deprecated: '第三方 Sol-Attn 在 ComfyUI 0.35+（cudaMallocAsync）上会在 cuMemFreeAsync 处 abort 并带崩整机（docs/minimax-h3-acceleration-lora.md §9.10；2026-10-20 在 0.42.1 上再次复现），改用原生 BlockSparseAttention 清单（minimax-h3-ref2v-ctx-balanced-pdd-solattn / i2v 同名）。', template: 'minimax-h3-pdd-i2v-sol.json', mode: 'balanced', estSeconds: 134, note: 'PDD + Sol-Attn（tau 1.2）· 实测 134.1s（对 PDD 单独 1.33×）' },
   // 链式续接（R3）：与上面同档同模型，只是把「上一镜」接进来。
   // estSeconds 口径同各档（多采样的 22 帧会被裁掉，实测与不带续接同档几乎同价：fast 实测 50.8s vs 50.1s）。
   { out: 'minimax-h3-ref2v-ctx-fast', group: GROUP_REF2V_CTX, tier: 'fast', priority: -100, template: 'minimax-h3-ref2v-ctx.json', mode: 'fast', estSeconds: 26, note: '链式续接 · 4 步 LoRA · 长边 832 · 实测接缝：画面 MAD 7.2（无续接对照 62.8）· 采样多 22 帧后裁掉' },
   { out: 'minimax-h3-ref2v-ctx-balanced', group: GROUP_REF2V_CTX, tier: 'balanced', priority: -100, template: 'minimax-h3-ref2v-8step-ctx.json', mode: 'balanced', estSeconds: 170, note: '链式续接 · 8 步 768p LoRA · shift 6/3 · euler · 采样多 22 帧后裁掉' },
   { out: 'minimax-h3-ref2v-ctx-balanced-pdd', group: GROUP_REF2V_CTX, tier: 'balanced', priority: -100, template: 'minimax-h3-pdd-ref2v-ctx.json', mode: 'balanced', estSeconds: 190, note: '链式续接 · PDD nfe=8 · 细节量高于 20 步成片档 · 采样多 22 帧后裁掉' },
+  // 原生块稀疏（2026-10 引入）：ComfyUI 0.42 起内置 `BlockSparseAttention`（sol-attn / sla / vsa），
+  // 走 comfy_kitchen 的 CUDA 扩展 —— 与第三方 `SolAttnMiniMaxH3`（torch.compile(flex_attention)）是**两套实现**。
+  // 第三方那套在 0.35+ 的 cudaMallocAsync 上会 `cuMemFreeAsync` abort（§9.10，2026-10-20 在 0.37.2/0.42.1 各复现一次），
+  // 而原生这套实测稳定：PDD+ctx 176.0s → 112.2s（1.57×）。
+  // priority -55：高于同组 -100，也高于 2K 放大族的 -60 —— 否则「带 continuity_from 的 balanced 请求」会默认落到
+  // 1200s 的 `…-ctx-balanced-2k`（放大族本该是显式选用，却被 chainOnly 的 priority 排序抢先）。
+  // 仍远低于普通实现（0）⇒ 不做**普通生成**的隐式默认，只有 chainOnly 时才会被优先选中。
+  { out: 'minimax-h3-ref2v-ctx-balanced-pdd-solattn', group: GROUP_REF2V_CTX, tier: 'balanced', accel: 'solattn', accelOf: 'minimax-h3-ref2v-ctx-balanced-pdd', priority: -55, template: 'minimax-h3-pdd-ref2v-ctx-solattn.json', mode: 'balanced', estSeconds: 112.7, note: '链式续接 · PDD nfe=8 + 原生 BlockSparseAttention(sol-attn, tau 1.0) · 实测 112.7s（t2 seed 均值；对 PDD+ctx 163–176s 为 1.45–1.57×）· 画质：tau 1.0 比 1.3 更接近基线（MAD 7.6 vs 10.2）· sink_conditioning=exact_kv_and_rows 保住文本/音频前缀 · 采样多 22 帧后裁掉' },
+  // quality 的原生块稀疏（非 PDD 路径：20 步 base + ctx + BlockSparseAttention）。
+  // priority -55 高于 2K 放大族的 -60 ⇒ 续接 quality 默认走它，而不是默认落到 1200s+ 的 2K 实现。
+  { out: 'minimax-h3-ref2v-ctx-quality-solattn', group: GROUP_REF2V_CTX, tier: 'quality', accel: 'solattn', accelOf: 'minimax-h3-ref2v-ctx-quality', priority: -55, template: 'minimax-h3-ref2v-ctx-solattn.json', mode: 'quality', estSeconds: 253.8, note: '链式续接 · 20 步 + 原生 BlockSparseAttention(sol-attn, tau 1.0) · 实测 253.8s（对 ctx-quality 379.1s 为 1.49×）· 画质 MAD 9.66 / PSNR 22.95 dB · sink_conditioning=exact_kv_and_rows · 采样多 22 帧后裁掉' },
   { out: 'minimax-h3-ref2v-ctx-quality', group: GROUP_REF2V_CTX, tier: 'quality', priority: -100, template: 'minimax-h3-ref2v-ctx.json', mode: 'quality', estSeconds: 400, note: '链式续接 · 20 步 · 采样多 22 帧后裁掉' },
   { out: 'minimax-h3-i2v-ctx-fast', group: GROUP_I2V_CTX, tier: 'fast', priority: -100, template: 'minimax-h3-i2v-ctx.json', mode: 'fast', estSeconds: 28, note: 'i2v 链式续接 · 4 步 LoRA · 长边 832 · 继承上一镜尾部（采样多 22 帧后裁掉）· 实测：首帧锚点被 head 取代、末帧锚点保留' },
   { out: 'minimax-h3-i2v-ctx-balanced', group: GROUP_I2V_CTX, tier: 'balanced', priority: -100, template: 'minimax-h3-i2v-8step-ctx.json', mode: 'balanced', estSeconds: 190, note: 'i2v 链式续接 · 8 步 fl2v 768p LoRA · 继承上一镜尾部 · 实测：首帧锚点被 head 取代、末帧锚点保留' },
   { out: 'minimax-h3-i2v-ctx-balanced-pdd', group: GROUP_I2V_CTX, tier: 'balanced', priority: -100, template: 'minimax-h3-pdd-i2v-ctx.json', mode: 'balanced', estSeconds: 195, note: 'i2v 链式续接 · PDD nfe=8 · 继承上一镜尾部 · 实测：首帧锚点被 head 取代、末帧锚点保留' },
+  // i2v 版原生块稀疏：接线与 r2v 完全同构（PDD 之后插 2b），只是条件节点是 MiniMaxH3ImageToVideo。
+  // 首帧锚点在链式 i2v 里会被 Motion Context 的 head 取代、末帧锚点保留（与 PDD+ctx 版一致）。
+  { out: 'minimax-h3-i2v-ctx-balanced-pdd-solattn', group: GROUP_I2V_CTX, tier: 'balanced', accel: 'solattn', accelOf: 'minimax-h3-i2v-ctx-balanced-pdd', priority: -55, template: 'minimax-h3-pdd-i2v-ctx-solattn.json', mode: 'balanced', estSeconds: 120, note: 'i2v 链式续接 · PDD nfe=8 + 原生 BlockSparseAttention(sol-attn, tau 1.0) · 继承上一镜尾部（采样多 22 帧后裁掉）· 末帧锚点保留 · 实测 116.1s@tau1.3；tau1.0 约 120s（推算）' },
+  // i2v quality 的原生块稀疏（非 PDD 路径）：与 r2v 的 ctx-quality-solattn 同构。
+  { out: 'minimax-h3-i2v-ctx-quality-solattn', group: GROUP_I2V_CTX, tier: 'quality', accel: 'solattn', accelOf: 'minimax-h3-i2v-ctx-quality', priority: -55, template: 'minimax-h3-i2v-ctx-solattn.json', mode: 'quality', estSeconds: 253.9, note: 'i2v 链式续接 · 20 步 + 原生 BlockSparseAttention(sol-attn, tau 1.0) · 实测 253.9s（对 i2v ctx-quality 382.7s 为 1.51×）· 画质 MAD 6.47 / PSNR 26.78 dB · 继承上一镜尾部、末帧锚点保留' },
   { out: 'minimax-h3-i2v-ctx-quality', group: GROUP_I2V_CTX, tier: 'quality', priority: -100, template: 'minimax-h3-i2v-ctx.json', mode: 'quality', estSeconds: 420, note: 'i2v 链式续接 · 20 步 · 继承上一镜尾部 · 实测：首帧锚点被 head 取代、末帧锚点保留' },
-  // 注意：**不提供 ctx 的 Sol 变体**。2026-09-15 复现两次：Sol-Attn 在本环境（0.35.2 + cudaMallocAsync）下
+  // 注意：**第三方 Sol-Attn 的 ctx 变体仍不提供**。2026-09-15 复现两次：它在本环境（0.35.2 + cudaMallocAsync）下
   // 无论带不带续接都会让 ComfyUI 硬崩（CUDA_ERROR_INVALID_VALUE from cuMemFreeAsync → Fatal Python error: Aborted，
-  // 容器整机重启，连别人的任务一起打掉）。模板 scripts/h3-templates/minimax-h3-pdd-ref2v-sol-ctx.json 保留备用，
-  // 但**不生成清单**——详见 docs/minimax-h3-acceleration-lora.md §9.10。
+  // 容器整机重启，连别人的任务一起打掉；2026-10-20 在 0.42.1 上再复现一次）。模板
+  // scripts/h3-templates/minimax-h3-pdd-ref2v-sol-ctx.json 保留备用，但**不生成清单**——详见 docs/minimax-h3-acceleration-lora.md §9.10。
+  // 需要「续接 + 稀疏」请用上面的原生 solattn 清单（BlockSparseAttention，不走 flex_attention，不触发该崩点）。
   // 两阶段潜空间放大（方案 B）：estSeconds 未实测（结构与普通档不同：首遍 896×512 全步 + 二遍 1344×768 低噪声），
   // 先按待实测填，跑完对照后回填真实值。
   { out: 'minimax-h3-ref2v-hires', group: GROUP_REF2V_HIRES, tier: 'quality', priority: -50, template: 'minimax-h3-ref2v-hires.json', mode: 'quality', estSeconds: 480, note: '两阶段放大 · 首遍 896×512 20 步 → latent ×1.5 → 二遍 denoise 0.35 · 交付 1344×768 · 耗时待实测' },
@@ -185,6 +202,10 @@ function buildVariant(spec, templates) {
   if (spec.deprecated) {
     m.internal = true
     delete m.priority
+    // 与正常分支一致：清单只保留本档 mode（否则 quality-sol 会带着模板里的 fast mode）
+    m.modes = { [spec.tier]: modeCfg }
+    // 弃用清单不进可用性矩阵，不需要第三方节点预检（也避免半套 requiresNodes 误导）
+    delete m.requiresNodes
     m.displayName = `${m.displayName}（已弃用）`
     m.description = `**已弃用，不要用于新镜头**：${spec.deprecated} ` + m.description
     m.note = `**已弃用**：${spec.deprecated} ` + String(spec.note || '')

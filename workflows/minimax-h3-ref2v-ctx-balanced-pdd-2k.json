@@ -512,14 +512,6 @@
   },
   "group": "minimax-h3-ref2v-ctx-2k",
   "tier": "balanced",
-  "requiresNodes": [
-    "MiniMaxH3MotionContext",
-    "MiniMaxH3MotionContextLoadLatent",
-    "MiniMaxH3MotionContextSaveLatent",
-    "MiniMaxH3MotionContextTrim",
-    "MiniMaxH3PDDAccApply",
-    "MinimaxH3LatentUpscaler3DRefineHandoff"
-  ],
   "note": "**已弃用**：PDD 接在首遍（设计文档推荐接二遍），实测更慢且闪烁 +150%；改用 minimax-h3-ref2v-ctx-quality-pdd2-2k。 链式续接 + 学习式 latent ×2 · PDD 在**首遍**（nfe=8）· 交付 2688×1536",
   "chain": {
     "source": "clip-latent",

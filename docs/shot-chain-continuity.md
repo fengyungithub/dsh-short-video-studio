@@ -152,10 +152,10 @@ comfy_render(capability, ..., continuity_from?)
 
 命令见**附 D**。清单与模板：
 
-* 模板：r2v `scripts/h3-templates/minimax-h3-ref2v-ctx.json`、`…-8step-ctx.json`、`…-pdd-ref2v-ctx.json`；i2v 由 `scripts/make-h3-ctx-templates.mjs` 从普通 i2v 模板**派生**（`minimax-h3-i2v-ctx.json`、`…-8step-ctx.json`、`…-pdd-i2v-ctx.json`，勿手改）
-* 清单（生成物，勿手改）：`workflows/minimax-h3-ref2v-ctx-{fast,balanced,balanced-pdd,quality}.json`、`workflows/minimax-h3-i2v-ctx-{fast,balanced,balanced-pdd,quality}.json`
+* 模板：r2v `scripts/h3-templates/minimax-h3-ref2v-ctx.json`、`…-8step-ctx.json`、`…-pdd-ref2v-ctx.json`、`…-pdd-ref2v-ctx-solattn.json`（由 `make-h3-solattn-template.mjs` 从 PDD+ctx 派生）；i2v 由 `scripts/make-h3-ctx-templates.mjs` 从普通 i2v 模板**派生**（`minimax-h3-i2v-ctx.json`、`…-8step-ctx.json`、`…-pdd-i2v-ctx.json`，勿手改）
+* 清单（生成物，勿手改）：`workflows/minimax-h3-ref2v-ctx-{fast,balanced,balanced-pdd,balanced-pdd-solattn,quality,quality-solattn}.json`、`workflows/minimax-h3-i2v-ctx-{fast,balanced,balanced-pdd,balanced-pdd-solattn,quality,quality-solattn}.json`
 * 覆盖矩阵基准：`scripts/bench-chain-continuity.mjs` → `e2e-out/chain-bench/{report.md,rows.json}`；i2v 端到端 `scripts/e2e-chain-continuity-i2v.mjs` → `e2e-out/chain-continuity-i2v/`
-* 生成器：`scripts/make-h3-variants.mjs`（清单）、`scripts/make-h3-ctx-templates.mjs`（i2v ctx 模板）
+* 生成器：`scripts/make-h3-variants.mjs`（清单）、`scripts/make-h3-ctx-templates.mjs`（i2v ctx 模板）、`scripts/make-h3-solattn-template.mjs`（原生块稀疏模板）
 
 ---
 
@@ -209,7 +209,11 @@ comfy_render(capability, ..., continuity_from?)
 | `minimax-h3-ref2v-ctx-balanced` | 8 步 768p 蒸馏 LoRA | 1344×768 | 124/136/136 | **2.631** → 32.350 | **0.534** → 0.017 | +0.134 → −0.091 | **−0.77 dB** → −8.78 dB | 152.5 / 209.6 / 182.8 |
 | `minimax-h3-ref2v-ctx-balanced-pdd` | PDD nfe=8 | 1344×768 | 124/136/136 | **3.436** → 51.176 | **0.305** → 0.065 | **+0.827** → −0.293 | **−0.26 dB** → −14.62 dB | 152.9 / 283.6 / 188.2 |
 | `minimax-h3-ref2v-ctx-quality` | 无（20 步） | 1344×768 | 124/136/**141** | **2.605** → 35.546 | **0.552** → 0.096 | −0.097 → −0.267 | **+0.09 dB** → −24.04 dB | 361.9 / 676.2 / 443.1 |
-| ~~`…-ctx-balanced-pdd-sol`~~ | PDD + Sol-Attn | — | — | — | — | — | — | **撤销**：Sol-Attn 崩服务（附 C） |
+| ~~`…-ctx-balanced-pdd-sol`~~ | PDD + 第三方 Sol-Attn | — | — | — | — | — | — | **撤销**：Sol-Attn 崩服务（附 C） |
+| `minimax-h3-ref2v-ctx-balanced-pdd-solattn` | PDD + **原生** `BlockSparseAttention`(sol-attn, tau 1.0) | 1344×768 | 124/—/— | 待测 | 待测 | 待测 | 待测 | **112.7** / — / — |
+| `minimax-h3-i2v-ctx-balanced-pdd-solattn` | PDD + **原生** `BlockSparseAttention`(sol-attn, tau 1.0) | 1344×768 | 124/—/— | 待测 | 待测 | 待测 | 待测 | **116.1**（tau1.3 实测，tau1.0 约 120s）/ — / — |
+| `minimax-h3-ref2v-ctx-quality-solattn` | 20 步 + **原生** `BlockSparseAttention`(sol-attn, tau 1.0) | 1344×768 | 124/—/— | MAD 9.66（vs 基线） | 待测 | 待测 | 待测 | **253.8**（基线 379.1，1.49×）/ — / — |
+| `minimax-h3-i2v-ctx-quality-solattn` | 20 步 + **原生** `BlockSparseAttention`(sol-attn, tau 1.0) | 1344×768 | 124/—/— | MAD 6.47（vs 基线） | 待测 | 待测 | 待测 | **253.9**（基线 382.7，1.51×）/ — / — |
 
 ※ fast 档对照镜 2.3 s 是 ComfyUI **缓存命中**（同图同种子 → 产物逐比特相同）；产物有效，但别当耗时基准。后续各档已换种子，不再命中。
 

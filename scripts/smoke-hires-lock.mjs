@@ -178,7 +178,8 @@ for (const id of TWO_K) {
   if (!m) continue
   ok(`${id} tier ∈ {fast,balanced,quality}`, ['fast', 'balanced', 'quality'].includes(m.tier), m.tier)
   eq(`${id} 只提供自己那一档`, Object.keys(m.modes).join(','), m.tier)
-  ok(`${id} 声明 requiresNodes=[MinimaxH3LatentUpscaler3DRefineHandoff]`,
+  // 已弃用（internal）的 2K 清单不进产品面、不做可用性预检，因此不要求 requiresNodes
+  if (!m.internal) ok(`${id} 声明 requiresNodes=[MinimaxH3LatentUpscaler3DRefineHandoff]`,
     Array.isArray(m.requiresNodes) && m.requiresNodes.includes('MinimaxH3LatentUpscaler3DRefineHandoff'),
     JSON.stringify(m.requiresNodes))
 

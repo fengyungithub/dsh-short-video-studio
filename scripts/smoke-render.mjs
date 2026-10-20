@@ -51,7 +51,8 @@ ok(threw, '不存在 workflow 抛错')
 // 视频：分档能力（缺省 quality 档）
 eq((await resolveTieredManifest('video.reference2video', null, null, none)).manifest.id, 'minimax-h3-ref2v-quality', 'video.reference2video 缺省 → quality 档（STANDARD）')
 eq((await resolveTieredManifest('video.reference2video', 'balanced', null, none)).manifest.id, 'minimax-h3-ref2v-balanced', 'balanced 档默认取无加速实现（加速件需显式选择）')
-eq((await resolveTieredManifest('video.reference2video', 'balanced', null, { ...none, selection: { balanced: 'minimax-h3-ref2v-balanced-sol' } })).manifest.id, 'minimax-h3-ref2v-balanced-sol', '注入配置选择 → 用加速实现')
+// 第三方 -sol 已弃用（internal），显式选择改用原生块稀疏清单
+eq((await resolveTieredManifest('video.reference2video', 'balanced', null, { ...none, selection: { balanced: 'minimax-h3-ref2v-ctx-balanced-pdd-solattn' } })).manifest.id, 'minimax-h3-ref2v-ctx-balanced-pdd-solattn', '注入配置选择 → 用加速实现')
 eq((await resolveTieredManifest('video.image2video', 'fast', null, { ...none })).manifest.id, 'minimax-h3-i2v-fast', 'video.image2video fast 档')
 eq((await resolveTieredManifest('video.reference2video', 'quality', 'minimax-h3-ref2v-quality', { ...none })).manifest.id, 'minimax-h3-ref2v-quality', '显式 workflow 命中（脚本/内部通道）')
 

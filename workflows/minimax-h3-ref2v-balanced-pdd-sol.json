@@ -7,8 +7,8 @@
     5
   ],
   "runner": "comfyui",
-  "displayName": "MiniMax H3 参考生成视频",
-  "description": "MiniMax H3 参考生成视频 · balanced 档（sol 加速实现）。由 scripts/make-h3-variants.mjs 生成，请勿手改。",
+  "displayName": "MiniMax H3 参考生成视频（已弃用）",
+  "description": "**已弃用，不要用于新镜头**：第三方 Sol-Attn 在 ComfyUI 0.35+（cudaMallocAsync）上会在 cuMemFreeAsync 处 abort 并带崩整机（docs/minimax-h3-acceleration-lora.md §9.10；2026-10-20 在 0.42.1 上再次复现），改用原生 BlockSparseAttention 清单（minimax-h3-ref2v-ctx-balanced-pdd-solattn / i2v 同名）。 MiniMax H3 参考生成视频 · balanced 档（sol 加速实现）。由 scripts/make-h3-variants.mjs 生成，请勿手改。",
   "output": {
     "mediaType": "video",
     "hasAudio": true
@@ -340,11 +340,7 @@
   },
   "group": "minimax-h3-ref2v",
   "tier": "balanced",
-  "requiresNodes": [
-    "SolAttnMiniMaxH3"
-  ],
-  "priority": -30,
-  "note": "PDD + Sol-Attn（tau 1.2）· 实测 137.3s（对 PDD 单独 1.35×；细节量仍与 20 步成片档持平）",
+  "note": "**已弃用**：第三方 Sol-Attn 在 ComfyUI 0.35+（cudaMallocAsync）上会在 cuMemFreeAsync 处 abort 并带崩整机（docs/minimax-h3-acceleration-lora.md §9.10；2026-10-20 在 0.42.1 上再次复现），改用原生 BlockSparseAttention 清单（minimax-h3-ref2v-ctx-balanced-pdd-solattn / i2v 同名）。 PDD + Sol-Attn（tau 1.2）· 实测 137.3s（对 PDD 单独 1.35×；细节量仍与 20 步成片档持平）",
   "estSeconds": 137,
-  "accel": "sol"
+  "internal": true
 }

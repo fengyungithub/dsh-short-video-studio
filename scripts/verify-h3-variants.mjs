@@ -42,7 +42,7 @@ const MAP = {
   'minimax-h3-ref2v-balanced-pdd': ['minimax-h3-pdd-ref2v.json', 'balanced'],
   'minimax-h3-i2v-balanced-pdd': ['minimax-h3-pdd-i2v.json', 'balanced'],
 }
-const ALLOW_DIFF = new Set(['id', 'version', 'description', 'group', 'tier', 'accel', 'displayName', 'estSeconds', 'note', 'priority', 'requiresNodes', 'modes'])
+const ALLOW_DIFF = new Set(['id', 'version', 'description', 'group', 'tier', 'accel', 'displayName', 'estSeconds', 'note', 'priority', 'requiresNodes', 'modes', 'internal'])
 
 let pass = 0
 let fail = 0
@@ -78,6 +78,12 @@ console.log('\n[2] 档位参数：步数 / 长边 / LoRA 配对')
     // PDD：无蒸馏 LoRA（PDD 自带 trunk + head bank）、shift 必须 12/3、采样器必须 euler
     'minimax-h3-ref2v-balanced-pdd': { steps: 8, longSide: 1344, lora: null, sampler: 'euler', shift: 12, pdd: true },
     'minimax-h3-i2v-balanced-pdd': { steps: 8, longSide: 1344, lora: null, sampler: 'euler', shift: 12, pdd: true },
+    // 原生块稀疏：PDD + 链式续接 + BlockSparseAttention（不用第三方 SolAttnMiniMaxH3）
+    'minimax-h3-ref2v-ctx-balanced-pdd-solattn': { steps: 8, longSide: 1344, lora: null, sampler: 'euler', shift: 12, pdd: true, solattn: true },
+    'minimax-h3-i2v-ctx-balanced-pdd-solattn': { steps: 8, longSide: 1344, lora: null, sampler: 'euler', shift: 12, pdd: true, solattn: true },
+    // quality 的非 PDD 路径：20 步 base + ctx + 原生块稀疏（sampler 仍是 res_multistep）
+    'minimax-h3-ref2v-ctx-quality-solattn': { steps: 20, longSide: 1344, lora: null, sampler: 'res_multistep', shift: 12, solattn: true },
+    'minimax-h3-i2v-ctx-quality-solattn': { steps: 20, longSide: 1344, lora: null, sampler: 'res_multistep', shift: 12, solattn: true },
   }
   for (const [id, e] of Object.entries(expect)) {
     const m = read(join(WF, id + '.json'))
@@ -91,13 +97,27 @@ console.log('\n[2] 档位参数：步数 / 长边 / LoRA 配对')
     const hasClass = (c) => Object.values(m.graph).some((n) => n.class_type === c)
     ok(`${id} Sol 节点${e.sol ? '存在' : '不存在'}`, hasClass('SolAttnMiniMaxH3') === Boolean(e.sol))
     ok(`${id} PDD 节点${e.pdd ? '存在' : '不存在'}`, hasClass('MiniMaxH3PDDAccApply') === Boolean(e.pdd))
+    ok(`${id} 原生块稀疏节点${e.solattn ? '存在' : '不存在'}`, hasClass('BlockSparseAttention') === Boolean(e.solattn))
     if (e.sol) {
       ok(`${id} Sol 关键参数（dense_first_percent=0 / tau 生效）`,
         m.graph['2a'].inputs.dense_first_percent === 0 && m.graph['2a'].inputs.tau > 0,
         JSON.stringify({ tau: m.graph['2a'].inputs.tau, dense: m.graph['2a'].inputs.dense_first_percent }))
       ok(`${id} Sol 接线：BasicGuider/BasicScheduler → 2a`,
         m.graph['7'].inputs.model[0] === '2a' && m.graph['9'].inputs.model[0] === '2a')
-      ok(`${id} requiresNodes=SolAttnMiniMaxH3`, deepEq(m.requiresNodes, ['SolAttnMiniMaxH3']))
+      if (m.internal) ok(`${id} 已弃用清单不登记 requiresNodes`, m.requiresNodes === undefined)
+      else ok(`${id} requiresNodes=SolAttnMiniMaxH3`, deepEq(m.requiresNodes, ['SolAttnMiniMaxH3']))
+    }
+    if (e.solattn) {
+      const sparse = Object.entries(m.graph).find(([, n]) => n.class_type === 'BlockSparseAttention')
+      const [sparseId, sparseNode] = sparse || ['?', { inputs: {} }]
+      const feed = sparseNode.inputs.model?.[0]
+      const feedType = m.graph[feed]?.class_type
+      ok(`${id} 稀疏接线：guider → ${sparseId} → ${feedType}`, m.graph['7'].inputs.model?.[0] === sparseId &&
+        (feedType === 'MiniMaxH3PDDAccApply' || feedType === 'MiniMaxH3SigmaShift'))
+      if (!m.graph['2a']) ok(`${id} BasicScheduler 也挂在 2b 上（非 PDD 路径）`, m.graph['9'].inputs.model?.[0] === sparseId)
+      ok(`${id} 稀疏方法=sol-attn · tau=1.0`, sparseNode.inputs.selection === 'sol-attn' && sparseNode.inputs['selection.tau'] === 1.0)
+      ok(`${id} H3 sink 保护=exact_kv_and_rows`, sparseNode.inputs.sink_conditioning === 'exact_kv_and_rows')
+      if (m.graph['2a']) ok(`${id} sigmas 仍取自 PDD（不被稀疏节点替换）`, m.graph['10'].inputs.sigmas?.[0] === '2a')
     }
     if (e.pdd) {
       // PDD 的不变量：任何一条被破掉都会退化成"普通 8 步无 LoRA"（画质掉档却查不出原因）
@@ -110,9 +130,14 @@ console.log('\n[2] 档位参数：步数 / 长边 / LoRA 配对')
       ok(`${id} 已删除 BasicScheduler（sigmas 必须来自 PDD 训练网格）`,
         !hasClass('BasicScheduler'))
       ok(`${id} sigmas 取自 Apply 节点`, m.graph['10'].inputs.sigmas?.[0] === applyId && m.graph['10'].inputs.sigmas?.[1] === 1)
-      ok(`${id} guider 走 PDD 打过的 model`, m.graph['7'].inputs.model?.[0] === applyId)
+      const gid = m.graph['7'].inputs.model?.[0]
+      const guiderOnPdd = gid === applyId ||
+        (m.graph[gid]?.class_type === 'BlockSparseAttention' && m.graph[gid].inputs.model?.[0] === applyId)
+      ok(`${id} guider 走 PDD 打过的 model`, guiderOnPdd, `guider→${gid}`)
       ok(`${id} 图里没有任何蒸馏 LoRA（PDD 不叠加）`, !hasClass('LoraLoaderModelOnly'))
-      ok(`${id} requiresNodes=MiniMaxH3PDDAccApply`, deepEq(m.requiresNodes, ['MiniMaxH3PDDAccApply']))
+      ok(`${id} requiresNodes=${
+        e.solattn ? 'BlockSparseAttention' : 'MiniMaxH3PDDAccApply'}`,
+        e.solattn ? deepEq(m.requiresNodes, ['BlockSparseAttention']) : deepEq(m.requiresNodes, ['MiniMaxH3PDDAccApply']))
       ok(`${id} base 与 PDD 权重同族（ref2va↔ref2va / fl2va↔fl2va）`,
         String(m.assets.unet?.default || '').includes(id.includes('-i2v') ? 'fl2va' : 'ref2va') &&
         String(m.assets.pdd?.default || '').includes(id.includes('-i2v') ? 'fl2va' : 'ref2va'))

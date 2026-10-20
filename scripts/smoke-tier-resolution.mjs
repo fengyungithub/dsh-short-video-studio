@@ -319,8 +319,8 @@ console.log('\n[11] PDD：四个普通清单（不单列策略，由用户组合
   const reg = I.getRegistry()
   const mx = await describeTierMatrix(reg, { probe: SOL_PRESENT, cfg: {} })
   for (const [cap, pddId, solId] of [
-    [R, 'minimax-h3-ref2v-balanced-pdd', 'minimax-h3-ref2v-balanced-pdd-sol'],
-    ['video.image2video', 'minimax-h3-i2v-balanced-pdd', 'minimax-h3-i2v-balanced-pdd-sol'],
+    [R, 'minimax-h3-ref2v-balanced-pdd', 'minimax-h3-ref2v-ctx-balanced-pdd-solattn'],
+    ['video.image2video', 'minimax-h3-i2v-balanced-pdd', 'minimax-h3-i2v-ctx-balanced-pdd-solattn'],
   ]) {
     const m = reg.manifests.find((x) => x.id === pddId)
     ok(`${pddId} 存在且是 balanced 档`, Boolean(m) && m.tier === 'balanced')
@@ -347,9 +347,10 @@ console.log('\n[11] PDD：四个普通清单（不单列策略，由用户组合
     // base 与 PDD 权重严格同族
     const want = cap === R ? 'ref2va' : 'fl2va'
     ok(`${pddId} base/PDD 权重同族（${want}）`, m.assets.unet.default.includes(want) && m.assets.pdd.default.includes(want))
-    // Sol 变体的 requiresNodes 只含 Sol 节点（accelOf 生效，没把 PDD 节点算进去）
+    // 原生块稀疏清单：requiresNodes 只含内置 BlockSparseAttention（accelOf 生效，没把 PDD/ctx 节点算进去）
     const ms = reg.manifests.find((x) => x.id === solId)
-    eq(`${solId} requiresNodes`, (ms.requiresNodes || []).join(','), 'SolAttnMiniMaxH3')
+    eq(`${solId} requiresNodes`, (ms.requiresNodes || []).join(','), 'BlockSparseAttention')
+    eq(`${solId} accel`, ms.accel, 'solattn')
   }
 }
 

@@ -34,6 +34,8 @@ const REF_FILE = arg('ref-file', '')
 const FIRST_FRAME = arg('first-frame', '')
 const PROMPT_FILE = arg('prompt-file', '')
 const OVERRIDES = arg('overrides', '')   // JSON：资产覆盖（A/B 两条臂必须一致，如 int8 VAE）
+const CHAIN = arg('chain', '')           // 链式模板的 clip 序号 "load,save"；缺省起链 0,1
+const TAU = arg('tau', '')               // 原生块稀疏的 tau（仅含 BlockSparseAttention 的模板）
 const DEFAULT_PROMPT =
   'For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n' +
   'integrated_multimodal_description: [Shot 1] 3D-animated film look, 5 seconds. A single cartoon fox wearing a small orange spacesuit with a backpack ' +
@@ -77,9 +79,22 @@ if (REF_INPUT || REF_FILE) {
   job.refs = [await ensureFile(name, REF_FILE)]
 }
 if (FIRST_FRAME) job.first_frame = await ensureFile(FIRST_FRAME, '')
+// 链式续接模板：节点包要求 clip_index 是 INT（模板里是 null），必须注入。
+// 缺省按「起链」注入 load=0 / save=1；续接另一镜用 --chain=1,2（load 上一镜序号、save 本镜序号）。
+if (tpl.chain) {
+  const idx = (CHAIN ? CHAIN.split(',') : ['0', '1']).map((x) => Number(x.trim()))
+  if (idx.length !== 2 || idx.some((x) => !Number.isInteger(x) || x < 0)) throw new Error('--chain 必须是 "load,save" 两个非负整数')
+  job.context_clip_index = idx[0]
+  job.save_clip_index = idx[1]
+}
 if (OVERRIDES) job.assetOverrides = JSON.parse(OVERRIDES)
 
 const { graph, size } = _internals.buildRenderGraph(manifest, job, RATIO)
+if (TAU) {
+  const sparse = Object.values(graph).find((n) => n.class_type === 'BlockSparseAttention')
+  if (!sparse) throw new Error('--tau 只对含 BlockSparseAttention 的模板有效')
+  sparse.inputs['selection.tau'] = Number(TAU)
+}
 
 // 3) 打印配方（A/B 前先肉眼核对两条臂的差异是否只在预期处）
 const g = Object.values(graph)
@@ -91,8 +106,10 @@ console.log('  步数/采样 :', node('BasicScheduler') ? node('BasicScheduler')
 console.log('  shift     :', node('MiniMaxH3SigmaShift').inputs.shift_video + '/' + node('MiniMaxH3SigmaShift').inputs.shift_audio)
 console.log('  unet      :', node('UNETLoader').inputs.unet_name)
 const loras = g.filter((n) => n.class_type === 'LoraLoaderModelOnly').map((n) => n.inputs.lora_name)
-console.log('  蒸馏 LoRA :', loras.join(' + ') || '无', pdd ? `| PDD: ${pdd.inputs.pdd_file}` : '')
-console.log('  参考/seed :', (job.refs || [job.first_frame]).join(',') || '(无)', '/', node('RandomNoise').inputs.noise_seed)
+console.log('  蒸馏 LoRA :', loras.join(' + ') || '无', pdd ? `| PDD: ${pdd.inputs.pdd_file}` : '',
+  TAU ? `| tau=${TAU}` : '')
+console.log('  参考/seed :', (job.refs || [job.first_frame]).join(',') || '(无)', '/', node('RandomNoise').inputs.noise_seed,
+  tpl.chain ? `| chain load=${job.context_clip_index} save=${job.save_clip_index}` : '')
 console.log('  VAE       :', node('VAELoader').inputs.vae_name)
 if (DRY) process.exit(0)
 

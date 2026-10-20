@@ -83,7 +83,8 @@ for (const id of BUILTIN_IDS.filter((x) => x.startsWith('minimax-h3') || IMAGE_F
   if (!m) continue
   ok(Boolean(m.tier && m.group), `${id} 声明 tier/group（tier=${m.tier} group=${m.group}）`)
   ok(Object.keys(m.modes || {}).join(',') === m.tier, `${id} 只有一个 mode 且名称＝档位`)
-  if (id.endsWith('-sol')) ok(Array.isArray(m.requiresNodes) && m.requiresNodes.length > 0, `${id} 声明 requiresNodes（${(m.requiresNodes || []).join(',')}）`)
+  // 已弃用的第三方 Sol 清单是 internal（不进产品面），不要求第三方节点预检
+  if (id.endsWith('-sol') && !m.internal) ok(Array.isArray(m.requiresNodes) && m.requiresNodes.length > 0, `${id} 声明 requiresNodes（${(m.requiresNodes || []).join(',')}）`)
 }
 // 图片清单的分辨率契约：t2i 声明 32 对齐的 longSide；i2i 声明参考图预算并带注入点
 for (const f of ['flux-text2image', 'qwen-image-21-t2i']) {

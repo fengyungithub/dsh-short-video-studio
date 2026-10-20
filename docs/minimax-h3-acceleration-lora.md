@@ -637,6 +637,63 @@ Fatal Python error: Aborted
 
 ---
 
+## 9.11 原生块稀疏（BlockSparseAttention / sol-attn）2026-10-20 实测 —— **推荐路径**
+
+**背景**：ComfyUI 0.42 起内置 `BlockSparseAttention`（`sol-attn` / `sla` / `vsa`）与 `ModelAttentionBackend`，
+走 **comfy_kitchen 的 CUDA 扩展**，与第三方 `ComfyUI-SolAttn-Ampere`（`torch.compile(flex_attention)`）**是两套实现**。
+§9.10 的崩点（`cudaMallocAsync` 下 `cuMemFreeAsync` abort）只属于后者；原生这套不经过该路径。
+
+**实测环境**：A800 80GB（sm_80，仍带 `: cudaMallocAsync`）、ComfyUI **0.42.1**、torch 2.15.0.dev+cu132、py3.14；
+1344×768 / 124 帧 / 同 seed / 同参考图。
+
+| 组合 | 耗时 | 相对基线 | 说明 |
+|---|---|---|---|
+| PDD（基线） | 175.4s | 1.00× | 0.42 上恢复可用（0.37.2 曾被节点的 `_check_core_supported()` 误判为"旧核心"） |
+| **PDD + 原生 sol-attn** | **109.1s** | **1.61×** | tau=1.3 |
+| PDD + ctx（基线） | 176.0s | 1.00× | 链式续接 |
+| **PDD + ctx + 原生 sol-attn** | **112.2s** | **1.57×** | 交付清单 `minimax-h3-ref2v-ctx-balanced-pdd-solattn` |
+| 8 步 LoRA + 原生 sol-attn | 112.8s | 1.47× | 0.37.2 上实测 |
+| **quality 20 步 + ctx（基线）** | 379.1s | 1.00× | 非 PDD 路径（base 20 步 + Motion Context） |
+| **quality 20 步 + ctx + 原生 sol-attn** | **253.8s** | **1.49×** | tau 1.0；画质 MAD 9.66 / PSNR 22.95 dB |
+| comfy kitchen INT8 attention | 170.9s | 0.97× | A800 上**无收益**（INT8 反量化开销抵消） |
+
+**tau 对照（2 seed，同 prompt/参考图，对照同 seed 的 PDD+ctx 基线）**：
+
+| seed | 基线 | tau 1.3 | tau 1.0 |
+|---|---|---|---|
+| 777 | 163.5s | 107.8s · MAD 10.47 / PSNR 21.6 dB | 112.3s · **MAD 8.75 / PSNR 22.7 dB** |
+| 1234 | 163.1s | 109.2s · MAD 9.95 / PSNR 22.7 dB | 113.0s · **MAD 6.53 / PSNR 25.0 dB** |
+| 均值 | — | ~108.5s（1.51×）· MAD 10.2 | **~112.7s（1.45×）· MAD 7.6** |
+
+⇒ **默认取 `tau=1.0`**（内置清单已按此生成）：画质比 1.3 更接近基线（MAD 低 2.6、PSNR +1.6 dB），代价只慢约 4%。
+要更快可显式调回 1.3（`selection.tau`），要更保守可到 0.8（保留约 32% 精确块，预计再慢 5–8%）。
+结构/身份/光照在三个 tau 下都保持，差异集中在高频细节（月面纹理、衣料纹样）。
+
+**i2v 版**：
+- balanced：`minimax-h3-i2v-ctx-balanced-pdd-solattn` 实测 116.1s（tau 1.3），同构 r2v 为 112.2s；
+- quality：`minimax-h3-i2v-ctx-quality-solattn` 实测 **253.9s**（对 i2v ctx-quality 382.7s 为 **1.51×**），
+  画质 MAD 6.47 / PSNR 26.78 dB（比 r2v quality 的 9.66 更低，i2v 的 20 步路径对稀疏更稳）。
+
+**第三方 Sol 在 0.42.1 上仍崩**：2026-10-20 复现（提交后 ~13s 失联，服务重启），与 §9.10 一致。
+**六份 `-sol` 清单已标记 `deprecated`（`internal: true`）**：仍保留在 `workflows/` 里用于复现（只能显式按 id 调用），
+但**不进档位解析、不出现在设置页/工具条**，所以不会再被误选。
+
+**接线与坑**：
+- `BlockSparseAttention` 是 **dynamic combo**：API 里不是 `tau` 平铺，而是 `selection="sol-attn"` + **`"selection.tau": 1.3`**（点号键）。
+- **H3 专用参数** `sink_conditioning="exact_kv_and_rows"`：文本/音频/参考前缀保持精确，目标音频的 query 行走 dense（不设会先退化音频）。
+- 其余推荐值：`start_percent=0.2`、`end_percent=1.0`、`min_tokens=12288`、`extra_tokens=256`、`tau=1.0`（见上表）。
+- 该节点是**内置节点**，不需要安装任何第三方包；`requiresNodes` 里仍登记 `BlockSparseAttention` 以便缺节点时置灰。
+
+**落位**：模板 `scripts/h3-templates/minimax-h3-pdd-ref2v-ctx-solattn.json`（由 `make-h3-solattn-template.mjs` 从 PDD+ctx 派生），
+清单 `workflows/minimax-h3-ref2v-ctx-balanced-pdd-solattn.json`，`priority: -55`（高于 2K 放大族的 -60，
+避免 `continuity_from` 默认落到 1200s 的 2K 实现；仍远低于普通实现的 0，不做普通生成的隐式默认）。
+
+**与 Sage Attention 的关系**：`ModelAttentionBackend`（`comfy kitchen attention`）就是 ComfyUI 官方的 INT8 量化注意力
+（`convrot=True`，与 `int8_convrot` 权重同源技法），等价于"免编译的 SageAttention"；但在这台 A800 上实测 0.97×，
+不值得。thu-ml 的 `sageattention` 包仍需 CUDA Toolkit 编译，本机无 nvcc。
+
+---
+
 ## 10. 参考链接
 
 **模型与权重**
