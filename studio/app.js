@@ -879,6 +879,7 @@ import { markdownToHtml } from './markdown.js'
       + (project.settings?.duration ? ' · 时长 ' + project.settings.duration : '')
       + ' · 音频 ' + (project.settings?.audioMode || 'silent')
       + ' · 档位 ' + (project.settings?.mode || 'quality')
+      + ' · 审查 ' + (project.settings?.reviewMode === 'batch' ? '批量' : '逐镜')
       + ' · 节点 ' + nodes.length
       + (nodes.length ? '（主线 ' + main.length + (frames.length ? ' · 抽帧 ' + frames.length : '') + (discards.length ? ' · 作废 ' + discards.length : '') + '）' : '')
 
