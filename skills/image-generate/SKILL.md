@@ -1,3 +1,10 @@
+---
+name: image-generate
+description: 把「提示词 + 尺寸/档位/张数 + 可选单张参考图」生成为一张或数张图片，支持文生图（t2i）与参考图生图（i2i 改绘）。适用于「输入框手动生成」这条轻量链路：用户在输入框用 `/image-generate` 斜杠命令加载本 skill、在工具条选参数、写 prompt，发送后由本 skill 解析命令行参数并调度图片生成工具出图并落画布。不适用于完整片型流程（简报/大纲/镜头表/分镜/逐镜交付），那些请用 story-short-generator 或 brand-promo-video-generator。
+whenToUse: |
+  用户消息以 `/image-generate` 斜杠命令开头（内联 `type/tier/size/count/refs` 参数 + 空行后的 prompt 正文），或用户要求「用输入框手动生成一张图片 / 文生图 / 参考图生图」时使用。档位由注册表决定（一个能力多档，具体见 `comfy_list_workflows`；旧参数 `mode=` 为兼容别名）。
+---
+
 # 图片生成（image-generate）
 
 最简单的图片生成流程：解析任务消息里的字段，调用 ComfyUI 图片工具出图，产物落画布并回报结果。支持**文生图（t2i）**与**参考图生图（i2i，FLUX.2 ReferenceLatent 改绘）**。
