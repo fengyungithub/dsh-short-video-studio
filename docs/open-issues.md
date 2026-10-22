@@ -16,7 +16,7 @@
 
 ### 现状取证
 
-技能里**已定义**的：查库/复用（`asset_list` → `asset_to_canvas`，未命中才新建）、生成工具（`comfy_generate_image`）、形态硬约束（**角色卡形态随视频档位：`fast` 单视图 / `balanced`·`quality` 三视图横排**（2026-10-10 起）/ 背景纯净 / 图内零文字 / 不临时拼图 / 不同着装分建状态卡 / 记录 seed 供同 seed 重出 / 带风格锁后缀）、画布分组（`character cards` / `scene cards`）。
+技能里**已定义**的：查库/复用（`asset_list` → `asset_to_canvas`，未命中才新建）、生成工具（`comfy_generate_image`）、形态硬约束（**角色卡双版本：每个角色出单视图 + 三视图；视频引用按档位选（`fast` 单视图 / `balanced`·`quality` 三视图），非 fast 形态问题先退回单视图**（2026-10-21 起）/ 背景纯净 / 图内零文字 / 不临时拼图 / 不同着装分建状态卡 / 记录 seed 供同 seed 重出 / 带风格锁后缀）、画布分组（`character cards` / `scene cards`）。
 
 技能里**未定义**的：**档位、显式宽高、张数**。
 

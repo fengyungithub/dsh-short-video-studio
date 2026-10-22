@@ -92,7 +92,7 @@ Agent(skill: story-short-generator / brand-promo / video-generate)
 | | Toonflow | 本项目 |
 |---|---|---|
 | 做法 | 图片生成节点出角色（面部特写 + 正侧背三视图）/ 场景 / 道具；全局素材库 `assetOperator` 可 `import` 到工作区 | `comfy_generate_image(tier=quality)` 出角色卡 / 场景卡 / 道具卡；`asset_list` / `asset_to_canvas` 复用跨会话资产 |
-| 形态规则 | 资产图规范（角色多视图） | **形态随视频档位**：视频 `fast` → 单视图正面全身；`balanced`/`quality` → 三视图横排（`skills/story-short-generator/SKILL.md:72`） |
+| 形态规则 | 资产图规范（角色多视图） | **角色卡双版本**：每个角色出单视图 + 三视图；视频引用版本由 STEP 0 用户选择（`fast` 只能单视图；`balanced`/`quality` 可选单视图或三视图），每镜显式 `ref_variant`；非 fast 档出问题先退回单视图（`skills/story-short-generator/SKILL.md`） |
 | 图片规格 | 模型声明 `imageSizes` / `imageRatios`，节点默认最低分辨率、比例 16:9 | 图片档位独立于视频：`fast` 1024 / `balanced` 1344 / `quality` 2048 长边，按画布比例推导（`comfy_list_workflows` 实测同值） |
 | 身份约束 | 参考资产 + 提示词；**无 seed、无 LoRA / IPAdapter** | 参考资产 + 提示词 + seed 记账；同样无身份锁，靠「参考图形态门禁 + 文风锚点」 |
 

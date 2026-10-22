@@ -55,13 +55,13 @@ whenToUse: |
 4. **调用生成**（按类型二选一）：
    - r2v：`comfy_generate_video(prompt, type='r2v', tier=档位, width, height, length=时长, ref_nodes=[参考图节点...], title='手动 r2v · 档位 · 比例', group='手动生成')`
    - i2v：`comfy_generate_video(prompt, type='i2v', tier=档位, width, height, length=时长, first_frame_node=首帧, last_frame_node=末帧(可选), title='手动 i2v · 档位 · 比例', group='手动生成')`
-   （**`type` 必须原样透传**（r2v/i2v）——它决定用参考绑定还是首末帧串联，工具会据此校验参数：r2v 带首/末帧、i2v 带 `ref_nodes` 都会直接报错。`tier` 也显式传。）
+   （**`type` 必须原样透传**（r2v/i2v）——它决定用参考绑定还是首末帧串联，工具会据此校验参数：r2v 带首/末帧、i2v 带 `ref_nodes` 都会直接报错。`tier` 也显式传。参考卡是双版本角色卡时，显式传 `ref_variant=single|three`（fast 只能 single）；不传则原样使用传入的卡。**只传 `prompt` 即可**：视频工具会自动把本次 prompt 持久化为该镜头的分档提示词库节点并返回 `promptNodeId`；需要复用同一提示词重渲 / 升档时，把 `promptNodeId` 作为 `prompt_node` 传入并改 `tier`，不要手抄 prompt。）
 5. **回报结果**：工具已把产物写回画布；回复里给出视频节点标题、媒体相对路径与「画布」tab 入口。**汇报口径是「哪个能力 + 哪个档位 + 交付尺寸/时长」**（用户按档位决策，不按实现名）；工具返回里的 `implementation` 只在排查问题、或用户主动问「用的哪个工作流」时再提。有 `warnings`（如上面尺寸被改写）必须如实说明。
 6. **失败不盲重试**：失败先看报错类型——**档位缺失类报错**（该能力没有这个档）直接改请求**可用档位**（可用档位以 `comfy_list_workflows` 为准，别凭记忆假设某能力没有某档）；其它失败再改锚点 / 缩时长 / 改档（升档修字准；降档省成本）/ 简化动作后重试。同一请求不要原样重复提交。
 
 ## 参考图硬规则（严格遵守）
 
-- **形态随档位**：`fast` 档下参考图里有几个身体，成片就倾向出现几个角色（还有墙面投影 / 环境被换材质等泄漏样式）⇒ **`fast` 档只传单视图**；`balanced` / `quality` 档实测干净，**多视图角色卡（如三视图横排）可直接使用**。prompt 里声明「同一角色」在 `fast` 档无效。
+- **形态随档位**：`fast` 档下参考图里有几个身体，成片就倾向出现几个角色（还有墙面投影 / 环境被换材质等泄漏样式）⇒ **`fast` 档只传单视图**；`balanced` / `quality` 档实测干净，**多视图角色卡（如三视图横排）可直接使用**。prompt 里声明「同一角色」在 `fast` 档无效。按本 Skill 的完整流程（story-short-generator）出卡时，每个角色都有单视图 + 三视图两版：**引用版本由 STEP 0 用户选择**（`fast` 只能单视图；`balanced`/`quality` 可选单视图或三视图），调用时用 `ref_variant=single|three` 显式指定，工具不会按 tier 自动选。非 fast 档若发现多角色副本 / 参考图版面被投影，改传 `ref_variant=single` 重渲。
 - **图内零文字**：参考图上的角色名/「正面·侧面」/FRONT VIEW/水印会被视频模型印进成片；文字只写画布节点标题或资产库元数据。
 - **不要额外拼图**：确需更多角度时把多张图分别放进不同 `ref_nodes` 槽位，绝不临时拼成一张（拼图的形态与档位风险都要另算）。
 - **first_frame 仅同场景续接**：跨场景只传角色卡 + 场景卡，不带上一镜末帧。

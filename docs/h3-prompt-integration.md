@@ -117,7 +117,7 @@ skills/
 | 镜头表 `音频与对白轨.音效` + `overall_soundscape` | `overall_soundscape`（环境音、物理音、非语言人声，1–4 句） |
 | BGM 意图 / 项目简报的情绪音乐 | `non_diegetic_music`（乐器、速度、节奏、动态；无则 `N/A`） |
 | 镜头表 `参考锚点`（地标 / 人物位置 / 光位） | `subject_definitions` 的 `<Subject N>`（角色/环境从哪张参考卡来）+ `detailed_description` 中的空间锚点描述；`retention_analysis` 标注 fully_preserved 等关系 |
-| 角色卡 / 场景卡（ref_nodes） | `<Subject N>` 定义（外观/环境特征）+ 参考图在 `ref_nodes` 槽位；**形态随视频档位（`fast` 单视图 / `balanced`·`quality` 三视图横排）、零文字硬规则不变** |
+| 角色卡 / 场景卡（ref_nodes） | `<Subject N>` 定义（外观/环境特征）+ 参考图在 `ref_nodes` 槽位；**角色卡双版本（视频引用版本由 STEP 0 用户选择；`fast` 只能单视图 / `balanced`·`quality` 可选单视图或三视图）、零文字硬规则不变** |
 | 镜头表 `字幕` 字段 | ① 对白进 `<d>`；② 字幕以英文双引号 on-screen text 声明**内嵌 `detailed_description` 对白处**（实验定稿，见 §5.4） |
 | 现有 `[AUDIO_MODE:...][SPEAKER:...]` 前缀 | **不再作为前缀**；其语义（dialogue/silent、单说话人、非说话人闭嘴）已内化进 `detailed_description`；实验确认无副作用后移除 |
 

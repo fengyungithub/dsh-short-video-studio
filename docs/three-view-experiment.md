@@ -1,6 +1,6 @@
 # 三视图必要性与重复角色问题 · 实验报告
 
-> **现行规则（2026-10-10 起）**：另一份文档 `skills/story-short-generator/references/reference-image-contract.md` 是**当前规则的唯一权威**——角色卡形态随项目视频档位（`fast` 单视图 / `balanced`·`quality` 三视图横排），`fast` 档对 `ref_nodes` 设形态门禁 G-ref。本报告是**历史实验记录**（全程只跑 `mode=fast`），它的每条臂结论仍然有效，只是**不再等同于全局产品规则**；档位维度的补测见文末「补记」与契约文件。
+> **现行规则（2026-10-21 起）**：另一份文档 `skills/story-short-generator/references/reference-image-contract.md` 是**当前规则的唯一权威**——每个角色固定出两版（单视图 + 三视图横排），视频引用哪一版由 STEP 0 用户选择（`fast` 只能单视图；`balanced` / `quality` 可选单视图或三视图）；非 fast 档若出现参考图形态类污染先退回单视图重渲；`fast` 档对 `ref_nodes` 设形态门禁 G-ref。本报告是**历史实验记录**（全程只跑 `mode=fast`），它的每条臂结论仍然有效，只是**不再等同于全局产品规则**；档位维度的补测见文末「补记」与契约文件。
 
 **结论先行：三视图对 H3 参考绑定没有必要性，拼成一张图是重复角色的直接原因。修复应在 workflow 层做，且零 JS 改动即可。**
 
@@ -215,7 +215,7 @@ ref_image_0 指向: ["1001",0]
 
 1. 本文的核心结论——E 臂（重复由**视图数量**决定，与文字无关）、C 臂（prompt 声明「只出现一只」**无效**）、H 臂（多张单视图分槽位可行）、I 臂（裁切 / `ImageCrop` 可修复）——**全部在 `fast` 档被复现，未被推翻**。
 2. 但「多视图必然出副本」应修正为「**`fast` 档下多视图必出副本；`balanced` / `quality` 实测不出**」。
-3. 产品侧规则随之从「无条件只传单视图」演进为「**默认单视图 + `fast` 档形态门禁 G-ref**」（2026-10-08）；**2026-10-10 又进一步演进为「形态分档」**——角色卡默认形态随项目视频档位：`fast` 单视图 / `balanced`·`quality` 三视图横排（现行规则见 `skills/story-short-generator/references/reference-image-contract.md`）。
+3. 产品侧规则随之从「无条件只传单视图」演进为「**默认单视图 + `fast` 档形态门禁 G-ref**」（2026-10-08）；2026-10-10 演进为「形态分档」（角色卡默认形态随项目视频档位）；**2026-10-21 进一步演进为「双版本」**——每个角色固定出单视图 + 三视图；**2026-10-22 起视频引用版本由 STEP 0 用户选择**（`fast` 只能单视图；`balanced`·`quality` 可选单视图或三视图），非 fast 档若出现参考图形态类污染先退回单视图（现行规则见 `skills/story-short-generator/references/reference-image-contract.md`）。
 4. **未解变量**：三档解析到**三个不同实现**（`minimax-h3-ref2v-fast` / `…-ctx-balanced-pdd` / `…-quality`），本文写作时**无法区分**差异来自步数 / 分辨率还是实现本身。**后续已用钉实现实验拆开**（把实现家族 pin 到同一档对照：fast 两家族都 ❌、balanced 两家族都 ✅ ⇒ 差异跟档位/采样配置，不跟实现家族）；每格 N = 1~2 个 seed，仍属**方向性证据**。详见 `reference-image-contract.md` §4。
 
 完整矩阵、门禁规程与结论强度见 `skills/story-short-generator/references/reference-image-contract.md`。

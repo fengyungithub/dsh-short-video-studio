@@ -1,6 +1,6 @@
 # dsh-short-video-studio 用户手册
 
-> 适用版本：**v1.11.0**（`package.json`）　·　配套 DSH：0.2.x
+> 适用版本：**v1.12.0**（`package.json`）　·　配套 DSH：0.2.x
 > 本手册面向**使用者**（创作者 / 运营 / 设计师），按「先装起来 → 看得懂界面 → 会下指令 → 会调质量 → 会排障」的顺序组织。
 > 需要看设计原理请转 [`README.md`](README.md)、[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)、[`docs/workflow-contract.md`](docs/workflow-contract.md)。
 >
@@ -244,6 +244,7 @@ dsh web        # 重启后：会话出现「画布」tab，设置页多出 Comfy
 | 时长 | `settings.duration`（仅非空时显示） |
 | 音频 | `settings.audioMode`：`silent` / `dialogue-led` / `narration-led`（显示原始英文枚举） |
 | 档位 | `settings.mode`：`fast` / `balanced` / `quality`（项目默认档位） |
+| 角色卡 | `settings.characterCardVariant`：`single` 显示「单视图」、`three` 显示「三视图」 |
 | 审查 | `settings.reviewMode`：`per-shot` 显示「**逐镜**」、`batch` 显示「**批量**」 |
 | 节点 | 总数，括号内为主线 / 抽帧 / 作废三类的计数 |
 
@@ -305,8 +306,8 @@ dsh web        # 重启后：会话出现「画布」tab，设置页多出 Comfy
 | 档位 | 选项**来自注册表矩阵**，标签形如 `fast · 约 25s` | 列表首个（通常 `fast`） |
 | 比例 | `16:9` / `9:16` / `1:1` | 16:9 |
 | 时长 | `≈3s`(73 帧) / `≈5s`(124) / `≈8s`(192) / `≈10s`(243) / `≈13s`(310) | `≈5s` |
-| 参考图（r2v） | 最多 8 张，上传即落画布节点 | — |
-| 首帧 / 末帧（i2v） | 各 1 张 | — |
+| 参考图（r2v） | 最多 8 张；点「＋」可从**画布已有图片节点 / 资产库图片资产 / 本地文件**三处选取 | — |
+| 首帧 / 末帧（i2v） | 各 1 张；来源同上 | — |
 | 尺寸提示 | `尺寸 1344×768 · <实现 id>（<加速> 加速） · 约 397s`，缺节点时追加 `✗ 缺节点 …` | — |
 
 生成的命令行形如：
@@ -317,6 +318,8 @@ dsh web        # 重启后：会话出现「画布」tab，设置页多出 Comfy
 一只橘猫在夕阳天台伸懒腰
 ```
 
+> 参考图选择器：画布节点是**只引用不复制**（移除时不会删画布原卡）；资产库图片会先**物化到画布**（移除时只删这份物化副本）；本地文件上传后同样落画布节点。
+
 **图片条**
 
 | 控件 | 选项 | 默认 |
@@ -325,7 +328,7 @@ dsh web        # 重启后：会话出现「画布」tab，设置页多出 Comfy
 | 比例（仅 t2i） | `16:9` / `9:16` / `1:1` / `4:3` / `3:2` | 16:9 |
 | 档位（仅 i2i） | 读清单的 mode 轴 | 见下方说明 |
 | 张数 | 1 / 2 / 3 / 4 张 | 1 |
-| 参考图（仅 i2i） | 1 张（重传会替换并删掉旧节点） | — |
+| 参考图（仅 i2i） | 1 张；可从**画布 / 资产库 / 本地**选取（替换时只删本次上传或物化的副本，不删你画布上的原卡） | — |
 | 尺寸提示 | t2i：`尺寸 1344×768`；i2i：`尺寸跟随参考图` | — |
 
 命令行形如：
@@ -518,12 +521,13 @@ Skill 会**先用选项卡问清规格**，然后才动第一张图。每一项�
 | 2 | **画面比例** | 16:9 横屏（电影短片）/ 9:16 竖屏短视频 / 1:1 方形 / 4:5 社媒竖图 / 自定义 | 决定所有生成的宽高比 |
 | 3 | **总时长** | 30–60s（推荐）/ 15–30s / 60–90s / 90–180s / 自定义 | 决定镜头数 |
 | 4 | **音频模式** | `dialogue-led` 对白主导（一镜一人 + 反应切镜）/ `silent` 静音（纯画面 + SFX，口型风险 0） | 逐镜的对白与口型规划；**旁白主导不在本 skill 范围** |
-| 5 | **生成档位（视频）** | `fast` / `balanced` / `quality` | **同时决定角色卡默认形态**（fast → 单视图；其余 → 三视图横排），并启用 / 关闭 G-ref 门禁 |
-| 6 | **图片档位** | `quality`（**推荐默认**，长边 2048）/ `balanced` / `fast`（**仅抽卡试构图**） | 卡片是全程复用的锚点；抽卡产物**不得直接锁定**，定稿前必须用选定档位重出 |
-| 7 | **交付画质** | 原生（最省，先出片）/ **后处理逐镜超分**（2K / 4K，不重画内容）/ 生成内放大（限 16:9 且单镜 ≤124 帧） | 决定 STEP 8 怎么做（第 9 章） |
-| 8 | **片段审查节奏** | `per-shot` 逐镜审查（**默认推荐**）/ `batch` 批量审查 | 只改**人工确认的时机**，不改 AI 自检次数 |
+| 5 | **生成档位（视频）** | `fast` / `balanced` / `quality` | 决定可选的参考图版本范围：`fast` 只能单视图；其余档可单视图 / 三视图。同时启用 / 关闭 G-ref 门禁 |
+| 6 | **角色卡引用版本** | 单视图 / 三视图（**推荐**；`fast` 档只有单视图） | **用户选择**视频 `ref_nodes` 引用哪一版；两版角色卡都会生成，工具不按档位自动选 |
+| 7 | **图片档位** | `quality`（**推荐默认**，长边 2048）/ `balanced` / `fast`（**仅抽卡试构图**） | 卡片是全程复用的锚点；抽卡产物**不得直接锁定**，定稿前必须用选定档位重出 |
+| 8 | **交付画质** | 原生（最省，先出片）/ **后处理逐镜超分**（2K / 4K，不重画内容）/ 生成内放大（限 16:9 且单镜 ≤124 帧） | 决定 STEP 8 怎么做（第 9 章） |
+| 9 | **片段审查节奏** | `per-shot` 逐镜审查（**默认推荐**）/ `batch` 批量审查 | 只改**人工确认的时机**，不改 AI 自检次数 |
 
-确认后 Agent 会把**画布比例 / 总时长 / 音频模式 / 视频档位（state 里的 `mode`）/ 片段审查节奏（`reviewMode`）/ 分组顺序（`groupOrder`）**写进画布设置，并把「视觉风格 / 图片档位 / 交付画质」记进项目简报（这三项没有对应的 state 字段）。
+确认后 Agent 会把**画布比例 / 总时长 / 音频模式 / 视频档位（state 里的 `mode`）/ 角色卡引用版本（`characterCardVariant`）/ 片段审查节奏（`reviewMode`）/ 分组顺序（`groupOrder`）**写进画布设置，并把「视觉风格 / 图片档位 / 交付画质」记进项目简报（这三项没有对应的 state 字段）。
 
 **中途改主意怎么办**：
 
@@ -549,15 +553,16 @@ Skill 会**先用选项卡问清规格**，然后才动第一张图。每一项�
 
 | 步骤 | 产出（画布） | 分组 | 你要做什么 |
 |---|---|---|---|
-| STEP 0 | —（写 `settings`） | — | 回答 8 项规格选项卡 |
+| STEP 0 | —（写 `settings`） | — | 回答 9 项规格选项卡 |
 | STEP 1 | **项目简报**（text） | `story planning` | 确认方向 / 修订前提 |
 | STEP 2 | **故事大纲**（text） | `story planning` | 批准故事 / 修订节拍 |
-| STEP 3 | **角色卡**（image，形态随视频档位） | `character cards` | 逐张确认「锁定角色设计」 |
+| STEP 3 | **角色卡**（image，每个角色两版：单视图 + 三视图） | `character cards` | 逐张确认「锁定角色设计（两版）」 |
 | STEP 4 | **场景卡**（image，单视图、无人物） | `scene cards` | 确认场景（含「连续性地标」） |
 | STEP 4.5 | **道具卡**（image，可选） | `prop cards` | 确认签名道具 |
 | STEP 5 | **七列标准镜头表**（table） | `shot table` | 门 1：批准表格 |
 | STEP 5.5 | 自检戳（写在表格顶部） | `shot table` | 门 2：批准自检 → 选分镜模式 |
 | STEP 6 | **单文本分镜文档**（text；可视化模式另加多宫格铅笔图） | `text storyboards` | 批准分镜 |
+| STEP 6.5 | **每镜提示词库**（text，fast / balanced / quality 三档同文） | `shot prompts` | 无需确认（渲染依据，可人工编辑） |
 | STEP 7 | **逐镜片段**（video，含转场镜） | `shot clips` | 门 3：按审查节奏确认（逐镜 / 批量） |
 | STEP 8 | **拼接成片** + **交付清单 / 终检** | `final delivery` | 批准交付 / 要求补做 |
 
@@ -582,7 +587,7 @@ Skill 会**先用选项卡问清规格**，然后才动第一张图。每一项�
 
 ### 5.6 逐镜生成与「门 3」
 
-**正片镜头一律 `r2v` + 参考绑定**：`ref_nodes=[本镜全部在屏角色卡, 场景卡]`；连续性只由 `continuity_from` 表达。
+**正片镜头一律 `r2v` + 参考绑定**：`ref_nodes=[本镜全部在屏角色卡, 场景卡]`；角色卡版本按 STEP 0 选择显式传 `ref_variant=single|three`（fast 镜强制 single），工具不按档位自动选。连续性只由 `continuity_from` 表达。
 
 | 镜头 | 调用形态 |
 |---|---|
@@ -602,7 +607,14 @@ Skill 会**先用选项卡问清规格**，然后才动第一张图。每一项�
 
 两种模式下**门 3 自检第 3 项（口型 / 字幕字准）不过关时都当场弹单镜处置卡**，不压到批量卡里；「同一镜连续 3 次失败」的求助门同样保留。**批量批准以整卡为单位，不接受部分批准**。
 
-**逐镜失败回退阶梯**：先检查 prompt 方法论合规（禁止不改 prompt 直接重试同一请求）→ ① 强化 prompt（直引镜头表锚点）→ ② 缩到 ≤6s 并拆行、重跑自检 → ③ 改档验证（字幕字准类**升档**；排查链路才降档，**改档会打断续接链**）→ ④ 同镜连续 3 次失败 → 选项卡问你（换档 / 放宽 / 跳过并标 `placeholder: missing clip` / 手动提供参考视频）。
+**逐镜失败回退阶梯**：先检查 prompt 方法论合规（禁止不改 prompt 直接重试同一请求）→ **非 fast 档命中参考图形态类污染（多角色副本 / 参考图版面被投影）先换同角色单视图卡重渲** → ① 强化 prompt（直引镜头表锚点）→ ② 缩到 ≤6s 并拆行、重跑自检 → ③ 改档验证（字幕字准类**升档**；排查链路才降档，**改档会打断续接链**）→ ④ 同镜连续 3 次失败 → 选项卡问你（换档 / 放宽 / 跳过并标 `placeholder: missing clip` / 手动提供参考视频）。
+
+### 5.6.1 每镜提示词分档持久化（prompt bank）
+
+- 每镜在 `shot prompts` 分组有一份文本节点（如「S01 提示词（分档）」），里面按 `## fast` / `## balanced` / `## quality` 存三段。**当前策略三段同文：都写同一份完整 quality 提示词（逐字一致）**，换档只变采样、不换 prompt。
+- 生成视频时传 `prompt_node=<该节点 id>`：工具按本次 `tier` 取对应段。**升档重渲就复用同一个节点 + 新 tier**，不会重写 prompt；若某档没写，工具会回退到最近的较低档（没有则较高档）并给出 warning。
+- 每次生成后，工具会把本次实际用的 prompt **回写**到该档段——所以你随时能在画布上看到「这一镜的 quality 提示词到底是什么」。
+- 你临时手动生成一段视频（只给 prompt）时，工具也会自动建一份提示词库并返回 `promptNodeId`；之后想升档重出，让 Agent 用这个 id 即可。
 
 ### 5.7 转场镜：跨场景怎么「过得去」
 
@@ -639,7 +651,7 @@ STEP 8 会：**拼接全片**（`video_concat`，含音轨）→（按开场选�
 
 ### 5.10 所有选项卡门（强制）
 
-查库后（库非空）→ 复用范围；任何产物之前 → 8 项规格；简报后 / 大纲后 / 角色卡后 / 场景卡后 / 道具卡后；镜头表后 → 门 1；自检后 → 门 2（并选分镜模式）；分镜后 → 分镜批准；渲染前 → 渲染档位确认（含审查节奏）；每镜 / 批量 → 门 3；交付后；以及任何「同一镜连续 3 次失败」的求助点。
+查库后（库非空）→ 复用范围；任何产物之前 → 9 项规格；简报后 / 大纲后 / 角色卡后 / 场景卡后 / 道具卡后；镜头表后 → 门 1；自检后 → 门 2（并选分镜模式）；分镜后 → 分镜批准；渲染前 → 渲染档位确认（含审查节奏）；每镜 / 批量 → 门 3；交付后；以及任何「同一镜连续 3 次失败」的求助点。
 
 **默认推荐项放在最前，且始终允许你自定义输入。** 你说「继续」＝ 按推荐项走。
 
@@ -898,14 +910,14 @@ STEP 8 会：**拼接全片**（`video_concat`，含音轨）→（按开场选�
 ### 11.2 入库（你手动做）
 
 1. 在画布上找到要登记的节点卡片（图片 / 视频 / 文本 / 表格都有「**入库**」按钮；生成失败或已作废的节点也有）。
-2. 点「入库」→ 选**资产类型**（下拉按节点载体自动收窄：图片 → 角色 / 场景 / 风格锚点；视频 → 视频片段；文本 → 文本）→ 填**资产名**（**小写英文 / 拼音**，如 `luna`）。
+2. 点「入库」→ 选**资产类型**（下拉按节点载体自动收窄：图片 → 角色 / 场景 / 风格锚点；视频 → 视频片段；文本 → 文本）→ 填**资产名**（**支持中文 / 英文 / 拼音**，如 `小狐狸`、`luna`；会生成 `character:小狐狸` 这类资产 id）。
 3. 成功后卡片上的按钮变成「**已入库**」（悬停可看资产 id）。
 
 规则与坑：
 
 - **资产 id = `<type>:<name>`**（如 `character:luna`、`scene:prop-lantern`）。
 - **同名会直接覆盖**（保留 `createdAt`），界面不会问「是否覆盖」——重名请自己改名。
-- 名字非法会报错：`asset name 仅小写字母/数字/._-，且字母或数字开头`。
+- 名字非法会报错：`asset name 仅允许字母/数字（含中文等 Unicode 字符）与 . _ -，且以字母或数字开头`。
 - **载体与类型不匹配会被拒**（如「视频节点 + 角色卡」→ 400）：这是**故意的**，避免库里有语义错位的记录（Agent 拿到一条 `character:xxx` 会当参考图去驱动生成，必然失败）。
 - **文本资产不落文件**：保存正文 + 标题 + `nodeKind`，取回画布时仍是 text / table。
 - **AI 不会替你入库**——跨会话复用必须由你在画布上点按钮。
@@ -919,7 +931,8 @@ STEP 8 会：**拼接全片**（`video_concat`，含音轨）→（按开场选�
 
 ### 11.4 复用纪律（很重要）
 
-- **复用前先核形态**：走 `fast` 档时，物化前必须确认该资产是**单主体 / 单视图 / 零文字 / 无拼图**——库里完全可能存着三视图卡（那是给 `balanced` / `quality` 用的）。不合规就走 G-ref 的四个出路，**别硬渲**。
+- **复用前先核版本与形态**：角色卡有两版（`cardVariant=single|three`），视频引用版本按 STEP 0 用户选择（`characterCardVariant`）——`fast` 只能单视图（单主体 / 单视图 / 零文字 / 无拼图），`balanced` / `quality` 可选单视图或三视图。每镜显式传 `ref_variant`（工具不自动选）；非 fast 档若出现参考图形态类污染，传 `ref_variant=single` 重渲。
+- 角色卡入库时会一并保存 `character` / `cardVariant` 元数据：两版都入库后，跨会话直接传资产 id 也能按显式 `ref_variant` 换版；只入库一版或老资产没有元数据时，先物化两版再传节点 id。
 - 物化复用的卡是**历史已锁定版本**，不再重跑 AI 自检。
 - **入库 / 删除都是人工动作**，画布与对话保持一致：库里有、画布上也要有。
 
@@ -1102,7 +1115,7 @@ node scripts/import-comfy.mjs exported.json \
 |---|---|
 | `检测到旧版 ComfyUI「Save workflow」格式（nodes/links 数组）。请改用菜单里的「Export (API)」导出（{nodeId:{class_type,inputs}} 格式），再导入。` | 你导出错了格式，重新按 API 格式导出 |
 | `检测到 ComfyUI 原始导出（缺少 id/capability 字段）。请在导入时填写 id 与能力，或先运行 scripts/import-comfy.mjs 转换。` | 表单里的「工作流 id / 能力」没填 |
-| `id 非法（仅小写字母/数字/._-，且字母或数字开头）` | 改 id |
+| `id 非法（工作流 id 仍要求小写英文/数字/._-）` | 改 id（仅工作流 id；资产名已支持中文） |
 | `tier "<t>" 不在档位词汇表（fast\|balanced\|quality）` | 档位只能三选一 |
 | 清单校验错误（`id 必须是非空字符串` / `capability "…" 不在能力词汇表` / `graph 必须…` 等） | 按提示改 JSON；**不修好不会加载** |
 
@@ -1125,8 +1138,8 @@ whenToUse: 适用于……不适用于……
 
 ## 生产流程
 1. 开场：用 canvas_set_state 声明画幅/时长/音频模式/审查节奏（reviewMode）与分组展示顺序（groupOrder）
-2. 用 comfy_generate_image 建卡片（角色卡形态随视频档位：fast 单视图 / balanced·quality 三视图横排；场景卡与道具卡单视图；全部零文字）
-3. 用 comfy_generate_video(type=…, tier=…) 逐镜生成（fast 调试 → quality 成片）
+2. 用 comfy_generate_image 建卡片（每个角色出单视图 + 三视图两版：fast 引用单视图 / balanced·quality 引用三视图；场景卡与道具卡单视图；全部零文字）
+3. 用 canvas_write_prompt_bank 落每镜提示词库（三档同文，共用 quality 提示词），再 comfy_generate_video(type=…, tier=…, prompt_node=…) 逐镜生成（fast 调试 → quality 成片，换档只变采样、不换 prompt）
 4. 用 video_concat 拼接；交付前把文本要点写进回复（飞书会自动送达产物）
 ```
 
@@ -1151,7 +1164,7 @@ whenToUse: 适用于……不适用于……
 
 | skill | 看点 |
 |---|---|
-| `story-short-generator` | 最完整的片型流程：8 项开场、七列镜头表、11 项自检门、门 3、续接规划、转场镜、重渲连锁 |
+| `story-short-generator` | 最完整的片型流程：9 项开场、七列镜头表、11 项自检门、门 3、续接规划、转场镜、重渲连锁 |
 | `brand-promo-video-generator` | 「真素材先行」与身份素材保护、能力降级声明、六列镜头表 |
 | `h3-prompt-writing` | 结构化 prompt 的写法权威（Ref2VA 六段式 / I2VA·FL2VA 三段式）与字幕写法 |
 | `image-generate` / `video-generate` | 最轻量的单次生成链路，适合照抄输入契约 |
@@ -1160,19 +1173,20 @@ whenToUse: 适用于……不适用于……
 
 ## 第 16 章　参考手册
 
-### 16.1 Agent 工具（16 个）
+### 16.1 Agent 工具（18 个）
 
 | 工具 | 关键参数 | 说明 |
 |---|---|---|
-| `comfy_generate_image` | `prompt`（必填）、`tier`（缺省 quality）、`width` / `height`、`seed`、`steps`、`guidance`、`count`（1–4）、`title` / `group` / `nodeId` | 文生图别名 |
-| `comfy_generate_video` | `prompt`、**`type`（必填 r2v\|i2v）**、`tier`、`ref_nodes[]`、`first_frame_node`、`last_frame_node`、`continuity_from`、`width` / `height`、`length`（默认 124）、`seed` / `steps` | 单镜头视频 |
-| `comfy_render` | `capability`（必填）、`prompt`，其余同上；`type` 可选但必须与 capability 一致 | 通用入口；**不接受 `workflow=`** |
+| `comfy_generate_image` | `prompt`（必填）、`tier`（缺省 quality）、`width` / `height`、`seed`、`steps`、`guidance`、`count`（1–4）、`character` / `card_variant` / `paired_node_id`（角色卡双版本）、`title` / `group` / `nodeId` | 文生图别名 |
+| `comfy_generate_video` | `prompt` 或 `prompt_node`、**`type`（必填 r2v\|i2v）**、`tier`、`persist_prompt`、`ref_nodes[]`、`ref_variant`、`first_frame_node`、`last_frame_node`、`continuity_from`、`width` / `height`、`length`（默认 124）、`seed` / `steps` | 单镜头视频；三档同文时换档只变采样；按显式 ref_variant 选角色卡版本，生成后自动回写 |
+| `comfy_render` | `capability`（必填）、`prompt` 或 `prompt_node`，其余同上；`type` 可选但必须与 capability 一致 | 通用入口；**不接受 `workflow=`** |
 | `comfy_list_workflows` | — | 列出能力 → 档位（可用性 / 交付尺寸 / 实测耗时），实现 id 收在诊断字段 |
 | `extract_frame` | `video_node`（必填）、`frame_index`（默认 `-1` 末帧） | 抽帧 |
 | `video_concat` | `nodes[]`（≥2，按顺序） | 拼接（含音轨） |
 | `video_upscale` | `video_node`（必填）、`tier`、`target_width`、`chunk_frames` | 超分 |
 | `canvas_list_nodes` / `canvas_get_node` | `nodeId` | 读画布 |
 | `canvas_write_node` | `kind`（text\|table）、`title`、`content` | 写文本 / 表格（同时导出 PDF / HTML 供飞书送达） |
+| `canvas_write_prompt_bank` / `canvas_get_prompt` | `prompts{fast,balanced,quality}` / `nodeId`+`tier` | 提示词库：每镜三段落画布；当前策略三段同文 |
 | `canvas_group_nodes` / `canvas_reorder` | `nodeIds[]`、`group` | 归组 / 排序 |
 | `canvas_get_state` / `canvas_set_state` | `aspectRatio` / `duration` / `audioMode` / `mode` / `reviewMode` / `groupOrder` | 读写项目设置 |
 | `asset_list` | `type`、`query` | 查资产库 |

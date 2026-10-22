@@ -1,6 +1,5 @@
 # dsh-short-video-studio
 [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/fengyungithub/dsh-short-video-studio)
-[![DSH](https://img.shields.io/badge/DSH-0.2.1--alpha.2-4c6ef5?style=flat-square&labelColor=454a54)](https://github.com/deepseek-ai/deepseek-harness)
 
 **完全本地 · 免费 · 零云端依赖**的**短剧 / 动画画布工作室**，作为 [DeepSeek Harness](https://github.com/deepseek-ai) 双面插件运行。所有生成都跑在**本地 ComfyUI** 上——不需要任何付费云 API、不消耗额度，装好即用，一次生成、无限出片。
 
@@ -29,7 +28,7 @@
 - **自己添加资产**：画布顶栏「＋ 上传图片」可直接把本地 png/jpg/webp/gif 传成角色卡/场景卡等资产节点（无需先生成）；「📚 资产库」带缩略图把已入库的跨会话资产取到当前画布，图片类即可作为 ref 参考直接驱动视频生成。
 - **入库覆盖三类载体**：画布上的**图片**（角色卡 / 场景卡 / 风格锚点）、**视频**（镜头片段 / 成片）、**文本与表格**（镜头表 / 分镜文档 / 提示词）节点都能点「入库」登记进跨会话资产库；资产库对话框里可**删除**（连同库文件清理，画布上的副本不受影响）。载体与语义类别是两个正交维度：type 决定分组，kind（image/video/text）决定怎么存、怎么取回、以及能不能当 ref 参考图。
 - **生成的卡也能编辑替换**：已生成/已入库的角色卡、场景卡上点「编辑」→ 选本地图即可替换该卡图片（节点/标题/分组保留；若已入库会解除绑定，替换后按需重新「入库」登记新版本）。
-- **输入框视频生成（`video-generate` skill 的可视化入口）**：会话输入框工具行左端保留「🎨 图片 / 🎬 视频」开关。点「🎬 视频」即把 **`/video-generate` 斜杠命令（内联 `type/tier/ratio/size/length/refs/first/last` 参数）写入官方输入框**，用 dsh 原生 skill 加载机制加载内置 `video-generate` skill；同时在输入卡上方弹出**紧凑工具条**——类型 **r2v（参考图生成）/ i2v（首/末帧生成）**、**档位下拉（选项来自档位矩阵，带实测耗时）**、比例、时长（原生下拉菜单）与「参考图 / 首帧 / 末帧」自定义上传元素（经 `/canvas/upload` 落为画布节点；dsh 原生附件无法端到端转成 `ref_nodes`，故保留自定义图片输入）。**prompt 接着写在官方输入框空行后**，改参数时工具条自动重写命令行、保留 prompt；**发送直接点 dsh 默认发送键**（提交整条草稿，不额外做发送按钮、不劫持 Enter），Agent 按对应 skill 解析命令行参数并调用生成工具出片，产物回进对话并落画布。图片生成（🎨 `image-generate`）同机制：工具条切换 **文生图（t2i）/ 图生图（i2i）**——t2i 选比例与张数（默认 1344×768，可 1–4 张）；i2i 上传**单张参考图**（图 chip + ➕ 新增格，与 dsh 原生上传同款 64px 样式）、选 **quality / fast 档**与张数，命令头自动写 `/image-generate type=… tier=… refs=<画布节点id>`。**档位按模式独立记忆**：视频默认 `fast`（调试快）、图生图默认 `quality`（保真优先），手动选过后各自记住；上传的参考图即画布节点（删除/切型/清空草稿都会同步清理，画布不残留）。
+- **输入框视频生成（`video-generate` skill 的可视化入口）**：会话输入框工具行左端保留「🎨 图片 / 🎬 视频」开关。点「🎬 视频」即把 **`/video-generate` 斜杠命令（内联 `type/tier/ratio/size/length/refs/first/last` 参数）写入官方输入框**，用 dsh 原生 skill 加载机制加载内置 `video-generate` skill；同时在输入卡上方弹出**紧凑工具条**——类型 **r2v（参考图生成）/ i2v（首/末帧生成）**、**档位下拉（选项来自档位矩阵，带实测耗时）**、比例、时长（原生下拉菜单）与「参考图 / 首帧 / 末帧」自定义选择器（来源：**画布已有图片节点 / 资产库图片资产 / 本地上传**；本地上传经 `/canvas/upload` 落为画布节点，资产经 `/assets/to-canvas` 物化到画布，画布节点只引用不复制）。**prompt 接着写在官方输入框空行后**，改参数时工具条自动重写命令行、保留 prompt；**发送直接点 dsh 默认发送键**（提交整条草稿，不额外做发送按钮、不劫持 Enter），Agent 按对应 skill 解析命令行参数并调用生成工具出片，产物回进对话并落画布。图片生成（🎨 `image-generate`）同机制：工具条切换 **文生图（t2i）/ 图生图（i2i）**——t2i 选比例与张数（默认 1344×768，可 1–4 张）；i2i 从**画布 / 资产库 / 本地**选**单张参考图**（图 chip + ➕ 新增格，与 dsh 原生上传同款 64px 样式）、选 **quality / fast 档**与张数，命令头自动写 `/image-generate type=… tier=… refs=<画布节点id>`。**档位按模式独立记忆**：视频默认 `fast`（调试快）、图生图默认 `quality`（保真优先），手动选过后各自记住；上传的参考图即画布节点（删除/切型/清空草稿都会同步清理，画布不残留）。
 - **跟随 DSH 的浅色 / 深色**：画布页自带两套调色板，跟着宿主的主题服务走（含「跟随系统」与自定义主题的 `colorScheme`）。首屏由 `?theme=` 定，避免先闪一下另一种底色；运行中你在设置里一切换，画布立刻跟着换。原生控件（下拉、滚动条、复选框）也跟着 `color-scheme` 变。
 - Agent 工具与画布页读写**同一份持久状态**，对话推进的每一步产物都实时可见。
 
@@ -279,7 +278,7 @@ video_upscale({ video_node: '<长片节点 id>', target_width: 4032, chunk_frame
 |---|---|
 | 生成 | `comfy_generate_image` · `comfy_generate_video` · `comfy_render`（通用入口，模型无关）· `comfy_list_workflows`（查能力/工作流） |
 | 后处理 | `extract_frame`（抽帧）· `video_concat`（拼接成片）· `video_upscale`（超分：画布视频节点 → 像素空间 ×2/×4，可换模型与工作流） |
-| 画布 | `canvas_list_nodes` · `canvas_write_node` · `canvas_get_node` · `canvas_group_nodes` · `canvas_reorder` · `canvas_get_state` · `canvas_set_state` |
+| 画布 | `canvas_list_nodes` · `canvas_write_node` · `canvas_get_node` · `canvas_write_prompt_bank`（每镜分档提示词） · `canvas_get_prompt` · `canvas_group_nodes` · `canvas_reorder` · `canvas_get_state` · `canvas_set_state` |
 | 资产 | `asset_list`（列出跨会话资产，含 kind）· `asset_to_canvas`（物化回画布：图片/视频→媒体节点，文本→text/table 节点） |
 
 > 全部工具**模型无关**：capability 由注册表 `preferred` 解析到具体工作流，prompt 与流程里不硬编码模型名。
@@ -308,9 +307,9 @@ whenToUse: 适用于……不适用于……
 ---
 
 ## 生产流程
-1. 开场：用 canvas_set_state 声明画幅/时长/音频模式/片段审查节奏（`reviewMode` = `per-shot` 逐镜确认 / `batch` 全部渲完一次确认）与分组展示顺序
-2. 用 comfy_generate_image 建卡片（**角色卡形态随视频档位**：`fast` 单视图 / `balanced`·`quality` 三视图横排；场景卡与道具卡单视图；全部零文字）
-3. 用 comfy_generate_video(type=…, tier=…) 逐镜生成（fast 调试 → quality 成片）
+1. 开场：用 canvas_set_state 声明画幅/时长/音频模式/角色卡引用版本（`characterCardVariant` = `single` / `three`；fast 只能 single）/片段审查节奏（`reviewMode` = `per-shot` 逐镜确认 / `batch` 全部渲完一次确认）与分组展示顺序
+2. 用 comfy_generate_image 建卡片（**每个角色出单视图 + 三视图两版**；视频引用版本由 STEP 0 用户选择，`fast` 只能单视图；场景卡与道具卡单视图；全部零文字）
+3. 用 canvas_write_prompt_bank 落每镜提示词库（三档同文，共用 quality 提示词），再 comfy_generate_video(type=…, tier=…, ref_variant=…, prompt_node=…) 逐镜生成（fast 调试 → quality 成片，换档只变采样、不换 prompt）
 4. 用 video_concat 拼接，交付前把文本要点写进回复（飞书自动送达产物）
 ```
 
@@ -423,13 +422,15 @@ node scripts/import-comfy.mjs exported.json \
 
 ## 实战要点（沉淀自真实生产）
 
-1. **角色卡形态跟着视频档位走，参考图风险也与档位强相关**：`fast` 档下参考图里有几个身体，画面就倾向出现几个角色，**且泄漏样式不固定**——多出人、内容被投影成背景墙纸、环境被换掉材质都出现过；**`balanced` / `quality` 档实测干净**（角色卡 / 一图两身体 / 三视图均只出 1 个角色）。prompt 声明无效，只能从参考图形态或档位下手。⇒ **默认形态**：`fast` → 单视图正面全身；`balanced` / `quality` → **三视图横排**（正 / 侧 / 背全身，1×3，纯底零文字）。⇒ `fast` 档对进 `ref_nodes` 的参考图设**形态门禁 G-ref**（单主体 / 单视图 / 零文字 / 无拼图），判定键是**每次调用实际传入的 `tier`**；`balanced` / `quality` 不受此限。场景卡与道具卡不随档位改形态（仍单视图）。证据与强度见 [`skills/story-short-generator/references/reference-image-contract.md`](skills/story-short-generator/references/reference-image-contract.md) 与[旧实验报告](docs/three-view-experiment.md)（后者全程只测了 `fast` 一档）。
+1. **角色卡固定出两版（单视图 + 三视图），视频引用版本由 STEP 0 用户选择**：每个角色都建 `single` 单视图正面全身与 `three` 三视图横排（正 / 侧 / 背 1×3，纯底零文字），两版用 `character` / `cardVariant` / `pairedNodeId` 配对。参考图风险与档位强相关：`fast` 档下参考图里有几个身体，画面就倾向出现几个角色，**且泄漏样式不固定**——多出人、内容被投影成背景墙纸、环境被换掉材质都出现过；**`balanced` / `quality` 档实测干净**（角色卡 / 一图两身体 / 三视图均只出 1 个角色）。⇒ **引用规则**：`fast` 只能单视图；`balanced` / `quality` 由用户在 STEP 0 选单视图或三视图；每镜显式传 `ref_variant`（工具不再按 tier 自动选版），非 fast 档若出现参考图形态类污染，**传 `ref_variant=single` 重渲**。prompt 声明「只出现一只」无效。⇒ `fast` 档对进 `ref_nodes` 的参考图设**形态门禁 G-ref**（单主体 / 单视图 / 零文字 / 无拼图），判定键是**每次调用实际传入的 `tier`**。场景卡与道具卡不随档位改形态（仍单视图）。证据与强度见 [`skills/story-short-generator/references/reference-image-contract.md`](skills/story-short-generator/references/reference-image-contract.md) 与[旧实验报告](docs/three-view-experiment.md)。
+
 2. **参考图内不得有任何文字**：角色名、FRONT VIEW 之类标注会被视频模型渲进成片，`fast` 档尤甚（文档类参考图会以墙面投影形式把文字烙进画面）。名字只写画布标题与资产元数据。
 3. **多角度由卡片形态承担，不要临时拼图**：单张正面卡足以支撑转身/走远，非 `fast` 档直接用三视图横排卡；确需更多角度时把多张图分别放进不同 `ref_nodes` 槽位（实测仍只出 1 个角色），**绝不临时拼成一张图**。
 4. **原生字幕**：使用带原生字幕能力的视频模型（如内置默认 H3）时，对白字幕写进 prompt 末尾即可端到端渲染（含中文）；换成不带该能力的模型后，此条不适用，字幕需走其它方式。
 5. **同场景续接优先用链式续接（`continuity_from`），不是末帧串联**：前者把上一镜的 latent 逐帧钉进本镜、音频也接着走，接缝几乎看不出来；后者只是拿一张静帧当首帧，模型仍要重新猜运动与声音。**跨场景不续接**，只放「角色 + 场景」参考。
 6. **转场镜与锚点式重渲是 i2v 的两处专用场景**：转场镜要精确落回下一镜首帧（末帧锚定），锚点式重渲要在改中段时保住下游首帧。两者都能**再叠**链式续接（用 `…-i2v-ctx-*`）：链式 i2v 里**首帧锚点会被丢弃**（开头由上一镜尾部决定）、**末帧锚点保留** ⇒ 尾部连续 + 精确落点同时拿到。
-7. **角色分状态建卡**：同一角色不同着装分别建状态卡，形态按视频档位（`fast` 单视图 / 其余档三视图横排）。
+7. **角色分状态建卡**：同一角色不同着装分别建一对状态卡，每对仍是单视图 + 三视图两版。
+8. **每镜提示词库落画布（prompt bank）**：`canvas_write_prompt_bank` 写 `fast` / `balanced` / `quality` 三段；当前 story/brand 策略是**三段同文、共用 quality 提示词**，换档只变采样。生成传 `prompt_node`，工具按 tier 取段、缺档自动回退并告警，生成后回写本档。**换档重渲复用同一个 prompt_node + 新 tier**，不重写 prompt；只传 prompt 时工具也会自动建库并返回 `promptNodeId`。
 
 ## H3 结构化 prompt（本地版 H3-Context-IR 替代）
 
@@ -448,7 +449,7 @@ node scripts/import-comfy.mjs exported.json \
 
 ### 角色卡与场景卡
 
-> ⚠️ 以下角色卡为**历史示例（仍属反面）**：多视图拼图 **+ 图内文字标注**，且用的是「左侧 1 全身 + 右侧 3 个头部特写」的卡面布局。按现行规则，**非 `fast` 档的角色卡默认就是多视图**——但默认形态是**三视图横排（正 / 侧 / 背全身，1×3）**且要求**零文字、无分隔线**；这三张的标注文字与头特写混排都不符合（`fast` 档下该布局实测出 5 个副本）。正确做法见上文实战要点。
+> ⚠️ 以下角色卡为**历史示例（仍属反面）**：多视图拼图 **+ 图内文字标注**，且用的是「左侧 1 全身 + 右侧 3 个头部特写」的卡面布局。按现行规则，每个角色应出**两版**——单视图正面全身 + **三视图横排（正 / 侧 / 背全身，1×3）**，两版都要求**零文字、无分隔线**；这三张的标注文字与头特写混排都不符合（`fast` 档下该布局实测出 5 个副本）。正确做法见上文实战要点。
 
 | 小狐狸（不穿） | 小狐狸（穿宇航服） | 小兔子 |
 |---|---|---|
@@ -475,6 +476,44 @@ node scripts/import-comfy.mjs exported.json \
 ## 更新日志
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
+
+### v1.12.0 — 角色卡双版本 + 提示词库 + 资产名 + 参考图选择器（2026-10-22）
+
+**✨ 角色卡：每个角色固定出「单视图 + 三视图」两版**
+
+- **出卡规则**：每个角色都出 `single` 单视图正面全身（2:3、纯底、零文字）与 `three` 三视图横排（16:9、正 / 侧 / 背 1×3、纯底、零文字）；两版共享同一份角色设定与风格锁，用 `character` / `cardVariant` / `pairedNodeId` 配对（`comfy_generate_image` 新增 `character` / `card_variant` / `paired_node_id` 参数，两节点互记配对 id）。
+- **视频引用版本由 STEP 0 用户选择**：`canvas_set_state(characterCardVariant='single'|'three')`；`fast` 只能 `single`，`balanced`·`quality` 可选 `single` 或 `three`。`comfy_generate_video` 的 `ref_variant` 只接受显式 `single` / `three`（不再有 `auto`），每镜按 state + 当次 tier 传入。**非 fast 档若自检发现参考图形态类污染**（多角色副本 / 参考图版面或文字被投影 / 环境材质被替换）→ **传 `ref_variant=single` 重渲本镜**（同 prompt / 同 seed 优先），再走 prompt 失败阶梯。
+- **自检**：两版都查（单视图单主体、三视图恰好三格同一角色），并新增**跨版本一致性**核对（脸 / 发型 / 身材 / 服饰主色 / 签名道具）。
+- **落点**：`story-short-generator` v3.4.0（STEP 0/3/5/5.5/7/门 3/重渲纪律）、`reference-image-contract.md`、`image-generate` / `video-generate` / `h3-prompt-writing` 的口径与插件 systemPrompt。
+
+**✨ 视频提示词分档持久化（prompt bank）**
+
+- **每镜一份画布文本节点**（group `shot prompts`，标题如「S01 提示词（分档）」），用 `canvas_write_prompt_bank` 写入 `fast` / `balanced` / `quality` 三段；**三档写同一份完整 quality 提示词（逐字一致）**，换档只变采样。工具本身仍支持三段不同内容。
+- **生成时传 `prompt_node`**：`comfy_generate_video` / `comfy_render` 按本次 `tier` 读对应段；缺该档自动回退最近较低档（没有则较高档）并在 `warnings` 说明。生成后工具把本次实际 prompt **回写该档段**，所以每次生成的提示词都落在画布上。
+- **升档重渲**：复用同一个 `prompt_node` + 新 `tier`（或同一视频 `nodeId` 重渲且不传 prompt，工具会读回该镜提示词库）——不重写、不手抄旧 prompt。
+- **只传 `prompt` 也兼容**：视频工具会自动创建 / 更新提示词库节点并返回 `promptNodeId`（`persist_prompt:false` 可关闭），后续升档用该 id。
+- **新增工具**：`canvas_write_prompt_bank` / `canvas_get_prompt`；`comfy_generate_video` / `comfy_render` 新增 `prompt_node` / `persist_prompt` / `prompt_group`，视频工具另加 `ref_variant`（显式 `single` / `three`，由 STEP 0 用户选择驱动；fast 只能 single）。H3 结构化质检门同步支持从 `prompt_node` 取段校验。
+- **落点**：`lib/index.js`（prompt bank 解析 / 回退 / 自动持久化 / 工具 / 质检门）、`story-short-generator` v3.4.0、`brand-promo-video-generator` v1.3.0、`video-generate` v1.2.0、`docs/prompt-bank.md`、`scripts/smoke-prompt-bank.mjs`。
+
+**✨ 提示词库策略更新（全档位共用 quality，同日追加）**
+
+- **策略变更**：每个镜头的 `fast` / `balanced` / `quality` 三段**都写同一份完整 quality 提示词（逐字一致）**；换档只改变采样预算，不再更换 prompt。
+- **写入方式**：先写一份 quality prompt，再用 `canvas_write_prompt_bank` 原样复制到三段；不再为 fast / balanced 另写精简版。
+- **工具不变**：`prompt_node` 仍按 tier 取段，三段同文时读到的都是同一份 quality 文本；缺档回退机制保留，正常流程不会触发。
+- **旧库迁移**：已有三档不同文案的 `SXX 提示词（分档）`，先读 quality 段，再用 `canvas_write_prompt_bank(nodeId=…, prompts={fast:q, balanced:q, quality:q})` 统一；Skill 已把这一步写进流程。
+- **依据与边界**：1 seed pilot 显示“全档同文”不会崩，但 fast 档会出现构图拉宽、人物变小，quality 档的表演落点也可能偏移；因此这是**流程策略选择**，不是“全档更优”的保证。生产仍以门 3 自检的动作/走位/景别为准。
+
+
+**✨ 资产库命名支持中文**
+
+- `slugifyName` / `normalizeAssetId` 从「只允许小写英文/数字」改为允许 **Unicode 字母/数字（含中文）** + `. _ -`：中文标题不再被吃掉，`POST /assets` 可直接登记 `character:小狐狸` 这类资产 id；文件名为 `character-小狐狸.png`，跨会话 `asset_to_canvas` / `ref_nodes` / `/media` 均按 URL 编码正常工作。
+- 画布入库表单的默认名与提示同步改成「中文 / 英文 / 拼音都可以」；非法名（如含冒号）仍返回 400 并说明规则。
+
+**✨ 输入框图片 / 视频参考图支持从画布与资产库选取**
+
+- 「🎨 图片 · 图生图参考图」与「🎬 视频 · r2v 参考图 / i2v 首末帧」的「＋」现在打开统一选择器：**从画布已有图片节点、资产库图片资产、本地文件**三处取图。
+- 画布节点是**引用**：移除时不删除原画布卡；资产库图片会先物化到画布，移除时只删这份物化副本；本地文件仍按原逻辑上传落画布。
+- 资产库选择器只列图片类资产（角色 / 场景 / 风格锚点），视频 / 文本资产不会出现在参考图列表里。
 
 ### v1.11.0 — 片段审查节奏可选：逐镜审查 / 批量审查（2026-10-12）
 
@@ -591,7 +630,7 @@ node scripts/import-comfy.mjs exported.json \
 - **文本资产不落文件，存正文**：入库 `text`/`table` 节点时保存 `text` + `title` + `nodeKind`，取回画布时按 `nodeKind` **还原成 text 还是 table**——表格类资产取回来仍是表格，不会退化成纯文本。
 - **资产库可删除**（对话框每张卡片新增「删除」，二次确认）：删除索引的同时**清理库文件**，但有两个安全边界——① 仅当库里没有别的记录引用同一文件时才删（同图多状态/多名字的情况不会误删）；② **画布上已取用的副本不受影响**（它们是各自独立的文件），确认文案里写明了这一点。删除接口是 `DELETE /api/assets?id=…`，返回 `fileDeleted` 说明是否连带删了文件。
 - **对话框按载体渲染缩略图**：图片用 `<img>`，视频用 `<video>`（右上角挂「🎬 视频」角标，取不到时回落成「🎬 视频缺失」），文本资产不请求图片、直接把正文摘要显示在缩略图位（6 行截断）。
-- **顺带修掉一个 500**：入库名不合法（如中文名）时 `normalizeAssetId` 抛的是普通 `Error`，路由没转成 `HttpError`，前端拿到的是 500 而不是带原因的 400。
+- **顺带修掉一个 500**：入库名不合法（如含冒号的名字）时 `normalizeAssetId` 抛的是普通 `Error`，路由没转成 `HttpError`，前端拿到的是 500 而不是带原因的 400。（中文名已从「非法」改为合法，见 v1.12.0。）
 
 **🎨 走查中量出来并修掉的两处**
 

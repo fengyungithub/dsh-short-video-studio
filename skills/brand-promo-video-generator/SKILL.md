@@ -22,7 +22,8 @@ whenToUse: |
 | 核验用户素材（LOGO / 产品图 / 截图的识别与描述） | 默认用当前模型自身视觉直接读图；当前模型不支持图片输入时回退 `describe_image` |
 | 静帧生成（抽象动效层 / 氛围底板 / 概念场景板） | `comfy_generate_image` |
 | 参考图改绘（授权素材的抽象化 / 氛围版迭代，非品牌标识） | `comfy_render`（capability=`image.image2image` + `ref_nodes`） |
-| 单镜头视频生成（自带原生音频，支持画面内文案） | `comfy_generate_video` |
+| 单镜头视频生成（自带原生音频，支持画面内文案） | `comfy_generate_video`（传 `prompt_node`；三档同文，共用 quality 提示词） |
+| 写 / 读提示词库（三档同文；仍按 fast / balanced / quality 三段存） | `canvas_write_prompt_bank` / `canvas_get_prompt` |
 | 查可用能力与档位 | `comfy_list_workflows` |
 | 通用渲染（指定 capability / tier） | `comfy_render` |
 | 生成 H3 结构化 prompt（镜头表行 / 绑定 → Ref2VA 六段式 / I2VA·FL2VA 三段式） | 调用 skill 工具加载 `h3-prompt-writing`，按其 `references/` 规范重写 |
@@ -92,7 +93,7 @@ whenToUse: |
 4. **音频模式**：`silent` 纯音乐音效（BGM + SFX，无口播，零口型风险，产品宣传片推荐）/ `narration-led` 旁白主导（原生旁白 + BGM，讲解式宣传）。`dialogue-led` 不在本 Skill 范围。
 5. **生成档位**：`fast`（调试 / 调构图，长边 832）/ `balanced`（日常，画质与耗时平衡，长边 1344）/ `quality`（成片，长边 1344）。允许先 fast 走通全片再升档重出（`fast`→`balanced`、`fast`→`quality`、`balanced`→`quality` 都允许）。
 
-确认后用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode），**同一次调用一并传 `groupOrder=["brand intake","creative plan","asset plates","shot clips","final delivery"]`**，并写入生产简报。
+确认后用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode），**同一次调用一并传 `groupOrder=["brand intake","creative plan","asset plates","shot prompts","shot clips","final delivery"]`**，并写入生产简报。
 
 > **每镜必须显式传 `type` 与 `tier`**：`type=r2v`（参考绑定）/ `type=i2v`（首末帧串联）——**工具面 `type` 必填**，且与参数冲突会报错；`tier=fast|balanced|quality` 同样逐镜显式写，**不要依赖缺省**——缺省是 `quality`（成本最高档）。
 
@@ -104,10 +105,11 @@ whenToUse: |
 4. 品牌资产节点（image，group `asset plates`；用户素材上画布 + 生成板）
 5. 创意方向（text，group `creative plan`）
 6. 六列标准镜头表（table，group `creative plan`）
-7. 单镜头视频片段（video，group `shot clips`）
-8. 拼接成片（video）+ 交付清单与终检（text），均 group `final delivery`
+7. 提示词库（text，group `shot prompts`；每镜一份，fast / balanced / quality 三段同文）
+8. 单镜头视频片段（video，group `shot clips`）
+9. 拼接成片（video）+ 交付清单与终检（text），均 group `final delivery`
 
-**分组名由本 Skill 定义**（插件不预设任何片型词汇）。之后所有 `group` 参数必须用上面这五个精确名字；未声明的分组会排在末尾。
+**分组名由本 Skill 定义**（插件不预设任何片型词汇）。之后所有 `group` 参数必须用上面这六个精确名字；未声明的分组会排在末尾。
 
 ## STEP 1：品牌事实表
 
@@ -289,21 +291,25 @@ whenToUse: |
 
 **实现选择**：由配置决定（设置页），**不出工作流选项卡**，技能也不接受、不传递工作流 id。用户主动要求换模型时，引导他去设置页改该能力的「档位选择」，改完用 `comfy_list_workflows` 核对一遍即可。
 
+**提示词库（渲染前强制）**：本镜生成前先用 `canvas_write_prompt_bank` 写好 `fast` / `balanced` / `quality` 三段（group `shot prompts`），**三段都写同一份完整 quality 提示词（逐字一致）**；生成时传 `prompt_node`、不传 `prompt`；换档重渲复用同一个节点 + 新 `tier`，只变采样、不换 prompt。只传 `prompt` 也能用（工具会自动建库并返回 `promptNodeId`），但批量流程应显式建库。
+- **旧提示词库迁移**：已有旧版三档不同文案的库，先用 `canvas_get_prompt(nodeId, tier="quality")` 读 quality，再用 `canvas_write_prompt_bank(nodeId=…, prompts={fast: q, balanced: q, quality: q})` 统一三档，再生成。
+
 ### 参考绑定策略（逐镜按镜头表「策略」执行）
 
 > 以下所有逐镜调用都要显式带 `tier=`（STEP 7 渲染前的门选定），不要依赖缺省。
 
-- **`first-frame` 镜（LOGO / UI 界面锁定）**：`comfy_generate_video(type='i2v', tier=档位, first_frame_node=板节点 id, …)` —— 首帧锁定，身份逐像素继承自帧。
-- **`ref` 镜（产品英雄）**：`comfy_generate_video(type='r2v', tier=档位, ref_nodes=[干净产品图节点 id])` —— 参考绑定。
-- **`text` 镜（抽象动效层）**：不传参考图，纯文字生成。
-- **同场景续接镜（i2v 首帧串联）**：先 `extract_frame(video_node=上一镜片段节点)` 抽末帧，再 `comfy_generate_video(type='i2v', tier=档位, first_frame_node=末帧节点)` —— 首帧串联，环境直接从真实画面继承。**不传 `ref_nodes`**（i2v 工作流无参考图注入点，传了会**直接报错**）；且仅当上一镜末帧已包含本镜全部在屏主体（产品 / 吉祥物 / 人物）时才可用——末帧缺任一主体（如新主体登场）的镜禁止 i2v，必须改走 `ref` 参考绑定。
+- **`first-frame` 镜（LOGO / UI 界面锁定）**：`comfy_generate_video(type='i2v', tier=档位, prompt_node=…, first_frame_node=板节点 id, …)` —— 首帧锁定，身份逐像素继承自帧。
+- **`ref` 镜（产品英雄）**：`comfy_generate_video(type='r2v', tier=档位, prompt_node=…, ref_nodes=[干净产品图节点 id])` —— 参考绑定。
+- **`text` 镜（抽象动效层）**：不传参考图，`prompt_node=…` 纯文字生成。
+- **同场景续接镜（i2v 首帧串联）**：先 `extract_frame(video_node=上一镜片段节点)` 抽末帧，再 `comfy_generate_video(type='i2v', tier=档位, prompt_node=…, first_frame_node=末帧节点)` —— 首帧串联，环境直接从真实画面继承。**不传 `ref_nodes`**（i2v 工作流无参考图注入点，传了会**直接报错**）；且仅当上一镜末帧已包含本镜全部在屏主体（产品 / 吉祥物 / 人物）时才可用——末帧缺任一主体（如新主体登场）的镜禁止 i2v，必须改走 `ref` 参考绑定。
 - **跨场景镜绝不带上一镜末帧**（跨场景过渡交给下面的转场镜）。
 - 节点 id 可用画布节点 id 或资产 id（如 `style:acme-brand`）。
 
 ### prompt 组装（逐镜）
 
-按以下顺序组装：
+按以下顺序组装（先跑 1–4 得到**一份**完整 quality prompt，**最后**原样复制到三段落库；**渲染时只传 `prompt_node`**）：
 
+0. **提示词库（组装完成后落库，强制）**：用下面 1–4 步写出本镜的**完整 quality prompt**，然后**逐字复制成 `fast` / `balanced` / `quality` 三段**（三档同文，不另写精简版）。用 `canvas_write_prompt_bank(title="SXX 提示词（分档）", prompts={fast: p, balanced: p, quality: p}, group="shot prompts")` 写库并记下 `nodeId`。换档重渲复用同一个 `nodeId` + 新 `tier`，只变采样、不换 prompt。
 1. **H3 结构化重写（委托 `h3-prompt-writing` skill，主路径）**：调用 skill 工具加载 `h3-prompt-writing`，按它的规范（官方 `base-en.txt` / `ref-en.txt` + `references/studio-mapping.md` 映射表）把本镜「镜头表行 + 品牌视觉锁」重写为 H3 结构化 prompt：
    - **`ref` 镜**（无首末帧）→ **Ref2VA 六段式**：`subject_definitions` → `summary` → `retention_analysis` → `detailed_description` → `overall_soundscape` → `non_diegetic_music`；
    - **`first-frame` 镜** → **I2VA 三段式**：对齐指令（首行）+ `integrated_multimodal_description` + `overall_soundscape` + `non_diegetic_music`；
@@ -343,7 +349,7 @@ whenToUse: |
 
 1. `extract_frame(video_node=前一镜片段, frame_index=-1)` → 前一镜末帧。
 2. `extract_frame(video_node=后一镜片段, frame_index=0)` → 后一镜首帧。
-3. `comfy_generate_video(type='i2v', tier=档位, first_frame_node=末帧节点, last_frame_node=首帧节点, length=…, prompt=过渡意图, group="shot clips", title="S03→S04 转场")` —— 首末帧串联，模型自己补出中间运动，收尾精确落回后一镜首帧。
+3. `comfy_generate_video(type='i2v', tier=档位, first_frame_node=末帧节点, last_frame_node=首帧节点, length=…, prompt=过渡意图, group="shot clips", title="S03→S04 转场")` —— 首末帧串联，模型自己补出中间运动，收尾精确落回后一镜首帧。工具会自动把过渡 prompt 持久化为提示词库节点并返回 `promptNodeId`；升档重出转场镜时用 `prompt_node=<该 id>` + 新 tier 复用同一 prompt。
 4. 转场镜作为**普通片段**参与 STEP 8 的拼接顺序，插在两镜之间。
 
 转场 prompt 只写镜头运动与光线变化（如「镜头掠过产品边缘滑向生活场景，冷棚光渐变为暖日光」），**不写产品动作、不写文案与旁白**，音频按 `silent` 处理。
@@ -422,7 +428,7 @@ whenToUse: |
 
 每生成一个耐用产物立刻上画布并归组（生成工具自动上画布的不重复写）。本 Skill 的分组词汇（已在 STEP 0 通过 `groupOrder` 声明）：
 
-`brand intake`（生产简报 + 事实表 + 来源清单）· `creative plan`（创意方向 + 镜头表）· `asset plates`（品牌资产上画布节点 + 生成板）· `shot clips`（单镜片段 + 转场镜 + 抽取帧）· `final delivery`（拼接成片 + 交付清单 + 终检）
+`brand intake`（生产简报 + 事实表 + 来源清单）· `creative plan`（创意方向 + 镜头表）· `asset plates`（品牌资产上画布节点 + 生成板）· `shot prompts`（每镜提示词库，三档同文）· `shot clips`（单镜片段 + 转场镜 + 抽取帧）· `final delivery`（拼接成片 + 交付清单 + 终检）
 
 一轮生成产出 2 个或更多产物时立刻 `canvas_group_nodes` 归组并起清晰标题。顺序错乱时用 `canvas_reorder` 修正。
 

@@ -38,7 +38,7 @@ STYLE LOCK-B — anime facial proportions with expressive eyes and sharp chin, l
 
 ## 5. 分层适配
 
-- **角色卡**：形态随视频档位（`fast` 单视图正面全身 / `balanced`·`quality` 三视图横排）+ **锁 A + 锁 B**。发色 / 瞳色 / 校服配色写进节点描述。
+- **角色卡**：双版本（单视图正面全身 + 三视图横排；视频引用版本由 STEP 0 用户选择：`fast` 只能单视图，`balanced`·`quality` 可选单视图或三视图）+ **锁 A + 锁 B**。发色 / 瞳色 / 校服配色写进节点描述。
 - **场景卡**：只画环境 + **只加锁 A**；日式背景可偏向"动画背景美术"（略概括），但不得出现人物。⚠️ **不要带锁 B**——`anime facial proportions` / `expressive anime acting` 这类条款会把人物拉进空场景（**实测已复现**：本风格的场景卡里出现了一个动漫男性角色，违反"场景卡只展示环境"）。
 - **道具卡**：单件道具单视图 + **只加锁 A**。
 - **视频片段（r2v / i2v）**：**锁 A + 锁 B**，追加在 H3 结构化 prompt **之后**。对白镜靠表情与口型节拍，注意日式"口パク"式嘴型变化幅度小。
@@ -46,7 +46,7 @@ STYLE LOCK-B — anime facial proportions with expressive eyes and sharp chin, l
 
 ## 6. 与参考图契约的关系
 
-本风格**不改变**形态规则（角色卡随视频档位：`fast` 单视图 / `balanced`·`quality` 三视图横排）与「零文字 / 不拼图」硬规则；`fast` 档仍受 G-ref 门禁约束（见 [reference-image-contract.md](../reference-image-contract.md)）。
+本风格**不改变**形态规则（角色卡固定双版本（单视图 + 三视图）；视频引用版本由 STEP 0 用户选择，`fast` 只能单视图）与「零文字 / 不拼图」硬规则；`fast` 档仍受 G-ref 门禁约束（见 [reference-image-contract.md](../reference-image-contract.md)）。
 
 ## 7. 已知风险与未实测项
 

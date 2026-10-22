@@ -58,7 +58,16 @@
 - 对白逐字保留（含标点），不翻译不改写；`<d>` 内只放语言标签与原文。
 - 参考标签（`<Subject N>` / `<Picture N>` / `<Video N>` / `<Audio N>`）跨节保持一致，不重复定义。
 - 景别、镜头运动（类型 + 幅度 + 速度）、口型纪律全部写进 `detailed_description` / `integrated_multimodal_description`，不留到字段外。
-- 参考图硬规则：**角色卡形态随视频档位**（`fast` 单视图 / `balanced`·`quality` 三视图横排）、图内零文字、不把多张图临时拼成一张；需要更多角度时分别占不同 `ref_nodes` 槽位。
+- 参考图硬规则：**角色卡双版本**（每个角色出单视图 + 三视图横排；视频引用哪一版由 STEP 0 用户选择——项目档位 `fast` 只能单视图，`balanced` / `quality` 可选单视图或三视图；每镜显式 `ref_variant`）、图内零文字、不把多张图临时拼成一张；需要更多角度时分别占不同 `ref_nodes` 槽位。非 fast 档若命中参考图形态类污染，片型 skill 先传 `ref_variant=single` 重渲，再改 prompt。
+
+### 3.1 提示词库（三档同文，共用 quality）
+
+当前片型策略：先生成本镜的**完整 quality prompt**，再用 `canvas_write_prompt_bank` **逐字复制到 `fast` / `balanced` / `quality` 三段**。三档文本完全一致，换档只改变采样预算，不引入 prompt 差异。
+
+- 三段都要满足 H3 结构要求（Ref2VA 六段式 / I2VA·FL2VA 三段式 + 对齐指令），不能因为是 fast 段就省字段。
+- 不再为 fast / balanced 另写精简版；对白、字幕、口型纪律、关键动作三档完全一致。
+- 升档 / 降档复用同一个 `prompt_node`；工具按 tier 取段，但三段同文，所以不会读到另一套镜头计划。
+- 工具本身仍支持三段不同内容；如果以后要恢复按档位变体，只改 skill 策略和对应段即可。
 
 ## 4. 与片型 skill 的边界（项目级后缀）
 

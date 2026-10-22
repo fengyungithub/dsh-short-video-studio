@@ -26,7 +26,7 @@ process.env.DSH_SVS_SKILL_REFRESH = 'off'
 const { apply, _internals } = await import('../lib/index.js')
 const {
   loadLibrary, saveLibrary, registerAsset, removeAsset, assetKind, assetStoredFile,
-  resolveAssetPath, resolveAssetImagePath, assetTypesForKind, normalizeAssetId,
+  resolveAssetPath, resolveAssetImagePath, assetTypesForKind, normalizeAssetId, slugifyName,
   isAssetRef, assetFile,
 } = await import('../lib/assets.js')
 
@@ -139,6 +139,7 @@ try {
       node('n-table', 'table', { content: '| 镜号 | 内容 |\n|---|---|\n| S01 | 抬头 |' }),
       node('n-empty', 'text', {}),
       node('n-audio', 'audio', { media: 'x.mp3' }),
+      node('n-zh-img', 'image', { title: '小狐狸·穿宇航服', media: `${CANVAS_DIR}/${SID}/${imgName}` }),
     ],
   }
   writeFileSync(join(canvasDir, 'project.json'), JSON.stringify(project, null, 2))
@@ -149,6 +150,20 @@ try {
   const rImg = await call('POST', '/assets', { token, body: { nodeId: 'n-img', type: 'character', name: 'luna' } })
   eq('图片节点入库 → 200', rImg.status, 200)
   eq('  ……kind=image', rImg.json().kind, 'image')
+
+  const rZh = await call('POST', '/assets', { token, body: { nodeId: 'n-img', type: 'character', name: '小狐狸' } })
+  eq('中文资产名入库 → 200', rZh.status, 200)
+  eq('  ……id 保留中文', rZh.json().id, 'character:小狐狸')
+  {
+    const zhLib = loadLibrary(WORKSPACE)
+    ok('  ……中文 id 对应文件已落盘', String(assetStoredFile(zhLib.assets['character:小狐狸'])).includes('小狐狸'))
+    const zhMedia = await call('GET', '/media?asset=' + encodeURIComponent('character:小狐狸') + '&token=' + encodeURIComponent(token))
+    eq('  ……中文资产 id 的 /media → 200', zhMedia.status, 200)
+  }
+
+  const rZhDefault = await call('POST', '/assets', { token, body: { nodeId: 'n-zh-img', type: 'character' } })
+  eq('中文标题 + 不填 name：自动 slug 入库 → 200', rZhDefault.status, 200)
+  eq('  ……默认 id 保留中文并转分隔符', rZhDefault.json().id, 'character:小狐狸-穿宇航服')
 
   const rVid = await call('POST', '/assets', { token, body: { nodeId: 'n-vid', type: 'clip', name: 'shot01' } })
   eq('视频节点入库 → 200', rVid.status, 200)
@@ -191,8 +206,8 @@ try {
   const bad5 = await call('POST', '/assets', { token, body: { nodeId: 'nope', type: 'clip', name: 'x' } })
   eq('节点不存在 → 404', bad5.status, 404)
 
-  const bad6 = await call('POST', '/assets', { token, body: { nodeId: 'n-vid', type: 'clip', name: '中文名' } })
-  eq('非法资产名 → 400', bad6.status, 400)
+  const bad6 = await call('POST', '/assets', { token, body: { nodeId: 'n-vid', type: 'clip', name: 'bad:name' } })
+  eq('非法资产名（含冒号）→ 400', bad6.status, 400)
 
   // ---------------------------------------------------------------------------
   console.log('\n[3] 媒体伺服：视频资产必须能放出来')
@@ -324,6 +339,9 @@ try {
   eq('text 只允许 text', assetTypesForKind('text').join(','), 'text')
   eq('normalizeAssetId(clip)', normalizeAssetId('clip', 'shot01'), 'clip:shot01')
   eq('normalizeAssetId(text, 带 state)', normalizeAssetId('text', 'shotlist', 'v2'), 'text:shotlist/v2')
+  eq('slugifyName 保留中文', slugifyName('小狐狸·穿宇航服'), '小狐狸-穿宇航服')
+  eq('normalizeAssetId 支持中文', normalizeAssetId('character', '小狐狸', '穿宇航服'), 'character:小狐狸/穿宇航服')
+  eq('normalizeAssetId 中文标题分隔符归一', normalizeAssetId('character', '小狐狸·穿宇航服'), 'character:小狐狸-穿宇航服')
   ok('isAssetRef 认 clip:/text: 前缀', isAssetRef('clip:x') && isAssetRef('text:y') && !isAssetRef('foo:z'))
 
   {

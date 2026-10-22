@@ -105,7 +105,7 @@ import { markdownToHtml } from './markdown.js'
   }
 
   function slugify(s) {
-    return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    return String(s || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '')
   }
 
   function renderTextContent(content) {
@@ -410,7 +410,7 @@ import { markdownToHtml } from './markdown.js'
       if (!assets.length) {
         const p = document.createElement('p')
         p.className = 'lib-empty-hint'
-        p.innerHTML = '资产库还是空的。<br>画布上的图片、视频、文本卡片都能点「入库」登记（选类型 + 填小写英文名），<br>之后任意会话都能从这里直接取用到画布；图片类还能直接当 ref 参考图。'
+        p.innerHTML = '资产库还是空的。<br>画布上的图片、视频、文本卡片都能点「入库」登记（选类型 + 填名字：中文 / 英文 / 拼音都可以），<br>之后任意会话都能从这里直接取用到画布；图片类还能直接当 ref 参考图。'
         body.appendChild(p)
         foot.appendChild(dialogBtn('完成', () => dlg.close()))
         return
@@ -565,7 +565,7 @@ import { markdownToHtml } from './markdown.js'
       }
       box.appendChild(typeSel)
 
-      box.appendChild(label('资产名（小写英文/拼音，如 luna）'))
+      box.appendChild(label('资产名（支持中文 / 英文 / 拼音，如 小狐狸 / luna）'))
       const nameInput = document.createElement('input')
       nameInput.type = 'text'
       nameInput.value = String(defaultName || '')
@@ -607,7 +607,7 @@ import { markdownToHtml } from './markdown.js'
 
   function paramsSummary(node) {
     if (!node.params || typeof node.params !== 'object') return ''
-    const keys = ['model', 'seed', 'width', 'height', 'length', 'steps', 'guidance']
+    const keys = ['model', 'tier', 'character', 'cardVariant', 'seed', 'width', 'height', 'length', 'steps', 'guidance']
     const parts = keys.filter((k) => node.params[k] !== undefined && node.params[k] !== null)
       .map((k) => k + '=' + node.params[k])
     return parts.join(' · ')
@@ -879,6 +879,7 @@ import { markdownToHtml } from './markdown.js'
       + (project.settings?.duration ? ' · 时长 ' + project.settings.duration : '')
       + ' · 音频 ' + (project.settings?.audioMode || 'silent')
       + ' · 档位 ' + (project.settings?.mode || 'quality')
+      + (project.settings?.characterCardVariant ? ' · 角色卡 ' + (project.settings.characterCardVariant === 'three' ? '三视图' : '单视图') : '')
       + ' · 审查 ' + (project.settings?.reviewMode === 'batch' ? '批量' : '逐镜')
       + ' · 节点 ' + nodes.length
       + (nodes.length ? '（主线 ' + main.length + (frames.length ? ' · 抽帧 ' + frames.length : '') + (discards.length ? ' · 作废 ' + discards.length : '') + '）' : '')

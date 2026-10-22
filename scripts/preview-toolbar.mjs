@@ -105,8 +105,12 @@ if (process.argv.includes('--assert')) {
   const capTiers = TE.tiersOf(apiPayload, 'video.reference2video')
   const tiersOk = tierVals.length > 0 && tierVals.join(',') === capTiers.join(',')
   const labelsHaveEst = tierSel ? findAll(tierSel, (n) => n.type === 'option').every((o) => String(o.props.children).includes('约')) : false
-  const okAll = orphan === 0 && labels.length > 0 && groups.length > 0 && tiersOk && labelsHaveEst
-  console.log(`参数条结构断言：标签 ${labels.length} / 分组 ${groups.length} / 游离 ${orphan} / 档位选项 [${tierVals.join(', ')}] = 矩阵 [${capTiers.join(', ')}] ${tiersOk ? '✓' : '✗'} / 选项含实测耗时 ${labelsHaveEst ? '✓' : '✗'} → ${okAll ? '✓ 通过' : '✗ 失败'}`)
+  const addSlots = findAll(tree, (n) => n.props && n.props.className === 'svsg-slot add')
+  const addHints = addSlots.map((n) => String(n.props.title || '')).join(' | ')
+  const refSourcesOk = addSlots.length > 0 && /画布/.test(addHints) && /资产库/.test(addHints)
+  const noPickerByDefault = findAll(tree, (n) => n.props && n.props.className === 'svsg-picker-mask').length === 0
+  const okAll = orphan === 0 && labels.length > 0 && groups.length > 0 && tiersOk && labelsHaveEst && refSourcesOk && noPickerByDefault
+  console.log(`参数条结构断言：标签 ${labels.length} / 分组 ${groups.length} / 游离 ${orphan} / 档位选项 [${tierVals.join(', ')}] = 矩阵 [${capTiers.join(', ')}] ${tiersOk ? '✓' : '✗'} / 选项含实测耗时 ${labelsHaveEst ? '✓' : '✗'} / 参考图来源 [${addHints || '(无加号)'}] ${refSourcesOk ? '✓' : '✗'} / 选择器默认关闭 ${noPickerByDefault ? '✓' : '✗'} → ${okAll ? '✓ 通过' : '✗ 失败'}`)
   process.exit(okAll ? 0 : 1)
 }
 const inner = toHtml(tree)

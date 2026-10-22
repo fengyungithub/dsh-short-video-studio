@@ -223,8 +223,8 @@ studio/app.css     两套调色板：:root（浅，默认）/ :root[data-theme="
 
 ### 3.5 集成层
 
-- **Agent 工具**（原生 ToolDefinition，parameters 直接写 JSON Schema，零 `@deepseek-ai/*` 运行时 import，全部走注入 `ctx`）：15 个工具 = 6 生成/抽帧/拼接/查询（`comfy_generate_image` / `comfy_generate_video` / `comfy_render` / `extract_frame` / `video_concat` / `comfy_list_workflows`）+ 7 画布（`canvas_list_nodes` / `canvas_write_node` / `canvas_get_node` / `canvas_group_nodes` / `canvas_reorder` / `canvas_get_state` / `canvas_set_state`）+ 2 资产（`asset_list` / `asset_to_canvas`）。
-- **systemPrompt GUIDANCE 段**（order 150）：基本约定 + 工具契约 + 参考图硬规则（**形态随视频档位** / 零文字等实测结论）+ 指向流程 skill 的指针。**不含任何流程、任何片型词汇、任何具体 skill 名**——流程的唯一真相在 skill。
+- **Agent 工具**（原生 ToolDefinition，parameters 直接写 JSON Schema，零 `@deepseek-ai/*` 运行时 import，全部走注入 `ctx`）：18 个工具 = 6 生成/抽帧/拼接/查询（`comfy_generate_image` / `comfy_generate_video` / `comfy_render` / `extract_frame` / `video_concat` / `comfy_list_workflows`）+ 9 画布（`canvas_list_nodes` / `canvas_write_node` / `canvas_get_node` / `canvas_write_prompt_bank` / `canvas_get_prompt` / `canvas_group_nodes` / `canvas_reorder` / `canvas_get_state` / `canvas_set_state`）+ 2 资产（`asset_list` / `asset_to_canvas`）。
+- **systemPrompt GUIDANCE 段**（order 150）：基本约定 + 工具契约 + 参考图硬规则（**角色卡双版本 / STEP 0 用户选择引用版本 / fast 只能单视图 / 非 fast 形态回退** / 零文字等实测结论）+ **提示词分档持久化（prompt bank）** + 指向流程 skill 的指针。**不含任何流程、任何片型词汇、任何具体 skill 名**——流程的唯一真相在 skill。
 - **HTTP 路由**（`/dsh-short-video-studio`）：
   - `/api/config`、`/api/workflows`：**显式 tokenless**（设置页调用；威胁模型见 §7）；
   - `/api/canvas`、`/api/canvas/node`、`/api/canvas/group`、`/api/canvas/reorder`、`DELETE /api/canvas/node`、`GET|POST|DELETE /api/assets`（入库 / 列表 / 删除）、`/api/generate/image|video`：需 `x-dsh-svs-token` 头；
@@ -244,7 +244,7 @@ studio/app.css     两套调色板：:root（浅，默认）/ :root[data-theme="
 
 ### 4.1 一次图片/视频生成（Agent 工具路径）
 ```
-Agent 调用 comfy_generate_video(prompt, type='r2v', ref_nodes=[角色卡,场景卡], tier='quality', ...)
+Agent 调用 comfy_generate_video(prompt_node=…, type='r2v', ref_nodes=[角色卡,场景卡], ref_variant='three', tier='quality', ...)
   → runRender(capability=video.reference2video)
   → 注册表按 tier 解析（显式 workflow > tiers 配置 > 组内该档标准实现；缺档/不可用显式报错）
   → 上传参考图（画布节点 media 或资产库图片 → /upload/image）
@@ -331,7 +331,7 @@ Agent 调用 comfy_generate_video(prompt, type='r2v', ref_nodes=[角色卡,场�
 | **P2** | `schemaVersion` 无迁移 | 只有写入无检查无 `migrate()`，为将来 shotlist 节点预留 |
 | **P2** | 设置页资产字段仍硬编码 | 应改为按 registry 动态渲染（即 M4）。入库表单化已完成（资产类型下拉 + 资产名，不再从分组名反推类型） |
 
-另外 `docs/consistency-optimization-plan.md` 指出的功能缺口中，「无拼接能力」已由 `runConcat` 解决，「末帧串联链路断裂（无抽帧能力）」已由 `extract-frame` 清单 + `extract_frame` 工具解决；仍未解决：`slugifyName` 对中文标题失效导致入库堵死、无身份锁（仅参考图 + 散文约束）、七列镜头表不可机读（无 shotlist schema）。
+另外 `docs/consistency-optimization-plan.md` 指出的功能缺口中，「无拼接能力」已由 `runConcat` 解决，「末帧串联链路断裂（无抽帧能力）」已由 `extract-frame` 清单 + `extract_frame` 工具解决；仍未解决：无身份锁（仅参考图 + 散文约束）、七列镜头表不可机读（无 shotlist schema）。**`slugifyName` 的中文标题入库问题已解决（2026-10-22：资产名支持 Unicode 字母/数字，含中文）。**
 
 ---
 
@@ -365,7 +365,7 @@ Agent 调用 comfy_generate_video(prompt, type='r2v', ref_nodes=[角色卡,场�
 |---|---|
 | 工具契约（名/参数/语义） | ① `makeTools` description（硬）② `GUIDANCE` 工具契约段 ③ `SKILL.md` 工具映射表 |
 | 流水线 Step 0-8 | ① `GUIDANCE` ② `SKILL.md` 正文 ③ `references/`（更细规范） |
-| 实践要点（形态随档位/零文字/档位条件） | ① `GUIDANCE` ② `SKILL.md` ③ README ④ `references/reference-image-contract.md`（完整证据）。**规则（2026-10-10 起）**：角色卡默认形态随项目视频档位——`fast` 单视图 / `balanced`·`quality` 三视图横排；`fast` 档对 `ref_nodes` 设 G-ref 形态门禁，判定键是**每次调用实际传入的 `tier`**；`balanced` / `quality` 实测干净 |
+| 实践要点（角色卡双版本/零文字/档位条件/prompt bank） | ① `GUIDANCE` ② `SKILL.md` ③ README ④ `references/reference-image-contract.md`（完整证据）与 `docs/prompt-bank.md`。**规则（2026-10-22 起）**：每个角色固定出单视图 + 三视图两版（`character` / `cardVariant` / `pairedNodeId` 配对）；**视频引用哪一版由 STEP 0 用户选择**（`canvas_set_state(characterCardVariant=…)`）——项目档位 `fast` 只能单视图，`balanced`·`quality` 可选单视图或三视图；每镜显式传 `ref_variant`（fast 镜强制 single），工具不按 tier 自动选；非 fast 档若出现参考图形态类污染先退回单视图重渲；`fast` 档对 `ref_nodes` 设 G-ref 形态门禁。**提示词按 fast/balanced/quality 三段持久化到画布（prompt bank）；当前 story/brand 策略是三段同文、共用 quality 提示词，换档只变采样。** |
 | 模型名 | ① `GUIDANCE`（「图片默认 flux-text2image」）② `SKILL.md` 正文括号备注 |
 
 两个漂移放大器：

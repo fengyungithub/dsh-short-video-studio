@@ -145,7 +145,7 @@ for (const t of tools) {
 // 只挑"空参数必然早期失败、且不产生副作用"的工具跑。
 const INERT_ON_EMPTY_ARGS = [
   'comfy_list_workflows', 'canvas_list_nodes', 'canvas_get_state', 'canvas_get_node',
-  'asset_list', 'video_upscale', 'extract_frame', 'video_concat', 'comfy_render', 'comfy_generate_video',
+  'asset_list', 'video_upscale', 'extract_frame', 'video_concat', 'comfy_render', 'comfy_generate_video', 'canvas_write_prompt_bank', 'canvas_get_prompt',
 ]
 if (host && typeof host.mod.validateJsonSchemaValue === 'function') {
   for (const tool of tools.filter((t) => INERT_ON_EMPTY_ARGS.includes(t?.name))) {

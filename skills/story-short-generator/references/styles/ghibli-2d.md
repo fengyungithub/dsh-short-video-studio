@@ -38,7 +38,7 @@ STYLE LOCK-B — rounded soft body shapes with relaxed hand-drawn contours, natu
 
 ## 5. 分层适配
 
-- **角色卡**：形态随视频档位（`fast` 单视图正面全身 / `balanced`·`quality` 三视图横排）+ **锁 A + 锁 B**。色指定（发色 / 服装色）写进节点描述。
+- **角色卡**：双版本（单视图正面全身 + 三视图横排；视频引用版本由 STEP 0 用户选择：`fast` 只能单视图，`balanced`·`quality` 可选单视图或三视图）+ **锁 A + 锁 B**。色指定（发色 / 服装色）写进节点描述。
 - **场景卡**：本风格的核心竞争力所在——环境卡可以画得比角色更细，但仍要**单视图**、零文字、无人物，且**只加锁 A**。⚠️ **不要带锁 B**——表演语言会把人物拉进画面（实测发现，见 `pixar-3d.md` 第 5 段）。
 - **道具卡**：单件道具单视图 + **只加锁 A**。
 - **视频片段（r2v / i2v）**：**锁 A + 锁 B**，追加在 H3 结构化 prompt **之后**。风景 / 运镜镜（云、风、光）是本风格的强项，可多排。
@@ -46,7 +46,7 @@ STYLE LOCK-B — rounded soft body shapes with relaxed hand-drawn contours, natu
 
 ## 6. 与参考图契约的关系
 
-本风格**不改变**形态规则（角色卡随视频档位：`fast` 单视图 / `balanced`·`quality` 三视图横排）与「零文字 / 不拼图」硬规则；`fast` 档仍受 G-ref 门禁约束（见 [reference-image-contract.md](../reference-image-contract.md)）。
+本风格**不改变**形态规则（角色卡固定双版本（单视图 + 三视图）；视频引用版本由 STEP 0 用户选择，`fast` 只能单视图）与「零文字 / 不拼图」硬规则；`fast` 档仍受 G-ref 门禁约束（见 [reference-image-contract.md](../reference-image-contract.md)）。
 
 ## 7. 已知风险与未实测项
 
