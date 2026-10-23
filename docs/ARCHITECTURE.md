@@ -158,7 +158,7 @@ comfy_render / comfy_generate_* → runRender(ctx, opts)
 |---|---|---|
 | 画布项目 | `<workspace>/canvas/<sessionId>/project.json` | `schemaVersion:1` + `settings`（aspectRatio / duration / audioMode / mode / groupOrder）+ `nodes[]`；**原子写**（tmp + rename）+ **per-session 写锁**（串行化并发） |
 | 媒体产物 | `<workspace>/canvas/<sessionId>/<filename>` | 节点只存相对路径，经 `/media` 路由带 token 伺服 |
-| 资产库 | `<root>/.dsh-assets/library.json` + `images/` | 跨会话素材。id 规范 `<type>:<name>[/<state>]`，`char:` 是 `character:` 别名。**type（语义类别）与 kind（载体）正交**：type ∈ character/scene/style/clip/text，kind ∈ image/video/text 由 type 推导（`TYPE_KINDS`）；kind 决定存法（图片/视频拷文件、文本只存 `text`+`title`+`nodeKind`）、取回画布时的节点类型、以及能否作 `ref_nodes` 参考图（只有 image 能）。目录名 `images/` 是历史包袱，视频文件也放这里 |
+| 资产库 | `<root>/.dsh-assets/library.json` + `images/` | 跨会话素材。**id 与显示名解耦**：新入库 id = `<type>:<16 位随机 hex>`（入库时生成、永久不变），显示名是独立字段、可随时重命名（state 为历史遗留字段，界面只读展示）；老库记录仍是 `<type>:<name>[/<state>]` 的可读 id（历史遗留，不再改）。`char:` 是 `character:` 别名。**type（语义类别）与 kind（载体）正交**：type ∈ character/scene/style/clip/text，kind ∈ image/video/text 由 type 推导（`TYPE_KINDS`）；kind 决定存法（图片/视频拷文件、文本只存 `text`+`title`+`nodeKind`）、取回画布时的节点类型、以及能否作 `ref_nodes` 参考图（只有 image 能）。目录名 `images/` 是历史包袱，视频文件也放这里 |
 | 插件配置 | `~/.dsh/dsh-short-video-studio.json`（或 `DSH_SVS_CONFIG`） | canvasHome / baseUrl / apiKey / pollMs / timeoutMs / models / assetOverrides / preferred；**优先级 env > 配置 > 默认**，每次调用重读（设置即时生效）。例外：`canvasHome`（画布的家）由**浏览器半在插件启动时读一次**，改动后需刷新页面 |
 
 ### 3.4 展示层（浏览器半）
@@ -180,7 +180,7 @@ comfy_render / comfy_generate_* → runRender(ctx, opts)
 1. **`conversation.view` 槽**（id `short-video-canvas`，order 20，label「画布」）：渲染 iframe 指向宿主伺服的 `/dsh-short-video-studio/?sessionId=&workspaceId=`。iframe 内「重做」按钮通过 `postMessage`（channel `dsh-short-video-studio`，type `ask-ai`）把指令回填父页输入框（`inputActions.setDraft`）。
 2. **`settings.section` 槽**（id `comfyui`，order 120）：ComfyUI 设置卡——**界面（画布位置 canvasHome）**、连接参数、工作流注册表（按 capability 分组、设默认写回 `preferred`）、资产覆盖（选中工作流后按 manifest 动态渲染 assets 字段）、工作流导入（粘贴 manifest 或 ComfyUI「导出 API」原始 JSON，自动转换）、用户清单删除。
 
-`studio/` 为**自包含无构建**画布页（index.html + app.js + app.css）：读取 `/api/canvas` 全量渲染节点卡（文本/表格 markdown 解析、图片/视频媒体、参数摘要、状态），支持节点内编辑、重做（回填给 AI）、**入库**（表单选资产类型 + 资产名，AI 不自动入库）、分组改名（自由输入 + datalist 候选）、上移/下移/删除；**分组词汇由流程 skill 自由定义**，展示顺序取 `settings.groupOrder`（skill 经 `canvas_set_state` 声明），未声明的分组按首次出现顺序排在其后，缺省分组为 `ungrouped`。iframe 内禁用原生 alert/confirm/prompt，自绘 DOM 模态框。
+`studio/` 为**自包含无构建**画布页（index.html + app.js + app.css）：读取 `/api/canvas` 全量渲染节点卡（文本/表格 markdown 解析、图片/视频媒体、参数摘要、状态），支持节点内编辑、重做（回填给 AI）、**入库**（表单选资产类型 + 显示名，资产 id 自动生成，AI 不自动入库）、分组改名（自由输入 + datalist 候选）、上移/下移/删除；**分组词汇由流程 skill 自由定义**，展示顺序取 `settings.groupOrder`（skill 经 `canvas_set_state` 声明），未声明的分组按首次出现顺序排在其后，缺省分组为 `ungrouped`。iframe 内禁用原生 alert/confirm/prompt，自绘 DOM 模态框。
 
 顶栏三块内容是 **A 品牌（`.brand`）/ B 工程参数（`.meta`）/ C 按钮（`.topbar-bar`）**，DOM 顺序即 A B C，响应式只改排列方向（`app.css` 的 `.topbar` 及其 `@media (max-width: 960px)`）：
 
@@ -227,7 +227,7 @@ studio/app.css     两套调色板：:root（浅，默认）/ :root[data-theme="
 - **systemPrompt GUIDANCE 段**（order 150）：基本约定 + 工具契约 + 参考图硬规则（**角色卡双版本 / STEP 0 用户选择引用版本 / fast 只能单视图 / 非 fast 形态回退** / 零文字等实测结论）+ **提示词分档持久化（prompt bank）** + 指向流程 skill 的指针。**不含任何流程、任何片型词汇、任何具体 skill 名**——流程的唯一真相在 skill。
 - **HTTP 路由**（`/dsh-short-video-studio`）：
   - `/api/config`、`/api/workflows`：**显式 tokenless**（设置页调用；威胁模型见 §7）；
-  - `/api/canvas`、`/api/canvas/node`、`/api/canvas/group`、`/api/canvas/reorder`、`DELETE /api/canvas/node`、`GET|POST|DELETE /api/assets`（入库 / 列表 / 删除）、`/api/generate/image|video`：需 `x-dsh-svs-token` 头；
+  - `/api/canvas`、`/api/canvas/node`、`/api/canvas/group`、`/api/canvas/reorder`、`DELETE /api/canvas/node`、`GET|POST|DELETE /api/assets`（入库 / 列表 / 删除）、`POST /api/assets/rename`（重命名：只改显示名，id 不变）、`/api/generate/image|video`：需 `x-dsh-svs-token` 头；
   - `/media`：token 走 query（便于 `<img>/<video>` 直接加载），**路径安全五步校验**（`safeRelative` → `resolve` → `inside` → `realpath` → 再 `inside`，连符号链接逃逸都堵）；
   - 静态 `studio/`：index.html 注入 token 后伺服，开发期 no-cache。
 - **skill 自动安装 + 版本戳刷新**：`apply()` 时调 `syncBundledSkills()`（`lib/index.js`，本插件 skill 分发的唯一实现，可注入路径以便测试）把 `<包>/skills/<name>` 同步到 `~/.dsh/skills/<name>`：
@@ -262,7 +262,9 @@ Agent 调用 comfy_generate_video(prompt_node=…, type='r2v', ref_nodes=[角色
 ```
 画布节点「入库」按钮（人工，图片/视频/文本节点都有）→ POST /api/assets
   → 服务端按节点 kind 推出载体、校验 type 是否属于该载体（不匹配即 400）
-  → registerAsset：image/video 拷文件到 .dsh-assets/images/ + 索引；text 只存正文（无文件）
+  → 生成不透明 id：同「类型 + 显示名」命中已有资产就沿用它的 id（更新内容、保留 createdAt 与原 state），
+    否则 newAssetId() 生成 <type>:<16hex>（随机、永久不变）
+  → registerAsset：image/video 拷文件到 .dsh-assets/images/<id>.<ext> + 索引；text 只存正文（无文件）
 → 新会话 asset_list() → 命中 asset_to_canvas(id) → 按 kind 物化回画布（image/video→媒体节点，
   text→text 或 table 节点，看入库时的 nodeKind），节点 params.assetId 溯源
 → 图片类资产再经 comfy_generate_video(type='r2v', ref_nodes=[资产 id]) 复用同一张图，保证一致性且不重复生成
@@ -274,7 +276,14 @@ Agent 调用 comfy_generate_video(prompt_node=…, type='r2v', ref_nodes=[角色
 - 返回值 `{removed, id, file, fileDeleted}`；`fileDeleted` 的语义是**确实删掉了一个文件**（先判存在再删，不用 `rmSync({force})` 的静默成功），所以 `false` 有三种情况：被别的记录引用着、资产本就没有文件（文本）、文件早已不在盘上。
 - 图片/视频是**拷贝**进库的（不是链接）：源会话目录被清掉也不影响跨会话复用，代价是视频会多占一份磁盘。
 
-**kind 的两道闸门**：① 入库时表单下拉按 kind 收窄 + 服务端二次校验，避免出现「视频登记成 `character:luna`」这种记录（agent 会拿它当参考图去驱动生成，必然失败）；② 读取时 `resolveAssetImagePath` 硬性只认 image，视频/文本永远不会被当作 `ref_nodes` 图片传给 ComfyUI（`/media?asset=` 路由改用不限 kind 的 `resolveAssetPath`，否则视频资产会 404）。
+**重命名（`POST /api/assets/rename`，body `{id, name?, state?}`）的语义**（`renameAsset`）：
+- **只改显示名，id 与文件永远不动**：id 是跨会话引用的唯一键，改名不换 id ⇒ 各会话画布上的 `params.assetId`、文本节点、历史对话里的引用全部继续有效，**不需要任何迁移**（早期「改 id + 迁移绑定」的方案已废弃，因为它兜不住文本 / 对话引用）。
+- `name` 省略 = 保持；显式传空 = **400**。**界面只发 `name`**；`state` 仍可经 API 修改（兼容脚本 / 老调用），但 UI 已不提供编辑，作为历史字段只读展示。
+- **同类型内显示名唯一**：同类型 + 同显示名已有别的资产时拒绝（409）。state 不参与唯一性，入库按「类型 + 显示名」更新。比较忽略大小写与全半角。不同类型可以同名。
+- `character` 配对元数据**不动**（配对靠它，不靠显示名）；文本资产的 `title` 仍与旧显示名一致时才跟随。
+- 返回 `{renamed, id, name, state}`；id 不存在 404。
+
+**kind 的两道闸门**：① 入库时表单下拉按 kind 收窄 + 服务端二次校验，避免出现「视频登记成角色卡」这种记录（agent 会拿它当参考图去驱动生成，必然失败）；② 读取时 `resolveAssetImagePath` 硬性只认 image，视频/文本永远不会被当作 `ref_nodes` 图片传给 ComfyUI（`/media?asset=` 路由改用不限 kind 的 `resolveAssetPath`，否则视频资产会 404）。
 
 ---
 
@@ -303,14 +312,14 @@ Agent 调用 comfy_generate_video(prompt_node=…, type='r2v', ref_nodes=[角色
 | `lib/index.js` | 宿主入口：配置、ComfyUI 客户端、渲染编排（runRender + legacy）、画布存储、HTTP 路由、13 个工具、GUIDANCE、skill 安装、`_internals` 测试出口 |
 | `lib/manifest.js` | 契约引擎：`CAPABILITIES` 词汇、`validateManifest`、`resolveAssets`、`buildGraphFromManifest`（注入引擎）、`loadBuiltinManifests` |
 | `lib/convert.js` | ComfyUI 导出 → manifest 机械转换（资产抽取、标量注入点、todos 交人工的语义绑定清单） |
-| `lib/assets.js` | 资产库：load/save/register/remove、id 规范化（`normalizeAssetId`）、`isAssetRef` / `canonicalAssetId`、kind 派生（`assetKind` / `assetTypesForKind` / `TYPE_KINDS` / `NODE_KINDS`）、`assetStoredFile`、`resolveAssetPath`（任意 kind）/ `resolveAssetImagePath`（只认 image，作 ref 安全闸门）、`slugifyName` |
+| `lib/assets.js` | 资产库：load/save/register/remove/**rename**（只改显示名）、**不透明 id 生成**（`newAssetId` → `<type>:<16hex>`）、显示名规范化 + 按「类型+显示名」查重 / 按名更新（`normalizeDisplayName` / `findAssetByLabel` / `assetDisplayName`）、历史 state 只读解析（`assetDisplayState`）、老式 id 构造与解析（`normalizeAssetId` / 内部 `parseLegacyId`）、`isAssetRef` / `canonicalAssetId`、kind 派生（`assetKind` / `assetTypesForKind` / `TYPE_KINDS` / `NODE_KINDS`）、`assetStoredFile`、`resolveAssetPath`（任意 kind）/ `resolveAssetImagePath`（只认 image，作 ref 安全闸门）、`slugifyName` |
 | `lib/concat.js` | 视频拼接：`buildConcatGraph`（纯函数，变长左折叠图）、`detectFfmpeg`、`ffmpegConcat`（copy 失败降级重编码） |
 | `lib/client.js` | 浏览器半：画布的家（`canvasHome` 决定 `conversation.view` tab 或 `sidebar.right.pane.tab` 右栏类型，两者复用同一个 `CanvasView`）+ 画布主题跟随宿主浅/深（读 `ui-theme` + `?theme=` / postMessage 双通道）+ `settings.section` ComfyUI 设置卡 |
 | `studio/` | 自包含画布页：节点卡渲染、编辑/重做/入库/分组/排序/删除、markdown 表格解析、自绘模态、ask-ai postMessage、**双调色板跟随宿主浅/深**（`<html data-theme>`，app.css 两套调色板 + index.html 首屏脚本 + app.js message 监听） |
 | `workflows/` | 4 份内置 manifest（数据） |
 | `schemas/workflow-manifest.schema.json` | manifest 权威 JSON Schema |
 | `skills/story-short-generator/` | 其中一种片型的生产流程 skill（自包含单文件 SKILL.md + meta.yaml）；插件对它零认知 |
-| `scripts/` 冒烟与走查 | `mock-apply`（装配冒烟）、`smoke-manifest`（M1 图编译等价）、`smoke-render`（M2 纯逻辑）、`smoke-concat`（拼接图拓扑）、`smoke-canvas-home`（画布的家 + 主题接线的纯逻辑）、`smoke-canvas-theme`（双调色板对等 / 零颜色字面量 / WCAG）、`preview-canvas`（真浏览器：两套主题的实际合成像素对比度 + 宽/窄栏响应式布局 + 资产库对话框三载体与删除交互 + 截图）、`smoke-assets`（真路由：三种载体的入库/删除/物化 + 老库兼容）、`preview-settings` / `preview-toolbar`（离屏渲染截图）、`lib/ui-probe.mjs`（宿主主题变量 + 浏览器内对比度/溢出度量，含 `color(srgb …)` 解析）、`probe-concat` / `probe-extract-frame`（实跑，需 ComfyUI）、`smoke-flux2` / `smoke-submit` / `e2e` / `e2e-comfy`（需 ComfyUI）、`import-comfy`（CLI 转换） |
+| `scripts/` 冒烟与走查 | `mock-apply`（装配冒烟）、`smoke-manifest`（M1 图编译等价）、`smoke-render`（M2 纯逻辑）、`smoke-concat`（拼接图拓扑）、`smoke-canvas-home`（画布的家 + 主题接线的纯逻辑）、`smoke-canvas-theme`（双调色板对等 / 零颜色字面量 / WCAG）、`preview-canvas`（真浏览器：两套主题的实际合成像素对比度 + 宽/窄栏响应式布局 + 资产库对话框三载体、重命名与删除交互 + 截图）、`smoke-assets`（真路由：三种载体的入库/删除/**重命名**/物化 + 老库兼容 + 画布绑定迁移）、`preview-settings` / `preview-toolbar`（离屏渲染截图）、`lib/ui-probe.mjs`（宿主主题变量 + 浏览器内对比度/溢出度量，含 `color(srgb …)` 解析）、`probe-concat` / `probe-extract-frame`（实跑，需 ComfyUI）、`smoke-flux2` / `smoke-submit` / `e2e` / `e2e-comfy`（需 ComfyUI）、`import-comfy`（CLI 转换） |
 | `scripts/` 模板层（H3 一个 json = 一个档位实现） | `h3-templates/`（手写源）→ 三个生成器 → `workflows/`（产物，勿手改）：`make-h3-variants.mjs`（模板 → 单档清单，自动填 `requiresNodes`/`estSeconds`/`note`）、`make-pdd-template.mjs`（从同族 base 生成 PDD 模板，固定 6 处改动：model 直连 UNETLoader 不走 `$model` 哨兵、插 `MiniMaxH3PDDAccApply`、guider 改用其输出、删 `BasicScheduler`、`sigmas` 接该节点的 1 号输出、采样器强制 euler；shift 固定 12/3，`requiresNodes=['MiniMaxH3PDDAccApply']`，`priority=-30` 不做隐式默认）、`make-sol-attn-variant.mjs`（插 Sol 节点；`--after=<锚点>`，遇到 PDD 模板会自动锚定 PDD 节点、Sol id 改用 `2b`，避免与 Apply 节点的 `2a` 撞号） |
 | `scripts/bench-h3.mjs` + `e2e-out/{sharpness,noise-floor,frame-check,crop}.mjs` | 实测工具链：`bench-h3` 由**模板**直接组图跑真机并计时（两条臂只要 ref/seed/length/prompt 一致，差异即只来自配方；`--dry` 先核对配方）；`frame-check` 抽某帧、`sharpness` 比高频能量、`noise-floor` 比 16×16 分块梯度的低分位（**跨臂内容无关的噪声地板判据**：干净渲染里应有接近零的平坦块）。PDD 的"锐度高是细节还是颗粒"就是靠这一对指标判定的 |
 | `cordis.patch.yml` | bundle patch：插件行插入 web profile roster |
@@ -329,7 +338,7 @@ Agent 调用 comfy_generate_video(prompt_node=…, type='r2v', ref_nodes=[角色
 | **P1** | 无 `npm test` / CI | `scripts/` 8 个文件全靠手跑；`smoke-manifest` / `smoke-render` / `mock-apply` 是纯逻辑可 CI |
 | **P2** | tokenless 路由 `/config` / `/workflows` | `POST /workflows` 会写图文件并 `reloadRegistry`，`POST /config` 可改 baseUrl；建议加 token 或明示威胁模型 |
 | **P2** | `schemaVersion` 无迁移 | 只有写入无检查无 `migrate()`，为将来 shotlist 节点预留 |
-| **P2** | 设置页资产字段仍硬编码 | 应改为按 registry 动态渲染（即 M4）。入库表单化已完成（资产类型下拉 + 资产名，不再从分组名反推类型） |
+| **P2** | 设置页资产字段仍硬编码 | 应改为按 registry 动态渲染（即 M4）。入库表单化已完成（资产类型下拉 + 显示名，不再从分组名反推类型） |
 
 另外 `docs/consistency-optimization-plan.md` 指出的功能缺口中，「无拼接能力」已由 `runConcat` 解决，「末帧串联链路断裂（无抽帧能力）」已由 `extract-frame` 清单 + `extract_frame` 工具解决；仍未解决：无身份锁（仅参考图 + 散文约束）、七列镜头表不可机读（无 shotlist schema）。**`slugifyName` 的中文标题入库问题已解决（2026-10-22：资产名支持 Unicode 字母/数字，含中文）。**
 

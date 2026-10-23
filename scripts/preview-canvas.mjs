@@ -93,6 +93,21 @@ const server = createServer((req, res) => {
   const rel = p.slice(ROUTE_ROOT.length).replace(/^\/+/, '')
   if (rel === 'api/canvas') { jsonRes(res, 200, PROJECT); return }
   if (rel === 'api/assets/to-canvas') { jsonRes(res, 200, { ok: true, nodeId: 'n-from-lib' }); return }
+  if (rel === 'api/assets/rename') {
+    let raw = ''
+    req.on('data', (c) => { raw += c })
+    req.on('end', () => {
+      let body = {}
+      try { body = JSON.parse(raw || '{}') } catch { body = {} }
+      const a = assets.find((x) => x.id === body.id)
+      if (!a) { jsonRes(res, 404, { ok: false, message: '资产不存在: ' + (body.id || '') }); return }
+      // 只改显示名：id 与文件不变；state 未传时保持原值（与真实服务端一致）
+      a.name = String(body.name || a.name || '').trim()
+      if (typeof body.state === 'string') a.state = String(body.state).trim() || 'default'
+      jsonRes(res, 200, { ok: true, renamed: true, id: a.id, name: a.name, state: a.state })
+    })
+    return
+  }
   if (rel === 'api/assets') {
     if (req.method === 'DELETE') {
       const id = url.searchParams.get('id')
@@ -102,7 +117,7 @@ const server = createServer((req, res) => {
       jsonRes(res, 200, { ok: true, id, kind: 'video', fileDeleted: true })
       return
     }
-    jsonRes(res, 200, { ok: true, assets })
+    jsonRes(res, 200, { ok: true, assets: assets.map((a) => ({ ...a, displayName: a.name, displayState: a.state })) })
     return
   }
   if (rel === 'media') { res.writeHead(200, { 'content-type': 'image/png' }).end(PNG); return }
@@ -361,7 +376,11 @@ try {
     const p = await browser.newPage()
     await p.setViewport({ width: 1100, height: 900, deviceScaleFactor: 1 })
     const deletes = []
-    p.on('request', (r) => { if (r.method() === 'DELETE') deletes.push(r.url()) })
+    const renames = []
+    p.on('request', (r) => {
+      if (r.method() === 'DELETE') deletes.push(r.url())
+      if (r.method() === 'POST' && r.url().includes('/api/assets/rename')) renames.push(r.postData() || '')
+    })
     await p.goto(`${PAGE}&theme=dark`, { waitUntil: 'networkidle0' })
     await p.waitForSelector('.node', { timeout: 10000 })
     await p.evaluate(PROBE_CONTRAST)
@@ -406,8 +425,8 @@ try {
     ok('  视频卡片挂载体角标', vid.badge.includes('视频'), JSON.stringify(vid.badge))
     eq('  缩略图容器是定位上下文（否则角标会飞到对话框角落）', vid.thumbPos, 'relative')
     ok('文本资产不请求图片，直接显示正文摘要', txt.hasTextPreview && !txt.hasImg && txt.preview.includes('S01'), JSON.stringify(txt.preview.slice(0, 40)))
-    ok('每张卡片都有「加入画布」和「删除」',
-      view.cards.every((c) => c.buttons.some((b) => b.includes('加入画布')) && c.buttons.includes('删除')),
+    ok('每张卡片都有「加入画布」「重命名」「删除」',
+      view.cards.every((c) => c.buttons.some((b) => b.includes('加入画布')) && c.buttons.includes('重命名') && c.buttons.includes('删除')),
       JSON.stringify(view.cards.map((c) => c.buttons)))
     ok('删除是危险色（与主操作视觉区分）', view.cards.every((c) => c.dangerBtn))
     ok('对话框内无 AA 以下文本（深色）', view.lowContrast.length === 0, JSON.stringify(view.lowContrast))
@@ -429,7 +448,7 @@ try {
     await p.evaluate((o) => window.postMessage({ channel: 'dsh-short-video-studio', type: 'theme', theme: 'dark' }, o), ORIGIN)
     await p.waitForFunction(() => document.documentElement.getAttribute('data-theme') === 'dark', { timeout: 3000 })
 
-    // 按钮几何：文字必须单行且不被截断（窄卡片 + 两个按钮最容易把「＋ 加入画布」挤成两行）
+    // 按钮几何：文字必须单行且不被截断（窄卡片里三个按钮最容易把「＋ 加入画布」挤成两行）
     const btns = await p.evaluate(() => [...document.querySelectorAll('.asset-card .actions button')].map((b) => {
       const r = document.createRange(); r.selectNodeContents(b)
       return {
@@ -465,10 +484,49 @@ try {
     await p.screenshot({ path: dlgShot })
     console.log(`  截图 → ${dlgShot}`)
 
+    // 重命名：对话框预填旧名字 → 保存 → 卡片 id 跟着变，且真的发了 POST /api/assets/rename
+    await p.evaluate(() => {
+      [...document.querySelectorAll('.asset-card')].find((c) => c.dataset.assetId === 'character:luna')
+        .querySelector('.actions .btn-rename').click()
+    })
+    await p.waitForSelector('.svs-modal', { timeout: 3000 })
+    const renameForm = await p.evaluate(() => {
+      const m = document.querySelector('.svs-modal')
+      return {
+        inputs: [...m.querySelectorAll('input')].map((i) => i.value),
+        buttons: [...m.querySelectorAll('.svs-modal-actions button')].map((b) => b.textContent.trim()),
+        text: m.textContent,
+      }
+    })
+    eq('重命名对话框只有显示名一个输入框（state 已从界面去掉）', renameForm.inputs.length, 1)
+    eq('  预填旧名字', renameForm.inputs[0], 'luna')
+    eq('  按钮是 取消 / 保存', renameForm.buttons.join(','), '取消,保存')
+    ok('  文案说明只改显示名、id 与引用不变',
+      renameForm.text.includes('资产 id 不变') && renameForm.text.includes('不会断'),
+      renameForm.text.slice(0, 80))
+    await p.evaluate(() => { document.querySelector('.svs-modal input').value = 'fox' })
+    await p.evaluate(() => [...document.querySelectorAll('.svs-modal-actions button')].find((b) => b.textContent.trim() === '保存').click())
+    await p.waitForFunction(
+      () => {
+        const c = [...document.querySelectorAll('.asset-card')].find((x) => x.dataset.assetId === 'character:luna')
+        return Boolean(c) && c.querySelector('.name').textContent === 'fox'
+      },
+      { timeout: 5000 },
+    )
+    const renamed = await p.evaluate(() => {
+      const c = [...document.querySelectorAll('.asset-card')].find((x) => x.dataset.assetId === 'character:luna')
+      return { id: c.dataset.assetId, name: c.querySelector('.name').textContent, idLine: c.querySelector('.id').textContent }
+    })
+    eq('重命名后 id 不变（所有引用不受影响）', renamed.id, 'character:luna')
+    eq('  名字行更新为显示名', renamed.name, 'fox')
+    eq('  id 行保持原 id', renamed.idLine, 'character:luna')
+    ok('  发出了 POST /api/assets/rename', renames.length === 1, JSON.stringify(renames))
+    ok('  请求体不含 state 字段（界面已去掉）', renames.length === 1 && !renames[0].includes('"state"'), renames[0])
+
     // 删除：点删除 → 弹确认（必须说明画布上的卡片不受影响）→ 确认 → 卡片从列表消失
     await p.evaluate(() => {
-      [...document.querySelectorAll('.asset-card')].find((c) => c.dataset.assetId === 'clip:shot01')
-        .querySelectorAll('.actions button')[1].click()
+      const card = [...document.querySelectorAll('.asset-card')].find((c) => c.dataset.assetId === 'clip:shot01')
+      ;[...card.querySelectorAll('.actions button')].find((b) => b.textContent.trim() === '删除').click()
     })
     await p.waitForSelector('.svs-modal', { timeout: 3000 })
     const confirm = await p.evaluate(() => {

@@ -429,7 +429,8 @@ import { markdownToHtml } from './markdown.js'
           lastType = a.type
           const h = document.createElement('div')
           h.className = 'asset-group-title'
-          h.textContent = (ASSET_TYPE_LABEL[a.type] || a.type) + ' · ' + (a.state && a.state !== 'default' ? a.state + ' ' : '') + sorted.filter((x) => x.type === a.type).length
+          const stateLabel = a.displayState || a.state
+          h.textContent = (ASSET_TYPE_LABEL[a.type] || a.type) + ' · ' + (stateLabel && stateLabel !== 'default' ? stateLabel + ' ' : '') + sorted.filter((x) => x.type === a.type).length
           grid.appendChild(h)
         }
         const card = document.createElement('div')
@@ -483,7 +484,7 @@ import { markdownToHtml } from './markdown.js'
         info.appendChild(tag)
         const name = document.createElement('div')
         name.className = 'name'
-        name.textContent = a.name || a.id
+        name.textContent = a.displayName || a.name || a.id
         info.appendChild(name)
         const idLine = document.createElement('div')
         idLine.className = 'id'
@@ -504,8 +505,28 @@ import { markdownToHtml } from './markdown.js'
             addBtn.disabled = false
             alertBox('添加失败：' + (e.message || String(e)))
           }
-        }, 'btn-accent')
+        }, 'btn-accent btn-add')
         acts.appendChild(addBtn)
+
+        const renameBtn = dialogBtn('重命名', async () => {
+          const form = await assetRenameBox(a)
+          if (!form) return
+          renameBtn.disabled = true
+          renameBtn.textContent = '保存中…'
+          try {
+            await api('/assets/rename', {
+              method: 'POST',
+              body: JSON.stringify({ id: a.id, name: form.name }),
+            })
+            // 只改显示名：id 不变，重渲染库列表就能看到新名字（画布引用不受影响）
+            await render()
+          } catch (e) {
+            renameBtn.textContent = '重命名'
+            renameBtn.disabled = false
+            alertBox('重命名失败：' + (e.message || String(e)))
+          }
+        }, 'btn-rename')
+        acts.appendChild(renameBtn)
 
         const delBtn = dialogBtn('删除', async () => {
           const okToDelete = await confirmBox(
@@ -541,7 +562,7 @@ import { markdownToHtml } from './markdown.js'
   }
 
   /**
-   * 入库表单：资产类型（下拉，按节点载体收窄）+ 资产名（文本）。取消返回 null。
+   * 入库表单：资产类型（下拉，按节点载体收窄）+ 显示名（文本；资产 id 自动生成）。取消返回 null。
    * node 决定可选类型：图片→角色/场景/风格锚点；视频→视频片段；文本/表格→文本。
    */
   function assetRegisterBox(node, defaultName) {
@@ -565,7 +586,7 @@ import { markdownToHtml } from './markdown.js'
       }
       box.appendChild(typeSel)
 
-      box.appendChild(label('资产名（支持中文 / 英文 / 拼音，如 小狐狸 / luna）'))
+      box.appendChild(label('显示名（支持中文 / 英文 / 拼音，如 小狐狸 / luna；资产 id 自动生成）'))
       const nameInput = document.createElement('input')
       nameInput.type = 'text'
       nameInput.value = String(defaultName || '')
@@ -602,6 +623,60 @@ import { markdownToHtml } from './markdown.js'
       host.appendChild(box)
       nameInput.focus()
       nameInput.select()
+    })
+  }
+
+  /**
+   * 重命名资产：只改显示名（资产 id 与库文件不变，所有引用都不受影响）。
+   * 取消返回 null；确认返回 { name }。
+   */
+  function assetRenameBox(asset) {
+    return new Promise((resolve) => {
+      const host = ensureModalHost()
+      host.innerHTML = ''
+      host.className = 'svs-modal-host'
+      const box = document.createElement('div')
+      box.className = 'svs-modal lg'
+      const label = (t) => { const l = document.createElement('div'); l.className = 'svs-field-label'; l.textContent = t; return l }
+      const hint = (t) => { const p = document.createElement('p'); p.className = 'svs-hint'; p.textContent = t; return p }
+
+      const tail = String(asset.id || '').replace(/^char:/, 'character:').split(':').slice(1).join(':').split('/')
+      const rawName = String(asset.displayName || asset.name || '').trim()
+      const oldName = (rawName && !rawName.includes(':')) ? rawName : (tail[0] || '')
+
+      box.appendChild(label('资产 id（永久不变，所有引用靠它）'))
+      box.appendChild(hint(asset.id || ''))
+      box.appendChild(label('显示名（支持中文 / 英文 / 拼音，如 小狐狸 / luna）'))
+      const nameInput = document.createElement('input')
+      nameInput.type = 'text'
+      nameInput.value = oldName
+      nameInput.className = 'svs-field'
+      box.appendChild(nameInput)
+      box.appendChild(hint('改名只改显示名，资产 id 不变：所有画布、文本节点与历史对话里的引用继续有效，不会断。同类型内显示名不能重复。'))
+
+      const actions = document.createElement('div')
+      actions.className = 'svs-modal-actions'
+      const close = (val) => { host.remove(); resolve(val) }
+      const no = document.createElement('button')
+      no.className = 'btn'
+      no.textContent = '取消'
+      no.onclick = () => close(null)
+      actions.appendChild(no)
+      const yes = document.createElement('button')
+      yes.className = 'btn btn-accent'
+      yes.textContent = '保存'
+      const submit = () => {
+        const name = nameInput.value.trim()
+        if (!name) { nameInput.focus(); return }
+        close({ name })
+      }
+      yes.onclick = submit
+      actions.appendChild(yes)
+      box.appendChild(actions)
+      host.appendChild(box)
+      nameInput.focus()
+      nameInput.select()
+      nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit() })
     })
   }
 

@@ -273,9 +273,12 @@ body { display: flex; flex-direction: column; }
 }
 .asset-card .name { font-weight: 600; font-size: 13px; word-break: break-all; }
 .asset-card .id { font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace; word-break: break-all; margin-top: 2px; }
-.asset-card .actions { display: flex; gap: 6px; padding: 0 10px 10px; }
+.asset-card .actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 10px 10px; }
 /* nowrap：宁可让浏览器压缩字距，也不要「＋ 加入画布」断成两行（见上面列宽说明） */
-.asset-card .actions .btn { flex: 1; white-space: nowrap; }
+.asset-card .actions .btn { flex: 1 1 auto; white-space: nowrap; }
+/* 主操作独占一行，重命名 / 删除排第二行——窄卡片放三个按钮也不会把文字挤成两行 */
+.asset-card .actions .btn-add { flex: 1 1 100%; }
+.asset-card .actions .btn-rename { flex: 0 0 auto; }
 .asset-card .actions .btn-danger { flex: 0 0 auto; }
 .btn-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 12%, transparent); }
