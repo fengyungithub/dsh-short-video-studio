@@ -1,0 +1,19 @@
+display-name-zh: 短剧系列制片
+version: 0.1.1
+tag-en: Short Drama
+tag-cn: 短剧漫剧
+complete-tags-en:
+  - Short Drama / Full Production
+  - Short Drama / Series Production
+  - Short Drama / Planning
+complete-tags-cn:
+  - 短剧漫剧 / 成片制作
+  - 短剧漫剧 / 系列量产
+  - 短剧漫剧 / 计划制定
+summary-en: Orchestrate a full vertical micro-drama series (50–100 episodes × 90s) by composing a script-writing skill with the single-episode film pipeline — series bible, episode packages with shot intents, asset ledger, per-episode production, cost gates and delivery.
+summary-cn: 把「剧本」与「单集成片」接起来做整部微短剧量产（50–100 集 × 90 秒）：系列圣经、含镜头意图的集制作包、资产台账、逐集生产、成本闸门与交付。
+desc-en: A thin series-level orchestrator for dsh-short-video-studio. It does not write scripts and does not define shot rules — it routes script work to short-drama-series-writer, converts an approved episode script into an episode package (six fixed sections, an 8-column shot-intent list, the episode asset list and a prefilled production spec), then delegates the single-episode production to story-short-generator's steps 3–8 (cards, seven-column shot table, storyboard, per-shot clips, assembly, final review). It owns the series bible, the per-episode state file, the asset ledger, the cost gates (sample episode before mass production), cross-episode consistency checks and per-episode delivery packs. Defaults for this format — 90 seconds per episode, 9:16 vertical, Chinese, no burned-in subtitles, balanced tier, single-view character cards, batch clip review.
+desc-cn: dsh-short-video-studio 的薄系列总控。它不写剧本、不定义拍摄规则：剧本交给 short-drama-series-writer，获批的单集剧本转成「集制作包」（固定 6 节 + 8 列镜头意图 + 本集资产清单 + 预填生产参数），再把单集生产委托给 story-short-generator 的 STEP 3–8（卡片、七列镜头表、分镜、逐镜片段、拼接、终检）。它负责系列圣经、逐集状态文件、资产台账、成本闸门（先样片集再量产）、跨集一致性抽查与每集交付包。本片型默认：90 秒/集、9:16 竖屏、中文、无画面内字幕、balanced 档、单视图角色卡、批量片段审查。
+author-en: dsh-short-video-studio
+author-cn: dsh-short-video-studio
+source: bundled

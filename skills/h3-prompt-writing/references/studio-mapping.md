@@ -94,3 +94,13 @@
 - 实测矩阵（各实现对「对白联动字幕 / 画面内文案」的表现、PDD 字幕实验与边界）：`docs/h3-prompt-integration.md` §5.4；
 - 画布实验节点：「A/B 实验结论」「PDD 字幕验证」「综合判断」；
 - 在册实现与可用性：`comfy_list_workflows`。
+
+## 6. 试镜 / 声线采样镜头（audition）
+
+试镜镜头的唯一用途是**给用户听、然后抽音轨做 `voice:` 参考**，不是成片镜头。它的 H3 结构与正片镜同源（Ref2VA 六段式），但有三条**加严**：
+
+1. **禁环境音与配乐**：`overall_soundscape: N/A` + `non_diegetic_music: N/A`，并在 `detailed_description` 正文写一句 "The recording is clean and dry: no room tone, no background noise, no music, no sound effects — only the voice."。原因：抽音轨时环境音/配乐会被一起抽进参考样本，污染音色条件。
+2. **还没有参考音频**：试镜阶段不要写 `<Audio N>`、也不要传 `audio_ref_nodes`；参考音频是试镜的**产物**（`extract_audio` → `voice:` 资产），不是输入。
+3. **单人、单句、口型可见**：一镜一说话人（`(S1)`），台词 8–14 字、中性语气、不要笑声/叹气/拟声词；画面用中性背景 + 中近景，口型清晰可见。语言与后续对白一致。
+
+工具层会校验两者的一致性：传了参考音频却没写 `<Audio N>` 会警告「参考可能只被当环境音」；反过来写了 `<Audio N>` 却没传音频会警告「空绑定」。试镜镜属于**前者不适用**（本来就没有音频输入），所以不要为了消警告去写 `<Audio 1>`。

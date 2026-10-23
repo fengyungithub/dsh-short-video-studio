@@ -255,9 +255,12 @@ body { display: flex; flex-direction: column; }
 .asset-tag.scene { color: var(--tag-scene); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
 .asset-tag.style { color: var(--tag-style); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
 .asset-tag.clip { color: var(--tag-character); border-color: color-mix(in srgb, var(--accent-2) 45%, transparent); }
+.asset-tag.voice { color: var(--tag-style); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
 .asset-tag.text { color: var(--muted); border-color: var(--border); }
 /* 视频缩略图：占位尺寸与图片一致，右上角挂一个载体角标 */
 .asset-card .thumb video { max-width: 100%; max-height: 130px; object-fit: contain; }
+/* 音频资产没有封面：原生播放器撑满卡片缩略图区域（角标仍挂右上角） */
+.asset-card .thumb audio { width: calc(100% - 20px); max-height: 130px; }
 .asset-card .thumb .kind-badge {
   position: absolute; top: 6px; right: 6px;
   font-size: 10px; line-height: 1; padding: 3px 5px; border-radius: 4px;
@@ -373,6 +376,7 @@ body { display: flex; flex-direction: column; }
 
 .media { display: block; max-width: 100%; border-radius: 8px; background: var(--media-bg); }
 video.media { max-height: 420px; }
+audio.media { width: 100%; }
 
 .text-content {
   white-space: pre-wrap;
@@ -452,6 +456,8 @@ table.node-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 }
 .node-actions .group-input { width: 140px; }
 .node-actions .spacer { flex: 1; }
+/* 音频「下载」是 <a class="btn">：与按钮同款外观，去掉链接下划线 */
+.node-actions a.btn { display: inline-flex; align-items: center; text-decoration: none; }
 
 .params { color: var(--muted); font-size: 11px; margin-top: 8px; font-family: ui-monospace, monospace; word-break: break-all; }
 

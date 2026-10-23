@@ -297,6 +297,17 @@
       },
       "max": 8
     },
+    "ref_audios": {
+      "inject": "audio",
+      "via": "node",
+      "node": "LoadAudio",
+      "input": "audio",
+      "to": {
+        "node": "5",
+        "field": "ref_audios.ref_audio_${i}"
+      },
+      "max": 3
+    },
     "prefix": {
       "inject": "scalar",
       "to": {

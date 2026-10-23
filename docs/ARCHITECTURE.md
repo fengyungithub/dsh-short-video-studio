@@ -139,7 +139,7 @@ comfy_render / comfy_generate_* → runRender(ctx, opts)
 | ffmpeg | 本机 `ffmpeg -version` 成功 | concat demuxer + `-c copy`；copy 失败自动降级 libx264/aac 重编码 | 零重编码、零显存、秒级 |
 | ComfyUI | 无 ffmpeg（本机实测即此路径） | 逐段 `POST /upload/image` 进 input（该端点同时接受 mp4）→ `LoadVideo → GetVideoComponents` → `ImageBatch` / `AudioConcat` 左折叠 → `CreateVideo(images, fps, audio)` → `SaveVideo(mp4/h264)` | 整段素材作为 IMAGE 张量进内存（N×帧×W×H×3×4 字节） |
 
-`runConcat` 解析素材时强校验 `kind === 'video'` + `media` 存在 + 文件在盘（顺带堵住了「视频被当图上传」那条老路径）。已实测：3 段片段 7.6s 出片，总时长 14.085s → 产物 14.084s，`vide` + `soun` 双轨完整。限制：**只有硬切无溶解**、片段需同分辨率、不产 BGM（注册表无 `audio.music` 工作流）。
+`runConcat` 解析素材时强校验 `kind === 'video'` + `media` 存在 + 文件在盘（顺带堵住了「视频被当图上传」那条老路径）。已实测：3 段片段 7.6s 出片，总时长 14.085s → 产物 14.084s，`vide` + `soun` 双轨完整。限制：**只有硬切无溶解**、片段需同分辨率、BGM 走 `audio.music`（内置 `minimax-music3` 清单，本地 MiniMax Music 3 权重）。
 
 #### 跨场景转场（生成式转场镜）
 

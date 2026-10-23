@@ -19,6 +19,7 @@
 - **同场景续接镜「续得上」**：`continuity_from=上一镜节点 id` ⇒ **链式续接**——把上一镜的**服务端 latent 直接钉进本镜**（画面逐帧接住它的结尾、**音频从接缝继续**，实测接缝画面差 **2.6–7.0**，无续接对照 **32–68**），不需要上传图片、也不吃画质。**r2v 与 i2v 两侧都支持**（i2v 链式实现另见下），跨形状续接（上一镜 r2v → 本镜 i2v）同样可用。链的硬约束见[档位与加速策略](#档位tier与加速策略)与 [`docs/shot-chain-continuity.md`](docs/shot-chain-continuity.md)。
 - **画质可上 2K / 4K**：三条路线都在本地跑通——生成内两阶段放大（hires，交付 1344×768）、生成内**学习式 latent ×2**（`…-2k` 族，交付 **2688×1536**，可与链式续接叠用，见下）、以及独立**视频超分** `video.upscale`（画布片段 → 逐帧 CNN ×2/×4，**音轨原样带回**，原生一趟到 **4032×2304** 只需 **241.3s**/124 帧）。**超分建议按分镜做**（失败只毁一镜、可断点重跑）。详见[分辨率与画质（2K / 4K）](#分辨率与画质2k--4k)。
 - **完整后处理**：同场景续接（链式 latent 或末帧串联）、生成式转场镜、抽帧、拼接合成（本机有 ffmpeg 走零重编码，否则 ComfyUI 纯节点链路）、**超分提分辨率**——一条龙出片。
+- **声线一致性与 BGM**：视频参考生成支持**参考音频** `audio_ref_nodes`（H3 Ref2VA 的 `<Audio N>`，≤3 段 / 每段 2–15s / 总 ≤15s / 单文件 ≤15MB）——同一角色跨镜用同一段声线样本锁音色；`extract_audio` 可从已渲片段抽音轨存为画布音频节点；音频可入库为 `voice:` 资产跨会话复用；`comfy_generate_music` 用本地 **MiniMax Music 3** 生成 44.1kHz 立体声 BGM（`duration` 秒 / `lyrics` 分段）。画布上传支持音频，纯音频默认归 `voice refs` 组。
 - **画面内字幕可开关（开场选择）**：`burned-in` **要字幕**（默认——台词由 AV 模型原生烧进画面，无需后期叠加）/ `none` **不要字幕**（对白照常发声、`<d>` 说话人绑定照写，但不写字幕声明，成片无字幕；本流程没有后期字幕轨）。开关记在项目简报（没有 state 字段），开场与中途都可改；中途改要改简报 + 重写受影响镜的提示词并**重渲**。字幕写法仍由 `h3-prompt-writing` 统一裁定，本项只管「要不要」。
 - **片段审查节奏可选（开场选择）**：`per-shot` **逐镜审查**（每渲完一镜人工确认一次，默认推荐——坏镜头当场发现、不会连锁返工）/ `batch` **批量审查**（全部正片 + 转场镜渲完、AI 自检全过后出**一张**审查卡一次批准——人力往返最少，代价是坏镜头晚发现、续接链上的重渲会成串）。**两种模式下 AI 自检都逐镜执行**（关键帧抽样 / 角色一致性 / 口型字幕 / 污染 / 风格），差别只在人工确认的时机；口型与字幕字准类问题两种模式都**当场**弹单镜处置卡。选择持久化在画布 `settings.reviewMode`，画布头部显示「审查 逐镜 / 批量」，**中途可改**（改 state 即生效，已渲片段不重做）。
 
@@ -26,8 +27,8 @@
 
 - 每个会话多一个「**画布**」tab，按生产顺序预览 / 编辑 / 重做每一步产物：简报、大纲、角色卡、场景卡、镜头表、分镜、逐镜片段、成片。
 - 文本节点**实时渲染 markdown**（标题/表格/列表/代码块），媒体节点直接内嵌预览；分组、排序、删除、**入库**（一键登记为跨会话资产）都在画布上完成。
-- **自己添加资产**：画布顶栏「＋ 上传图片」可直接把本地 png/jpg/webp/gif 传成角色卡/场景卡等资产节点（无需先生成）；「📚 资产库」带缩略图把已入库的跨会话资产取到当前画布，图片类即可作为 ref 参考直接驱动视频生成。
-- **入库覆盖三类载体**：画布上的**图片**（角色卡 / 场景卡 / 风格锚点）、**视频**（镜头片段 / 成片）、**文本与表格**（镜头表 / 分镜文档 / 提示词）节点都能点「入库」登记进跨会话资产库；**资产 id 与显示名解耦**——id 入库时随机生成（形如 `character:<16 位 hex>`）、永久不变，显示名可随时改（**同类型内唯一**）；资产库对话框里可**重命名**（只改显示名，任何画布、文本与历史对话里的引用都不会断）或**删除**（连同库文件清理，画布上的副本不受影响）。载体与语义类别是两个正交维度：type 决定分组，kind（image/video/text）决定怎么存、怎么取回、以及能不能当 ref 参考图。
+- **自己添加资产**：画布顶栏「＋ 上传素材」支持本地**图片**（png/jpg/webp/gif）与**音频**（wav/mp3/m4a/aac/flac/ogg/opus，单文件 ≤24MB）——图片直接成角色卡/场景卡等资产节点，音频成声线参考节点（纯音频默认归 `voice refs` 组）；「📚 资产库」带缩略图把已入库的跨会话资产取到当前画布，图片类作 ref 参考、音频类作 `audio_ref_nodes` 声线参考。
+- **入库覆盖四类载体**：画布上的**图片**（角色卡 / 场景卡 / 风格锚点）、**视频**（镜头片段 / 成片）、**音频**（声线样本 / BGM，`voice:` 资产）、**文本与表格**（镜头表 / 分镜文档 / 提示词）节点都能点「入库」登记进跨会话资产库；**资产 id 与显示名解耦**——id 入库时随机生成（形如 `character:<16 位 hex>`）、永久不变，显示名可随时改（**同类型内唯一**）；资产库对话框里可**重命名**（只改显示名，任何画布、文本与历史对话里的引用都不会断）或**删除**（连同库文件清理，画布上的副本不受影响）。载体与语义类别是两个正交维度：type 决定分组（character / scene / style / clip / voice / text），kind（image / video / audio / text）决定怎么存、怎么取回、以及能不能当 ref 参考图或声线参考。
 - **生成的卡也能编辑替换**：已生成/已入库的角色卡、场景卡上点「编辑」→ 选本地图即可替换该卡图片（节点/标题/分组保留；若已入库会解除绑定，替换后按需重新「入库」登记新版本）。
 - **输入框视频生成（`video-generate` skill 的可视化入口）**：会话输入框工具行左端保留「🎨 图片 / 🎬 视频」开关。点「🎬 视频」即把 **`/video-generate` 斜杠命令（内联 `type/tier/ratio/size/length/refs/first/last` 参数）写入官方输入框**，用 dsh 原生 skill 加载机制加载内置 `video-generate` skill；同时在输入卡上方弹出**紧凑工具条**——类型 **r2v（参考图生成）/ i2v（首/末帧生成）**、**档位下拉（选项来自档位矩阵，带实测耗时）**、比例、时长（原生下拉菜单）与「参考图 / 首帧 / 末帧」自定义选择器（来源：**画布已有图片节点 / 资产库图片资产 / 本地上传**；本地上传经 `/canvas/upload` 落为画布节点，资产经 `/assets/to-canvas` 物化到画布，画布节点只引用不复制）。**prompt 接着写在官方输入框空行后**，改参数时工具条自动重写命令行、保留 prompt；**发送直接点 dsh 默认发送键**（提交整条草稿，不额外做发送按钮、不劫持 Enter），Agent 按对应 skill 解析命令行参数并调用生成工具出片，产物回进对话并落画布。图片生成（🎨 `image-generate`）同机制：工具条切换 **文生图（t2i）/ 图生图（i2i）**——t2i 选比例与张数（默认 1344×768，可 1–4 张）；i2i 从**画布 / 资产库 / 本地**选**单张参考图**（图 chip + ➕ 新增格，与 dsh 原生上传同款 64px 样式）、选 **quality / fast 档**与张数，命令头自动写 `/image-generate type=… tier=… refs=<画布节点id>`。**档位按模式独立记忆**：视频默认 `fast`（调试快）、图生图默认 `quality`（保真优先），手动选过后各自记住；上传的参考图即画布节点（删除/切型/清空草稿都会同步清理，画布不残留）。
 - **跟随 DSH 的浅色 / 深色**：画布页自带两套调色板，跟着宿主的主题服务走（含「跟随系统」与自定义主题的 `colorScheme`）。首屏由 `?theme=` 定，避免先闪一下另一种底色；运行中你在设置里一切换，画布立刻跟着换。原生控件（下拉、滚动条、复选框）也跟着 `color-scheme` 变。
@@ -40,7 +41,7 @@
 
 ### 🎬 多场景创作：一套引擎，任意场景
 
-- 默认内置 **3D 动画短片**场景（故事创意 → 角色/场景/镜头/分镜/逐镜/合成），但**场景不是插件边界**。
+- 默认内置 **3D 动画短片**、**品牌宣传短片**与**短剧系列制片**场景（分集剧本 → 集制作包 → 单集成片），但**场景不是插件边界**。
 - **电商宣传视频**（商品/卖点 → 展示分镜 + 口播）、**教育课件讲解**（知识点 → 图解 + 讲解）、品牌故事、纪念短片、Vlog 解说……任何「输入 X → 产出视频」的创作场景，都通过**扩展一个 skill** 覆盖——复用同一套画布、生成工具、资产库与飞书交付，只换编排规则（见[开发你自己的场景 skill](#扩展开发你自己的场景-skill)）。
 - **场景与模型双解耦**：场景由 skill 定义、模型由注册表定义，两者互不绑定——电商场景也可以随时切换到你想用的任何 ComfyUI 模型。
 
@@ -223,12 +224,13 @@ video_upscale({ video_node: '<长片节点 id>', target_width: 4032, chunk_frame
 | `minimax-h3-i2v-hires` | `video.image2video` | 同上（走 FL2VA 权重）。模板由 `scripts/make-hires-template.mjs` 从 ref2v/i2v 两个 base 各自派生，两阶段尾段逐字节一致 |
 | `minimax-h3-{ref2v,i2v}-ctx-{quality,balanced-pdd,fast}-2k` | `video.reference2video` / `video.image2video` | **组「链式续接 + 学习式放大（>2K）」**：ctx 图 + 学习式 latent ×2 放大器（`minimax_h3_latent_upscaler_3d_conv_v1_bf16`）+ denoise 0.3 精修，交付 **2688×1536 带声音**（fast 档 **1664×960** —— 各档保留自己的首遍尺寸：quality/pdd 首遍 1344×768、fast 首遍 832×480）。**关键结论：放大发生在链式存档之后**（`MiniMaxH3MotionContextSaveLatent` 读的是首遍采样器输出）⇒ **交付尺寸不参与续接**，同一条链内只要**首遍尺寸一致**就能续——甚至能和「非放大」的同档实现互接；首遍不同则显式拒跑。`priority: -60`（不做隐式默认）、**三档各有自己的清单**：`fast` 首遍 832×480 → 交付 1664×960、`balanced-pdd` 与 `quality` 首遍 1344×768 → 交付 2688×1536（本族唯一的非 2688 交付是 fast）。每份清单都带 `aspectRatios: ["16:9"]` + `maxDurationFrames: 124`（精修在 ≈500k token 上超线性，不支持竖版 / 长片）。实测（fast 档 56 帧）：起链 114.0s / 续接 246.3s；接缝画面差 **13.33** vs 同实现不续接 **79.57**，响度台阶 **+0.68 dB** vs **−6.34 dB**。有效分辨率（自校准频谱）：2688 网格 ≈1949px。模板 `scripts/make-2k-template.mjs` 从 ctx base 派生，见 [`docs/shot-chain-continuity.md`](docs/shot-chain-continuity.md) 附 F |
 | `video-upscale-x2` · `video-upscale-x4` | `video.upscale` | **视频超分（像素空间，U3）**：输入是画布上**已有的视频节点**（不是提示词），逐帧 CNN ×2 / ×4，**音轨原样带回**（全程不经过模型）。交付尺寸 = 源尺寸 × 倍率，可用 `target_width` 收敛（按 32 对齐）；**比例永远跟源片**——H3 族是 1.75:1，所以 4032 宽对应 **4032×2304**（不是 16:9 的 3840×2160）。逐帧独立 ⇒ 代价线性、**天然可分块**（超预算的长片按 `ImageFromBatch` + `TrimAudioDuration` 切块再拼回，不需要 ffmpeg）。实测 124 帧：原生 →×4→ 4032 **241.3s**；U1 的 2K →×2→ 4032 **261.6s**；U1 的 2K →×2→ 5376 **317.5s**；248 帧 5376 一次过 **551.4s**（无 OOM）。工具入口 `video_upscale`；模型走资产槽 `upscale_x2`/`upscale_x4`（**换权重必须换成同倍率的**）；x4 `priority: -10` 需显式选中。有效分辨率（自校准尺子，**同时看闪烁与平坦区锐度**才敢下判断）：同网格 + 无二次缩放的「原生→×2→2688」读到 ×1.65，优于 U1 单独 2K 的 ×1.45，而耗时只有 1/10.7；4032 上两臂读数接近（×1.96 / ×1.67），但原生×4 那臂平坦区锐度 362 vs 197（输入 68）提示**过锐/振铃**，所以那一格的读数不能当作"细节更多"。眼判对照图见 `e2e-out/4k/compare-4arms-1to1.png`。详见 [`docs/video-upscale.md`](docs/video-upscale.md) |
+| `minimax-music3` | `audio.music` | **MiniMax Music 3 文本生音乐（BGM）**：本地权重 + ComfyUI 原生节点（`MiniMaxMusic3TextEncode` → `KSampler` → `VAEDecodeAudio` → `SaveAudioAdvanced`）。输出 **44.1kHz 立体声**、时长由 `duration`（秒，1–360）控制；纯器乐把 `lyrics` 留空并在 prompt 写 instrumental。未分档（唯一实现）。实测 10s≈8–28s、30s≈122s |
 | `extract-frame` | `image.from_video` | 抽帧（末帧 / 首帧 → 图片节点） |
 | `minimax-h3-ref2v-sol-stats` | `video.reference2video` | **内部诊断清单**（`internal: true`）：跑 Sol 时输出统计用于复核。**不参与档位解析、不进 UI 与技能选项**，只能由配置面 `pins` 钉选（工具面不接受 `workflow=`） |
 
 ### 档位（tier）与加速策略
 
-- **视频形状 `type` 必填**：`comfy_generate_video(type='r2v', …)`（参考绑定，配 `ref_nodes`）或 `type='i2v'`（首末帧串联，配 `first_frame_node`）。形状与参数冲突**直接报错并给修法**（此前是静默丢弃参数）；形状与续接（`continuity_from`）正交，详见 `docs/video-shape-contract.md`。
+- **视频形状 `type` 必填**：`comfy_generate_video(type='r2v', …)`（参考绑定，配 `ref_nodes`）或 `type='i2v'`（首末帧串联，配 `first_frame_node`）。r2v 另可传 `audio_ref_nodes`（≤3 段 2–15s 人声）作 H3 的参考音色（`<Audio N>`），必须同时有 `ref_nodes`。形状与参数冲突**直接报错并给修法**（此前是静默丢弃参数）；形状与续接（`continuity_from`）正交，详见 `docs/video-shape-contract.md`。
 - **产品层档位是受控三档 `fast` / `balanced` / `quality`，图片与视频同一套**（长边按能力不同：图片 1024 / 1344 / **2048**，视频 832 / 1344 / 1344）。呼叫 `comfy_generate_image(tier=…)` / `comfy_generate_video(tier=…)` / `comfy_render(tier=…)`。缺省是 `quality` —— **成本最高（图片 2048 档单张约 45s 量级），抽卡迭代建议显式传 `tier=fast`（~4s）或 `balanced`**。
 - **工具面不接受 `workflow=`**：实现由**配置**决定（`preferred` 家族序 / `tiers` 档位选择 / `pins` 钉实现，设置页可改）；传 `workflow=` 会**报错并指路**。`comfy_list_workflows` 主输出只给「能力 → 档位（可用性 / 交付尺寸 / 耗时）」，实现 id 收在诊断字段里。
 - **请求了不存在的档位不会静默换档**：如 i2v 请求 `tier=balanced` → 工具**显式报错并列出可用档位**，改请求可用档位即可（不要原样重试）。
@@ -277,24 +279,27 @@ video_upscale({ video_node: '<长片节点 id>', target_width: 4032, chunk_frame
 
 | 组 | 工具 |
 |---|---|
-| 生成 | `comfy_generate_image` · `comfy_generate_video` · `comfy_render`（通用入口，模型无关）· `comfy_list_workflows`（查能力/工作流） |
-| 后处理 | `extract_frame`（抽帧）· `video_concat`（拼接成片）· `video_upscale`（超分：画布视频节点 → 像素空间 ×2/×4，可换模型与工作流） |
+| 生成 | `comfy_generate_image` · `comfy_generate_video` · `comfy_generate_music`（BGM）· `comfy_render`（通用入口，模型无关）· `comfy_list_workflows`（查能力/工作流） |
+| 后处理 | `extract_frame`（抽帧）· `extract_audio`（抽音轨，作声线参考）· `video_concat`（拼接成片）· `video_upscale`（超分：画布视频节点 → 像素空间 ×2/×4，可换模型与工作流） |
 | 画布 | `canvas_list_nodes` · `canvas_write_node` · `canvas_get_node` · `canvas_write_prompt_bank`（每镜分档提示词） · `canvas_get_prompt` · `canvas_group_nodes` · `canvas_reorder` · `canvas_get_state` · `canvas_set_state` |
-| 资产 | `asset_list`（列出跨会话资产，含 kind）· `asset_to_canvas`（物化回画布：图片/视频→媒体节点，文本→text/table 节点） |
+| 资产 | `asset_list`（列出跨会话资产，含 kind）· `asset_to_canvas`（物化回画布：图片/视频/音频→媒体节点，文本→text/table 节点） |
 
 > 全部工具**模型无关**：capability 由注册表 `preferred` 解析到具体工作流，prompt 与流程里不硬编码模型名。
 
 ## 扩展：开发你自己的场景 skill
 
-**适配场景**：插件默认内置两种场景 skill——**3D 动画短片**（故事创意 → 角色/场景/镜头/分镜/逐镜/合成）与**品牌宣传短片**（品牌素材 → 事实核验/创意方向/镜头表/逐镜/合成）。但**场景不是插件边界**——任何「输入 X → 产出视频内容」的创作场景，都能通过扩展 skill 覆盖，复用同一套执行层工具（生成 / 画布 / 资产 / 拼接 / 飞书交付），只换编排规则：
+**适配场景**：插件默认内置三种场景 skill——**3D 动画短片**（故事创意 → 角色/场景/镜头/分镜/逐镜/合成）、**品牌宣传短片**（品牌素材 → 事实核验/创意方向/镜头表/逐镜/合成）与**短剧系列制片**（分集剧本 → 集制作包 → 单集成片，整部量产）。但**场景不是插件边界**——任何「输入 X → 产出视频内容」的创作场景，都能通过扩展 skill 覆盖，复用同一套执行层工具（生成 / 画布 / 资产 / 拼接 / 飞书交付），只换编排规则：
 
 | 场景 | 输入 | skill 定义的编排重点 |
 |---|---|---|
 | 3D 动画短片（内置） | 一句话故事创意 | 角色一致、场景连续（**七列镜头表含「续接」列 + 链式续接**）、镜头表十项自检门、H3 原生字幕 |
 | 品牌宣传短片（内置） | 品牌素材 / 推广目标 | 身份核验、来源清单、LOGO 首帧锁定、H3 原生画面文案 |
+| **短剧系列制片**（内置） | 分集剧本 / 一句话题材 | 系列圣经、集制作包（8 列镜头意图）、资产台账、逐集生产与成本闸门（组合 `short-drama-series-writer` + `story-short-generator`） |
 | **电商宣传视频** | 商品 / 卖点文案 | 产品展示分镜、口播逐字稿、卖点高光镜、BGM 与节奏 |
 | **教育课件讲解** | 知识点 / 讲义 | 图解卡片、讲解分镜、字幕与口型绑定、节奏控制 |
 | 品牌故事 / 纪念短片 / Vlog 解说… | 素材与主题 | 按你的业务规范自定义 |
+
+> 另有**剧本层** `short-drama-series-writer`（自 `0xsline/short-drama` 收编，MIT）：负责选题、分集大纲与单集剧本，供 `short-drama-series-production` 调用；只写文本、不出视频。
 
 每个场景 skill 就是一个 `SKILL.md`（纯文本编排规则），插件对它零认知——触发哪个 skill 就完全按它执行。三步即可定义一种新场景：
 
@@ -433,6 +438,23 @@ node scripts/import-comfy.mjs exported.json \
 7. **角色分状态建卡**：同一角色不同着装分别建一对状态卡，每对仍是单视图 + 三视图两版。
 8. **每镜提示词库落画布（prompt bank）**：`canvas_write_prompt_bank` 写 `fast` / `balanced` / `quality` 三段；当前 story/brand 策略是**三段同文、共用 quality 提示词**，换档只变采样。生成传 `prompt_node`，工具按 tier 取段、缺档自动回退并告警，生成后回写本档。**换档重渲复用同一个 prompt_node + 新 tier**，不重写 prompt；只传 prompt 时工具也会自动建库并返回 `promptNodeId`。
 
+### 参考音频（声线一致性）
+
+- **能一次生成就别切次**：H3 官方只保证单次 4–15s 内的多镜头声画同源；跨调用没有官方机制。
+- **跨镜音色靠参考音频**：`comfy_generate_video(type='r2v', ref_nodes=[角色卡, 场景卡], audio_ref_nodes=[声线样本], …)`，并在 prompt 写 `<Audio 1> is the voice-timbre reference for <Subject 1> (S1).` + `<Audio 1>: reference - …`（只借音色时不要把参考音频里的原台词搬进成片）。
+- **参考音频来源**：画布音频节点（上传 wav/mp3/m4a）、画布视频节点（自动取音轨，`extract_audio` 也能抽成独立音频节点）、或入库后的 `voice:` 资产。
+- **限制**：只有 `r2v` 支持；`≤3` 段、每段 `2–15s`、总 `≤15s`、单文件 `≤15MB`；`2K` / `hires` 实现暂不支持（显式报 `audio-ref-unsupported`）。
+- **档位**：`fast` 是 4 步 turbo，官方说明会削弱参考/音频强度——要稳住声线用 `balanced` / `quality`。
+- **续接与参考音频正交**：参考音频管“是谁的声音”，`continuity_from` 管“接缝不断”；两者可以同镜使用。
+
+### 背景音乐（`audio.music`）
+
+- 工具：`comfy_generate_music(prompt, duration=30, lyrics='', seed=…)`，产物直接是画布音频节点。
+- 模型：内置 `minimax-music3`（本地权重已装）；纯器乐：prompt 里写 `instrumental / no vocals`，`lyrics` 留空。
+- 时长：`duration` 单位是**秒**（1–360），与视频的 `length`（帧数）不是一回事。
+- 带人声：`lyrics` 用 `[Verse]` / `[Chorus]` 分段；BGM 建议纯器乐。
+- 混音尚未自动化：目前只产独立音轨；`loudnorm` / 对白 ducking / loop crossfade 属于后续交付层工作。
+
 ## H3 结构化 prompt（本地版 H3-Context-IR 替代）
 
 本地 H3 工作流（`minimax-h3-*`）的逐镜 prompt 默认走 **H3 结构化格式**，用「本地 agent + skill」复刻官方云端 H3-Context-IR 的核心产物，提升成片质量（官方明言 Context-IR 直接决定输出质量）：
@@ -477,6 +499,43 @@ node scripts/import-comfy.mjs exported.json \
 ## 更新日志
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
+
+### v1.14.0 — 声线参考 + BGM + 短剧系列化（2026-10-23）
+
+**✨ 声线一致性：参考音频（H3 Ref2VA `<Audio N>`）**
+
+- 视频参考生成新增 `audio_ref_nodes`（`comfy_generate_video` / `comfy_render`）：≤3 段、每段 2–15s、总 ≤15s、单文件 ≤15MB；支持画布音频节点 / 画布视频节点（自动取音轨）/ `voice:` 资产 / `clip:` 资产。
+- 只在 `type='r2v'` 生效且必须同时传 `ref_nodes`；i2v、2K、hires 实现**显式拒跑**（`audio-ref-shape` / `audio-ref-unsupported`），不做静默降级。
+- prompt 守卫：传了音频却没写 `<Audio N>`（会被当环境音）、或写了 `<Audio N>` 却没传音频（空绑定），都会给出明确 warning。
+- 新增 `extract_audio`：从画布视频节点抽音轨（有 ffmpeg 走 ffmpeg，否则 ComfyUI `LoadVideo → GetVideoComponents → SaveAudio`），产物可直接作声线参考。
+- 资产库新增 **`voice` 类型 / `audio` 载体**：音频节点可入库、可 `asset_to_canvas` 物化回画布、可跨会话复用；`asset_list(type='voice')` 可查。
+- 时长校验优先读 WAV 头（本机没有 ffprobe 也能校验 2–15s），其余格式降级 ffprobe / 警告。
+
+**✨ 背景音乐：`audio.music` + MiniMax Music 3**
+
+- 新工具 `comfy_generate_music(prompt, duration, lyrics?, seed?, steps?, cfg?)`，产物直接是画布音频节点（44.1kHz 立体声）。
+- 新增内置清单 `minimax-music3`（`audio.music`，未分档）：`prompt → caption`、`duration → max_duration`（秒，1–360）、`lyrics` / `seed` / `steps` / `cfg` 注入；纯器乐把 `lyrics` 留空并在 prompt 写 instrumental。
+- 能力面新增 `audio.music`，`comfy_render` 可直接按能力调用；音频能力跳过分辨率推导（没有画面尺寸）。
+
+**✨ 画布与资产：音频上传 / 声线分组**
+
+- 画布顶栏「＋ 上传素材」支持图片与音频（wav/mp3/m4a/aac/flac/ogg/opus，单文件 ≤24MB）；纯音频上传默认归 `voice refs` 组，卡片仍可改分组。
+- 资产库对话框新增「音频」类型；入库覆盖**四类载体**：图片 / 视频 / 音频 / 文本（kind = image / video / audio / text）。
+- 媒体上传路由同时接受图片与音频；`asset_to_canvas` 音频资产 → 画布 audio 节点。
+
+**✨ 短剧系列化（组合式）**
+
+- 新增 `short-drama-series-production`（v0.1.1）：系列圣经 → 集制作包（8 列镜头意图 + 本集资产清单 + 预填参数）→ 委托 `story-short-generator` 的 STEP 3–8 → 每集交付 / 资产台账 / 成本闸门；默认 90s / 9:16 / 中文 / 无字幕 / balanced / 单视图 / batch。
+- 剧本层 `short-drama-series-writer` 收编进仓库（自 `0xsline/short-drama`，MIT，v0.2.0）：选题、分集目录、单集剧本与导出，只出文本。
+- `story-short-generator` v3.6.1：STEP 0 新增**片型门**（短视频故事 / 连续短剧）——选连续短剧时按「画布 → 资产库 → 工作区」三级查剧本，有集制作包直接从 STEP 3 生产，缺包则转 series skill 补齐；并新增**声线试镜**（STEP 3.5：试镜片段 → `extract_audio` → `voice:` 资产，对白镜带 `audio_ref_nodes`）。
+
+**📝 文档 / 测试**
+
+- 新增调研与设计文档：`docs/research/h3-audio-consistency.md` · `h3-audio-local.md` · `h3-audio-web.md` · `voice-generation-models.md` · `music-generation-models.md` · `audio-capability-roadmap.md` · `audition-voice-pipeline.md` · `docs/h3-voice-consistency-plan.md` · `docs/short-drama-series-integration-research.md`。
+- 新增冒烟 `scripts/smoke-music.mjs` / `scripts/smoke-voice-ref.mjs` 并接入 `npm run smoke`；新增真机端到端 `scripts/e2e-voice-ref.mjs`（`npm run e2e:voice`）。
+- README / ARCHITECTURE / H3 映射表同步参考音频、试镜规则与 BGM 能力。
+
+**已知限制**：参考音频只支持 r2v 的非 2K / 非 hires 实现；BGM 目前只产独立音轨，loudnorm / 对白 ducking / loop 尚未自动化。
 
 ### v1.13.0 — 资产库重命名与不透明 id + 画面内字幕开关（2026-10-23）
 
@@ -769,4 +828,4 @@ git push origin main --follow-tags   # 推送即触发自动发布（npm + GitHu
 
 ---
 
-更多设计细节：架构 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · 工作流契约 [`docs/workflow-contract.md`](docs/workflow-contract.md) · **链式续接**（机制验证矩阵 / 档位覆盖矩阵 / i2v 实测 / 测量口径）[`docs/shot-chain-continuity.md`](docs/shot-chain-continuity.md) · **形状与续接契约**（`type` 必填、r2v↔i2v 参数表）[`docs/video-shape-contract.md`](docs/video-shape-contract.md) · 渠道交付 [`docs/channel-delivery.md`](docs/channel-delivery.md)。
+更多设计细节：架构 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · 工作流契约 [`docs/workflow-contract.md`](docs/workflow-contract.md) · **链式续接**（机制验证矩阵 / 档位覆盖矩阵 / i2v 实测 / 测量口径）[`docs/shot-chain-continuity.md`](docs/shot-chain-continuity.md) · **形状与续接契约**（`type` 必填、r2v↔i2v 参数表）[`docs/video-shape-contract.md`](docs/video-shape-contract.md) · **声音一致性**（参考音频机制 / 试镜流水线 / 路线图）[`docs/h3-voice-consistency-plan.md`](docs/h3-voice-consistency-plan.md) · [`docs/research/audition-voice-pipeline.md`](docs/research/audition-voice-pipeline.md) · [`docs/research/audio-capability-roadmap.md`](docs/research/audio-capability-roadmap.md) · **短剧系列化** [`docs/short-drama-series-integration-research.md`](docs/short-drama-series-integration-research.md) · 渠道交付 [`docs/channel-delivery.md`](docs/channel-delivery.md)。

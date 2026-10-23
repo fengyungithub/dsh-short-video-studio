@@ -1,0 +1,216 @@
+{
+  "id": "minimax-music3",
+  "version": 1,
+  "capability": "audio.music",
+  "runner": "comfyui",
+  "displayName": "MiniMax Music 3 · BGM",
+  "description": "MiniMax Music 3 文本生音乐（本地权重，原生 ComfyUI 节点）。输出 44.1kHz 立体声，时长由 duration 控制（秒）。",
+  "output": {
+    "mediaType": "audio",
+    "sampleRate": 44100
+  },
+  "assets": {
+    "unet": {
+      "kind": "checkpoint",
+      "default": "minimax_music3_dit_fp16.safetensors",
+      "env": "DSH_SVS_MUSIC3_UNET",
+      "label": "Music 3 DiT"
+    },
+    "clip": {
+      "kind": "clip",
+      "default": "minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+      "env": "DSH_SVS_MUSIC3_CLIP",
+      "label": "Music 3 文本编码器"
+    },
+    "vae": {
+      "kind": "vae",
+      "default": "minimax_music3_dav.safetensors",
+      "env": "DSH_SVS_MUSIC3_VAE",
+      "label": "Music 3 音频 VAE"
+    }
+  },
+  "graph": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "$assets.unet",
+        "weight_dtype": "default"
+      }
+    },
+    "2": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "$assets.clip",
+        "type": "minimax",
+        "device": "default"
+      }
+    },
+    "3": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "$assets.vae"
+      }
+    },
+    "4": {
+      "class_type": "MiniMaxMusic3TextEncode",
+      "inputs": {
+        "clip": [
+          "2",
+          0
+        ],
+        "caption": null,
+        "lyrics": "",
+        "seed": null,
+        "max_duration": null,
+        "cfg_scale": 1.7,
+        "top_k": 50
+      }
+    },
+    "5": {
+      "class_type": "ConditioningZeroOut",
+      "inputs": {
+        "conditioning": [
+          "4",
+          0
+        ]
+      }
+    },
+    "6": {
+      "class_type": "EmptyMiniMaxMusic3LatentAudio",
+      "inputs": {
+        "seconds": [
+          "4",
+          1
+        ],
+        "batch_size": 1
+      }
+    },
+    "7": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": null,
+        "steps": 30,
+        "cfg": 1.7,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1,
+        "model": [
+          "1",
+          0
+        ],
+        "positive": [
+          "4",
+          0
+        ],
+        "negative": [
+          "5",
+          0
+        ],
+        "latent_image": [
+          "6",
+          0
+        ]
+      }
+    },
+    "8": {
+      "class_type": "VAEDecodeAudio",
+      "inputs": {
+        "samples": [
+          "7",
+          0
+        ],
+        "vae": [
+          "3",
+          0
+        ]
+      }
+    },
+    "9": {
+      "class_type": "SaveAudioAdvanced",
+      "inputs": {
+        "audio": [
+          "8",
+          0
+        ],
+        "filename_prefix": null,
+        "format": "mp3",
+        "format.quality": "V0"
+      }
+    }
+  },
+  "params": {
+    "prompt": {
+      "inject": "scalar",
+      "to": {
+        "node": "4",
+        "field": "caption"
+      }
+    },
+    "lyrics": {
+      "inject": "scalar",
+      "to": {
+        "node": "4",
+        "field": "lyrics"
+      },
+      "default": ""
+    },
+    "duration": {
+      "inject": "scalar",
+      "to": {
+        "node": "4",
+        "field": "max_duration"
+      },
+      "default": 30
+    },
+    "seed": {
+      "inject": "scalar",
+      "to": [
+        {
+          "node": "4",
+          "field": "seed"
+        },
+        {
+          "node": "7",
+          "field": "seed"
+        }
+      ]
+    },
+    "steps": {
+      "inject": "scalar",
+      "to": {
+        "node": "7",
+        "field": "steps"
+      },
+      "default": 30
+    },
+    "cfg": {
+      "inject": "scalar",
+      "to": [
+        {
+          "node": "4",
+          "field": "cfg_scale"
+        },
+        {
+          "node": "7",
+          "field": "cfg"
+        }
+      ],
+      "default": 1.7
+    },
+    "prefix": {
+      "inject": "scalar",
+      "to": {
+        "node": "9",
+        "field": "filename_prefix"
+      }
+    }
+  },
+  "constraints": {
+    "audio": {
+      "minSeconds": 1,
+      "maxSeconds": 360
+    }
+  },
+  "note": "纯器乐请把 lyrics 留空并在 prompt 里写 instrumental/no vocals；带人声时 lyrics 用 [Verse]/[Chorus] 分段。",
+  "license": "MiniMax Music 3 Community License（署名；年营收 <$20M 可商用）"
+}

@@ -1,0 +1,18 @@
+display-name-zh: 微短剧剧集编剧
+version: 0.2.0
+tag-en: "Short Drama / Scriptwriting"
+tag-cn: "短剧漫剧 / 剧本创作"
+complete-tags-en:
+  - "Short Drama / Scriptwriting"
+  - "Short Drama / Series Development"
+complete-tags-cn:
+  - "短剧漫剧 / 剧本创作"
+  - "短剧漫剧 / 剧集开发"
+summary-en: Write a full vertical micro-drama series — topic, audience, characters, hook rhythm, paywall beats, episode outline, episode scripts and export (50–100 episodes, domestic or overseas), script only.
+summary-cn: 从选题、受众、人物、爽点节奏、付费卡点到分集大纲与单集剧本，写出 50–100 集竖屏微短剧剧本并导出；纯剧本，不出视频。
+desc-en: Vendored from 0xsline/short-drama (MIT) for dsh-short-video-studio. Full-process short-drama scriptwriting — genre selection, audience, tone, character system, episode directory with hooks and paywall markers, per-episode scripts with 18–25 dialogue lines and 12–20 shot notes per episode, self-review scoring, compliance scan, overseas (ReelShort/DramaBox) formatting, and export packages. It is the script layer used by short-drama-series-production, and it produces text only and never calls image/video generation.
+desc-cn: 自 0xsline/short-drama（MIT）收编进 dsh-short-video-studio 的剧本层。微短剧全流程剧本创作：题材、受众、基调、人物体系、带钩子与付费卡点的分集目录、每集 18–25 句对白与 12–20 个镜头提示的分集剧本、质量自检评分、合规扫描、出海（ReelShort/DramaBox）格式与导出包。它是 short-drama-series-production 的剧本层：只产出文本，不调用任何图片/视频生成。
+author-en: "0xsline / dsh-short-video-studio"
+author-cn: "0xsline / dsh-short-video-studio"
+source: bundled
+source-original: https://github.com/0xsline/short-drama

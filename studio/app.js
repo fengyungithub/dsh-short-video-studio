@@ -89,15 +89,24 @@ import { markdownToHtml } from './markdown.js'
     return ROUTE_ROOT + '/media?' + u.toString()
   }
 
-  const ASSET_TYPE_LABEL = { character: '角色', scene: '场景', style: '风格锚点', clip: '视频片段', text: '文本' }
-  const ASSET_TYPE_ORDER = ['character', 'scene', 'style', 'clip', 'text']
+  const ASSET_TYPE_LABEL = { character: '角色', scene: '场景', style: '风格锚点', clip: '视频片段', voice: '音频', text: '文本' }
+  const ASSET_TYPE_ORDER = ['character', 'scene', 'style', 'clip', 'voice', 'text']
   // 载体（kind）与语义类别（type）是两个正交概念：kind 决定怎么存/怎么物化，type 决定分组。
   // 每个 kind 只允许一组 type，服务端也会校验（lib/assets.js TYPE_KINDS），这里保持一致，
   // 目的只是让下拉框一开始就不给出非法组合。
-  const NODE_ASSET_KIND = { image: 'image', video: 'video', text: 'text', table: 'text' }
-  const ASSET_TYPES_FOR_KIND = { image: ['character', 'scene', 'style'], video: ['clip'], text: ['text'] }
-  const ASSET_KIND_HINT = { image: '角色卡 / 场景卡 / 风格锚点', video: '视频片段', text: '文本（镜头表 / 分镜 / 提示词）' }
-  const UPLOAD_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif'
+  const NODE_ASSET_KIND = { image: 'image', video: 'video', audio: 'audio', text: 'text', table: 'text' }
+  const ASSET_TYPES_FOR_KIND = { image: ['character', 'scene', 'style'], video: ['clip'], audio: ['voice'], text: ['text'] }
+  const ASSET_KIND_HINT = {
+    image: '角色卡 / 场景卡 / 风格锚点',
+    video: '视频片段',
+    audio: '音频 / 声线参考',
+    text: '文本（镜头表 / 分镜 / 提示词）',
+  }
+  // 手动上传：图片 + 音频。音频默认归到「voice refs」组（可作声线参考），用户仍可在对话框里改。
+  const UPLOAD_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif'
+  const UPLOAD_ACCEPT = UPLOAD_IMAGE_ACCEPT + ',audio/*'
+  const AUDIO_UPLOAD_GROUP = 'voice refs'
+  const AUDIO_EXT_RE = /\.(wav|mp3|m4a|aac|flac|ogg|opus)$/i
   const UPLOAD_MAX_BYTES = 24 * 1024 * 1024
 
   function escapeHtml(s) {
@@ -252,8 +261,13 @@ import { markdownToHtml } from './markdown.js'
     })
   }
 
+  /** 本地文件是不是音频（mime 优先，浏览器对个别扩展名给空 type 时再看扩展名）。 */
+  function isAudioFile(file) {
+    return /^audio\//i.test(String((file && file.type) || '')) || AUDIO_EXT_RE.test(String((file && file.name) || ''))
+  }
+
   /**
-   * 手动添加资产 ①：从本机选图上传 → 画布资产卡。
+   * 手动添加资产 ①：从本机选图/音频上传 → 画布资产卡。
    * 先选文件，再弹「分组」框（可留空 = 未分组，之后每张卡仍可单独改分组）；
    * 入库保持可选——需要跨会话复用再点卡片上的「入库」。
    */
@@ -268,10 +282,10 @@ import { markdownToHtml } from './markdown.js'
       const okFiles = files.filter((f) => f.size <= UPLOAD_MAX_BYTES)
       const skipped = files.filter((f) => f.size > UPLOAD_MAX_BYTES).map((f) => f.name)
       if (!okFiles.length) {
-        alertBox('所选图片均超过 24MB，无法上传。')
+        alertBox('所选素材均超过 24MB，无法上传。')
         return
       }
-      const picked = await pickGroupForUpload(okFiles.map((f) => f.name))
+      const picked = await pickGroupForUpload(okFiles)
       if (!picked) return // 用户取消
 
       let reading = []
@@ -283,7 +297,7 @@ import { markdownToHtml } from './markdown.js'
         }
       }
       if (!reading.length) {
-        alertBox('没有可上传的图片。')
+        alertBox('没有可上传的素材。')
         return
       }
       try {
@@ -291,8 +305,9 @@ import { markdownToHtml } from './markdown.js'
           method: 'POST',
           body: JSON.stringify({ files: reading, group: picked.group }),
         })
-        let msg = '已添加 ' + d.added.length + ' 张资产卡'
-        if (d.added.length) msg += '：' + d.added.map((x) => x.title).join('、')
+        const added = Array.isArray(d.added) ? d.added : []
+        let msg = '已添加 ' + added.length + ' 个素材卡'
+        if (added.length) msg += '：' + added.map((x) => x.title).join('、')
         const problems = (d.errors || []).map((e) => (e.filename || '?') + '（' + e.message + '）').concat(skipped)
         if (problems.length) msg += '\n失败 ' + problems.length + ' 项：' + problems.join('；')
         alertBox(msg)
@@ -305,9 +320,12 @@ import { markdownToHtml } from './markdown.js'
   }
 
   /** 上传前选分组的小对话框：resolve(null)=取消，否则 { group }（''=未分组）。 */
-  function pickGroupForUpload(fileNames) {
+  function pickGroupForUpload(files) {
+    const fileNames = files.map((f) => f.name)
+    // 纯音频上传默认落到 voice refs（声线参考）；混传时留空，让用户自己决定。
+    const audioOnly = files.length > 0 && files.every(isAudioFile)
     return new Promise((resolve) => {
-      const dlg = openDialog('上传 ' + fileNames.length + ' 张图片到画布')
+      const dlg = openDialog('上传 ' + fileNames.length + ' 个素材到画布')
       const list = document.createElement('ul')
       list.className = 'file-list'
       for (const n of fileNames.slice(0, 20)) {
@@ -317,23 +335,24 @@ import { markdownToHtml } from './markdown.js'
       }
       if (fileNames.length > 20) {
         const li = document.createElement('li')
-        li.textContent = '…等共 ' + fileNames.length + ' 张'
+        li.textContent = '…等共 ' + fileNames.length + ' 个'
         list.appendChild(li)
       }
       dlg.body.appendChild(list)
 
       const lbl = document.createElement('label')
       lbl.className = 'field-label'
-      lbl.textContent = '分组（可留空 = 未分组；如「角色卡 / 场景卡」等，之后每张卡仍可单独改分组）'
+      lbl.textContent = '分组（可留空 = 未分组；音频默认归到「' + AUDIO_UPLOAD_GROUP + '」，之后每张卡仍可单独改分组）'
       const groupInput = document.createElement('input')
       groupInput.type = 'text'
       groupInput.setAttribute('list', 'dsh-svs-groups')
-      groupInput.placeholder = '未分组'
+      groupInput.placeholder = audioOnly ? AUDIO_UPLOAD_GROUP : '未分组'
+      groupInput.value = audioOnly ? AUDIO_UPLOAD_GROUP : ''
       dlg.body.appendChild(lbl)
       dlg.body.appendChild(groupInput)
       const note = document.createElement('p')
       note.className = 'form-note'
-      note.textContent = '上传即成为画布上的图片资产卡，可作 ref 参考直接生成视频；需要跨会话复用时可再点卡上的「入库」。'
+      note.textContent = '上传即成为画布上的素材卡：图片可作 ref 参考图，音频可作声线参考；需要跨会话复用时可再点卡上的「入库」。'
       dlg.body.appendChild(note)
 
       const cancel = dialogBtn('取消', () => { dlg.close(); resolve(null) })
@@ -352,7 +371,7 @@ import { markdownToHtml } from './markdown.js'
   function replaceImageByUpload(node) {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = UPLOAD_ACCEPT
+    input.accept = UPLOAD_IMAGE_ACCEPT
     input.addEventListener('change', async () => {
       const f = (input.files || [])[0]
       if (!f) return
@@ -410,7 +429,7 @@ import { markdownToHtml } from './markdown.js'
       if (!assets.length) {
         const p = document.createElement('p')
         p.className = 'lib-empty-hint'
-        p.innerHTML = '资产库还是空的。<br>画布上的图片、视频、文本卡片都能点「入库」登记（选类型 + 填名字：中文 / 英文 / 拼音都可以），<br>之后任意会话都能从这里直接取用到画布；图片类还能直接当 ref 参考图。'
+        p.innerHTML = '资产库还是空的。<br>画布上的图片、视频、音频、文本卡片都能点「入库」登记（选类型 + 填名字：中文 / 英文 / 拼音都可以），<br>之后任意会话都能从这里直接取用到画布；图片类还能直接当 ref 参考图，音频可作声线参考。'
         body.appendChild(p)
         foot.appendChild(dialogBtn('完成', () => dlg.close()))
         return
@@ -437,7 +456,7 @@ import { markdownToHtml } from './markdown.js'
         card.className = 'asset-card'
         card.dataset.assetId = a.id
 
-        const kind = a.kind || 'image'
+        const kind = a.kind || (a.type === 'voice' ? 'audio' : 'image')
         const thumb = document.createElement('div')
         thumb.className = 'thumb'
         if (kind === 'text') {
@@ -447,6 +466,24 @@ import { markdownToHtml } from './markdown.js'
           const t = String(a.text || '').replace(/\s+/g, ' ').trim()
           pre.textContent = t.length > 180 ? t.slice(0, 180) + '…' : (t || '（空文本）')
           thumb.appendChild(pre)
+        } else if (kind === 'audio') {
+          // 音频资产（type=voice）：给一个可直接试听的播放器 + 载体角标
+          const media = document.createElement('audio')
+          media.controls = true
+          media.preload = 'metadata'
+          media.src = assetMediaUrl(a.id)
+          media.onerror = () => {
+            media.remove()
+            const m = document.createElement('span')
+            m.className = 'missing'
+            m.textContent = '🎧 音频缺失'
+            thumb.appendChild(m)
+          }
+          thumb.appendChild(media)
+          const badge = document.createElement('span')
+          badge.className = 'kind-badge'
+          badge.textContent = '🎧 音频'
+          thumb.appendChild(badge)
         } else {
           const media = kind === 'video' ? document.createElement('video') : document.createElement('img')
           if (kind === 'video') {
@@ -599,7 +636,9 @@ import { markdownToHtml } from './markdown.js'
         ? '文本资产存正文（不存文件）；复用时可取回画布当参考，不能作 ref 参考图。'
         : kind === 'video'
           ? '视频资产拷入库；复用时可取回画布当素材，不能作 ref 参考图。'
-          : '图片资产可作 ref 参考图直接驱动生成。'
+          : kind === 'audio'
+            ? '音频资产存声线参考样本；复用时可取回画布当 audio_ref（声线参考），不能作 ref 参考图。'
+            : '图片资产可作 ref 参考图直接驱动生成。'
       box.appendChild(hint)
 
       const actions = document.createElement('div')
@@ -736,8 +775,16 @@ import { markdownToHtml } from './markdown.js'
         img.alt = node.title || ''
         a.appendChild(img)
         body.appendChild(a)
+      } else if (node.kind === 'audio') {
+        // 音频节点：原生播放器（与 <video> 共用 mediaUrl）；文件名/标题在卡片头部
+        const a = document.createElement('audio')
+        a.className = 'media'
+        a.controls = true
+        a.preload = 'metadata'
+        a.src = mediaUrl(node.media)
+        body.appendChild(a)
       } else {
-        // audio / fallback：给下载链接
+        // 其它媒体 fallback：给下载链接
         const a = document.createElement('a')
         a.href = mediaUrl(node.media)
         a.target = '_blank'
@@ -789,13 +836,25 @@ import { markdownToHtml } from './markdown.js'
       actions.appendChild(editBtn)
     }
 
+    // 音频保留下载入口（播放器之外再给一个明确的文件下载）
+    if (node.kind === 'audio' && node.media) {
+      const ext = (String(node.media).match(/\.[a-z0-9]{1,6}$/i) || [''])[0]
+      const dl = document.createElement('a')
+      dl.className = 'btn'
+      dl.href = mediaUrl(node.media)
+      dl.setAttribute('download', (node.title || 'audio') + ext)
+      dl.title = '下载音频文件'
+      dl.textContent = '下载'
+      actions.appendChild(dl)
+    }
+
     const redoBtn = document.createElement('button')
     redoBtn.className = 'btn'
     redoBtn.textContent = '重做'
     redoBtn.onclick = () => askAi('重做画布节点 ' + (node.id || '') + '（' + (node.title || node.kind) + '）：请按画布当前参数重新生成/重写该节点。')
     actions.appendChild(redoBtn)
 
-    // 入库：图片（角色/场景/风格锚点）、视频（片段）、文本/表格（镜头表/分镜/提示词）都可登记。
+    // 入库：图片（角色/场景/风格锚点）、视频（片段）、音频（声线参考）、文本/表格（镜头表/分镜/提示词）都可登记。
     // 载体由节点 kind 决定，可选类型随之收窄——避免出现「视频被登记成角色卡」这种语义错位的
     // 记录（agent 拿到它当 ref 图会直接失败）。
     const nodeAssetKind = NODE_ASSET_KIND[node.kind]
@@ -966,7 +1025,7 @@ import { markdownToHtml } from './markdown.js'
         '<h2>画布为空</h2>' +
         '<p>在对话里让 Agent 走生产流程（由流程 skill 定义），各步骤产物会落到这里；也可以先把自己的素材放上画布：</p>' +
         '<p class="empty-actions">' +
-        '<button class="btn btn-accent" id="empty-upload" type="button">＋ 上传图片</button>' +
+        '<button class="btn btn-accent" id="empty-upload" type="button">＋ 上传素材</button>' +
         '<button class="btn" id="empty-library" type="button">📚 从资产库添加</button>' +
         '</p>' +
         '<p>快速开始：<code>把「一只想当宇航员的小狐狸」做成 30 秒静音 3D 动画短片</code></p>'
@@ -1202,8 +1261,13 @@ import { markdownToHtml } from './markdown.js'
 
   el.refresh.addEventListener('click', load)
 
-  // 手动添加资产：顶栏按钮（空画布空态的 CTA 在 render 里单独绑定）
-  if (el.addUpload) el.addUpload.addEventListener('click', () => chooseFilesAndUpload())
+  // 手动添加资产：顶栏按钮（空画布空态的 CTA 在 render 里单独绑定）。
+  // 按钮文案在 index.html 里是「上传图片」；这里以 JS 统一改成「上传素材」，避免文案和 accept（图片 + 音频）不一致。
+  if (el.addUpload) {
+    el.addUpload.textContent = '＋ 上传素材'
+    el.addUpload.title = '从本机选择图片（png/jpg/webp/gif）或音频（wav/mp3/m4a/aac/flac/ogg，可多选），直接成为画布上的素材卡'
+    el.addUpload.addEventListener('click', () => chooseFilesAndUpload())
+  }
   if (el.addAssets) el.addAssets.addEventListener('click', () => openAssetLibrary())
 
   // 点击画布空白处 → 定位到最新主线节点（点卡片/按钮等交互元素不触发）
