@@ -682,7 +682,7 @@
     "audioMode": "dialogue-led",
     "subtitleMode": "none",
     "videoTier": "balanced",
-    "imageTier": "quality",
+    "imageTier": "balanced",
     "characterCardVariant": "single",
     "deliveryQuality": "native",
     "reviewMode": "batch",
@@ -820,7 +820,7 @@
 
 - 画面比例：9:16 ｜ 音频模式：dialogue-led ｜ 语言：中文
 - 画面内字幕：**none**（全表 none；不写字幕声明；负向尾句 `no subtitle, no burned-in dialogue text`；原稿「字幕：三百年前」不烧字，用晨雾/白场/古琴交代）
-- 视频档位：**balanced** ｜ 图片档位：quality ｜ 角色卡引用版本：single
+- 视频档位：**balanced** ｜ 图片档位：balanced ｜ 角色卡引用版本：single
 - 片段审查节奏：**batch** ｜ 交付画质：原生 768×1344（另做 1 镜 1080×1920 超分对照）
 - 视觉风格：**guofeng-xianxia**（角色卡 A+B、场景 A+C、道具 A、视频 A+B+C；角色卡中灰底 + `controlled highlights, minimal bloom`）
 - 场景数：2 ｜ 镜数：25 ｜ 对白：21 条（含 4 条画外）｜ 台词字数：≈300

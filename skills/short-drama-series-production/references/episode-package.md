@@ -165,7 +165,7 @@ T = 目标时长（80–110s，默认 90s）
 ## ⑥ 生产参数预填
 - 画面比例：9:16 ｜ 集时长：90s ｜ 音频模式：dialogue-led ｜ 语言：中文
 - 画面内字幕：none（全表 `字幕` 列写 none；逐镜负向尾句 `no subtitle, no burned-in dialogue text`）
-- 视频档位：balanced ｜ 图片档位：quality ｜ 角色卡引用版本：single
+- 视频档位：balanced ｜ 图片档位：balanced ｜ 角色卡引用版本：single
 - 片段审查节奏：batch ｜ 交付画质：原生（768×1344 或按 G-SAMPLE 定的 1080 超分）
 - 声线方案：existing（全季复用 ⑤ 的 `voice:`；text-only 才不传参考音频，并记风险）
 - 分镜模式：单文本（默认）/ 单文本+铅笔图（仅可视化预演时）
@@ -204,7 +204,7 @@ T = 目标时长（80–110s，默认 90s）
 | 字幕 | `none`（不写声明；负向尾句兜底） |
 | 生成档位（视频） | `balanced` |
 | 角色卡引用版本 | `single` |
-| 图片档位 | `quality` |
+| 图片档位 | `balanced` |
 | 交付画质 | 原生（样片后可改逐镜超分 1080） |
 | 片段审查节奏 | `batch` |
 | 分镜模式 | `text`（默认）/ `text+pencil`（仅可视化预演） |

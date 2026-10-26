@@ -1,5 +1,7 @@
 # 端到端流程与人工门清点（只读审计）
 
+> 后续变更（2026-10-26）：**图片档位默认已从 `quality` 改为 `balanced`**（单片 + 连续短剧）。本文表格里的「quality 默认」是审计当时的状态，不是当前默认。
+
 > 审计对象：`skills/story-short-generator/SKILL.md`（976 行，下称 **SSG**）、`skills/short-drama-series-production/SKILL.md`（355 行，下称 **PROD**）、`skills/short-drama-series-writer/SKILL.md`（609 行，下称 **WRI**），必要时引用 `skills/short-drama-series-production/references/episode-package.md`（下称 **PACK**）与 `references/production-runbook.md`（下称 **RUN**）。
 >
 > 约定：本文所有证据写成 `文件:行号`，行号即当前工作树版本；`SSG:213` 读作 `skills/story-short-generator/SKILL.md` 第 213 行。

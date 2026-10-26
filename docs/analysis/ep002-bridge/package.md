@@ -596,7 +596,7 @@
     "audioMode": "dialogue-led",
     "subtitleMode": "none",
     "videoTier": "balanced",
-    "imageTier": "quality",
+    "imageTier": "balanced",
     "characterCardVariant": "single",
     "deliveryQuality": "native",
     "reviewMode": "batch",

@@ -38,7 +38,7 @@ canvas_set_state(aspectRatio="9:16", duration="90 秒（默认；按包 ① 80�
 
 ```text
 有 id → asset_to_canvas(id)                     # 复用
-缺卡   → 按 story STEP 3 生成 single + three（图片档位 quality、两版配对）
+缺卡   → 按 story STEP 3 生成 single + three（图片档位 balanced、两版配对）
 ```
 
 - 建卡后的逐卡锁定**不单独弹卡**，并入 §2.2 的方案卡。
