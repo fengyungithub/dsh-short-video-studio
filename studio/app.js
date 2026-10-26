@@ -1022,6 +1022,7 @@ import { markdownToHtml } from './markdown.js'
       + ' · 档位 ' + (project.settings?.mode || 'quality')
       + (project.settings?.characterCardVariant ? ' · 角色卡 ' + (project.settings.characterCardVariant === 'three' ? '三视图' : '单视图') : '')
       + ' · 审查 ' + (project.settings?.reviewMode === 'batch' ? '批量' : '逐镜')
+      + ' · 自检 ' + (project.settings?.shotGate === 'off' ? '关闭' : project.settings?.shotGate === 'frames' ? '抽帧' : '开启')
       + ' · 节点 ' + nodes.length
       + (nodes.length ? '（主线 ' + main.length + (frames.length ? ' · 抽帧 ' + frames.length : '') + (discards.length ? ' · 作废 ' + discards.length : '') + '）' : '')
 

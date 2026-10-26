@@ -92,6 +92,7 @@ audioMode=dialogue-led
 mode=balanced
 characterCardVariant=single
 reviewMode=batch
+shotGate=verdict        # 逐镜自检门：默认开启；off=关闭，frames=只要求抽帧
 groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）]
 # 声线方案无 state 字段：existing（阶段 C 建）/ text-only（降级），写进系列圣经与集制作包 ⑥
 ```
@@ -113,6 +114,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 | BGM 模式 `bgmMode` | `none` / `in-model`（本期） | `in-model`=H3 逐镜自带 BGM，烘进片段；不可单独替换/duck，硬切可能换曲。`separate`（Music 3）下一期 |
 | 角色卡版本 `characterCardVariant` | `single` / `three`（仅 balanced/quality） | 9:16 下 three 未实测；切换 = 已产集重渲 |
 | 片段审查 `reviewMode` | `batch` / `per-shot` | per-shot 每镜一张卡，人力 ×N |
+| 逐镜自检门 `shotGate` | `verdict`（默认，每镜必须记录 pass）/ `frames`（只抽帧）/ `off`（关闭） | 关闭 = 坏镜头晚发现、返工成串；量产建议保持 `verdict` |
 | 声线方案 `voicePlan` | `existing`（复用/缺的补建，推荐）/ `audition`（全部重新试镜）/ `text-only` | text-only 无音色锚点，交付记风险；audition = 新季换声/重做声线 |
 | 交付画质 `delivery` | `native` / `upscale1080` / `upscale2k` / `upscale4k` | 超分 ≈+78 min/集（1080）；整季二选一 |
 | 视觉风格 | `cinematic-live-action` / 其余 6 套 | 改 = 全部卡片与片段作废 |
@@ -123,7 +125,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 1. **画面 / 时长**：`9:16`（推荐）/ `16:9` / `1:1`；`90s`（推荐）/ `80s` / `100s` / `110s` / 自定义。
 2. **画质 / 成本**：视频 `tier` = `balanced`（推荐）/ `quality` / `fast`；图片 `imageTier` = `balanced`（推荐）/ `quality` / `fast`；交付 `delivery` = `native`（推荐）/ `upscale1080` / `upscale2k` / `upscale4k`；字幕 `subtitles` = `none`（推荐）/ `burned-in`；BGM `bgmMode` = `none`（默认）/ `in-model`（H3 逐镜自带，本期）。
 3. **资产 / 声音**：角色卡 `characterCardVariant` = `single`（推荐）/ `three`（仅 balanced/quality）；声线 `voicePlan` = `existing`（推荐，阶段 C 复用/缺的补建）/ `audition`（强制每个说话角色重新试镜）/ `text-only`（降级）。
-4. **审查 / 风格**：`reviewMode` = `batch`（推荐）/ `per-shot`；视觉风格 7 选 1；语言中文 / English（出海，先 1 镜验证）。
+4. **审查 / 自检 / 风格**：`reviewMode` = `batch`（推荐）/ `per-shot`；**逐镜自检门 `shotGate` = `verdict`（推荐，默认）/ `frames` / `off`**；视觉风格 7 选 1；语言中文 / English（出海，先 1 镜验证）。
 
 **规格卡还要写**：预计单集成本、整季成本、样片集是否先做、是否需要三档实测。用户改任意一项 → 回到本卡重选，并按「切换成本」处理已产集。
 
@@ -198,7 +200,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
               "aspectRatio": "9:16", "style": "cinematic-live-action",
               "audioMode": "dialogue-led", "tier": "balanced", "imageTier": "balanced",
               "subtitles": "none", "delivery": "native|upscale1080",
-              "characterCardVariant": "single", "reviewMode": "batch",
+              "characterCardVariant": "single", "reviewMode": "batch", "shotGate": "verdict",
               "voicePlan": "audition|existing|text-only", "bgmMode": "none|in-model", "packageContract": "episode-package/v1", "assetMode": "library" },
   "assets": {
     "characters": [{ "name": "林晚",
@@ -332,7 +334,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 1. **读状态**：`series/production-state.json` → 当前集 / stage / doneShots / 资产台账（含 `voices[]`）。
 2. **读输入**：`episodes/epNNN.md` + 分集目录该行 + `series/bible.md` 相关段（不要全读，按需）。
 3. **物化资产**：只从台账/集制作包的 **asset id** 物化——`asset_list` 校验 → `asset_to_canvas(id=…)` 把本集用到的角色/状态/场景/道具/声线取回画布（复用也要可见）。**不要用上一集的 node id**；`asset_to_canvas` 会在节点写 `params.assetId`，可据此校验来源。
-4. **写画布设置**：`canvas_set_state` 一次写全（§1 代码块：`9:16` / 目标时长（80–110s，默认 90 秒）/ `dialogue-led` / `balanced` / `single` / `batch` / 十个分组）。**这是 `reviewMode` 与 `groupOrder` 的唯一写入点**；story 进入后只读、校验、缺值告警，不重写。**漏了这一步 = story 读不到 `reviewMode`：每集从 3 张卡变成「1 张方案 + 18 张片段 + 1 张交付」（≈20 张）。**
+4. **写画布设置**：`canvas_set_state` 一次写全（§1 代码块：`9:16` / 目标时长（80–110s，默认 90 秒）/ `dialogue-led` / `balanced` / `single` / `batch` / `verdict`（自检门）/ 十个分组）。**这是 `reviewMode`、`shotGate` 与 `groupOrder` 的唯一写入点**；story 进入后只读、校验、缺值告警，不重写。**漏了这一步 = story 读不到 `reviewMode`：每集从 3 张卡变成「1 张方案 + 18 张片段 + 1 张交付」（≈20 张）。**
 5. **写本集规格卡**：`canvas_write_node(kind="text", group="story planning", title="EP00X 本集规格", content=…)`，只读展示 `9:16 / 目标时长 / dialogue-led / 视频档位 / 图片档位 / 单视图 / batch / 字幕 none / 交付画质（native/upscale…）/ 风格 / 声线方案 / assetMode`，并附**当前节点数（动态，主线/总）**。**它不是新参数来源**：参数来源是系列圣经 §1 + 集制作包 ⑥；节点数只是画布状态。
 6. **建集制作包**：按 §10 生成 `package.md`，同时写该集画布文本节点（group `story planning`）。量产集 `params.assetMode=library`；EP01/试产才用 `draft`。
 7. **委托生产**：加载 `story-short-generator`，按 §8.2 从 STEP 3 起执行，并声明**每集 3 张卡的合并规则**（方案 / 片段 / 交付）。

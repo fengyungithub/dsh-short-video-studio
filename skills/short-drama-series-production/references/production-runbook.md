@@ -10,7 +10,7 @@
 1) read  series/production-state.json          # 当前集 / stage / doneShots / 资产与声线台账
 2) read  episodes/epNNN.md + 分集目录该行 + series/bible.md（按需段）
 3) asset_list()  →  asset_to_canvas(id=…) × N   # 本集用到的角色/状态/场景/道具
-4) canvas_set_state(…)                          # 一次写全：画幅/时长/音频/档位/卡版本/reviewMode/十个分组
+4) canvas_set_state(…)                          # 一次写全：画幅/时长/音频/档位/卡版本/reviewMode/shotGate/十个分组
 5) canvas_write_node(kind=text, group="story planning", title="EP00X 本集规格", content=…)  # 只读规格卡：参数 + 节点数（动态）
 6) canvas_write_node(kind=text, group="story planning", title="EP00X 集制作包", content=…)
 7) 加载 story-short-generator，声明总控与注入点，从 STEP 3 起
@@ -20,7 +20,7 @@
 
 ```text
 canvas_set_state(aspectRatio="9:16", duration="90 秒（默认；按包 ① 80–110s 调整）", audioMode="dialogue-led",
-                 mode="balanced", characterCardVariant="single", reviewMode="batch",
+                 mode="balanced", characterCardVariant="single", reviewMode="batch", shotGate="verdict",
                  groupOrder=["story planning","character cards","voice auditions","scene cards",
                              "prop cards","shot table","text storyboards","shot prompts",
                              "shot clips","final delivery"])

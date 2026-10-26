@@ -47,6 +47,7 @@
 | 图片档位 `balanced` | 圣经 + 集制作包 ⑥ | 校验（无 state 字段） |
 | 角色卡版本 `single` | 圣经 + `canvas_set_state.characterCardVariant` | 读回校验 |
 | 审查节奏 `batch` | 圣经 + `canvas_set_state.reviewMode` | 读回校验 |
+| 逐镜自检门 `verdict`（默认开启） | 圣经 + `canvas_set_state.shotGate` | 读回校验；缺省按 `verdict` |
 | 字幕 `none` | 圣经 + 集制作包 ⑥ | 校验（无 state 字段） |
 | 交付画质 `delivery` | 圣经 + 集制作包 ⑥（native / upscale1080 / 2k / 4k） | 校验；整季二选一 |
 | 风格 / 声线方案 / assetMode | 圣经 + ⑥ | 校验 |

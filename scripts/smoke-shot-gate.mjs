@@ -198,6 +198,18 @@ try {
   writeFileSync(join(canvasDir, 'project.json'), JSON.stringify(p2), 'utf8')
   rec = await record({ nodeId: 's1', verdict: 'pass' })
   ok(rec.ok === true && rec.frames.length === 1, 'extract_frame 记账的帧可作 pass 凭据')
+
+  // ---------- 7. 默认开启：缺省 / 非法值读回 verdict ----------
+  console.log('# shotGate 默认值（默认开启）')
+  writeProject({ shotGate: undefined }, [])
+  let st = await byName.canvas_get_state.execute({ sessionId: sid }, { agent })
+  ok(st.settings.shotGate === 'verdict', '没写 shotGate：读回 verdict（默认开启）')
+  writeProject({ shotGate: 'bogus' }, [])
+  st = await byName.canvas_get_state.execute({ sessionId: sid }, { agent })
+  ok(st.settings.shotGate === 'verdict', '非法值：读回 verdict')
+  writeProject({ shotGate: 'off' }, [])
+  st = await byName.canvas_get_state.execute({ sessionId: sid }, { agent })
+  ok(st.settings.shotGate === 'off', '显式关闭保留 off')
 } finally {
   rmSync(root, { recursive: true, force: true })
 }

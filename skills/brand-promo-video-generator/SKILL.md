@@ -93,8 +93,9 @@ whenToUse: |
 3. **总时长**：15 秒（推荐，快速发布片）/ 30 秒 / 45–60 秒 / 自定义。镜头数：15s → 2–3 镜，30s → 3–6 镜，45–60s → 5–10 镜（单镜 5–15 秒，见镜头表规则）。
 4. **音频模式**：`silent` 纯音乐音效（BGM + SFX，无口播，零口型风险，产品宣传片推荐）/ `narration-led` 旁白主导（原生旁白 + BGM，讲解式宣传）。`dialogue-led` 不在本 Skill 范围。
 5. **生成档位**：`fast`（调试 / 调构图，长边 832）/ `balanced`（日常，画质与耗时平衡，长边 1344）/ `quality`（成片，长边 1344）。允许先 fast 走通全片再升档重出（`fast`→`balanced`、`fast`→`quality`、`balanced`→`quality` 都允许）。
+6. **逐镜自检门**（`shotGate`，**默认开启**）：开启（`verdict`，每镜抽帧核对 + `canvas_record_check(pass)` 才放行下一镜）/ 只要求抽帧（`frames`）/ 关闭（`off`，不做逐镜 AI 自检留痕，片段批准前仍可人工看）。
 
-确认后用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode），**同一次调用一并传 `groupOrder=["brand intake","creative plan","asset plates","shot prompts","shot clips","final delivery"]`**，并写入生产简报。
+确认后用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode / shotGate），**同一次调用一并传 `groupOrder=["brand intake","creative plan","asset plates","shot prompts","shot clips","final delivery"]**，并写入生产简报。
 
 > **每镜必须显式传 `type` 与 `tier`**：`type=r2v`（参考绑定）/ `type=i2v`（首末帧串联）——**工具面 `type` 必填**，且与参数冲突会报错；`tier=fast|balanced|quality` 同样逐镜显式写，**不要依赖缺省**——缺省是 `quality`（成本最高档）。
 
@@ -367,7 +368,7 @@ whenToUse: |
 
 ### 片段批准
 
-**逐镜自检必须先落画布（工具层硬门）**：每渲完一镜立即 `extract_frame` 抽首/中/末帧核对（身份素材是否逐字一致、文案是否漏烧/错烧、无分镜痕迹），然后 `canvas_record_check(nodeId=<本镜片段节点>, verdict="pass"|"fail", frames=[抽出的帧节点 id], notes=<判定摘要>)`。`pass` 必须有抽帧证据；未 pass 的镜头会被插件 pre-execute 门挡住下一镜，`video_concat` 也要求参与拼接的镜头全部 pass。`fail` 时按「逐镜失败回退阶梯」改完**复用同一 nodeId 重渲**（重渲把自检重置为 pending）。项目设置 `shotGate=verdict|frames|off` 控制强度（默认 verdict）。
+**逐镜自检必须先落画布（工具层硬门，`settings.shotGate` 开启时生效、默认开启）**：每渲完一镜立即 `extract_frame` 抽首/中/末帧核对（身份素材是否逐字一致、文案是否漏烧/错烧、无分镜痕迹），然后 `canvas_record_check(nodeId=<本镜片段节点>, verdict="pass"|"fail", frames=[抽出的帧节点 id], notes=<判定摘要>)`。`pass` 必须有抽帧证据；未 pass 的镜头会被插件 pre-execute 门挡住下一镜，`video_concat` 也要求参与拼接的镜头全部 pass。`fail` 时按「逐镜失败回退阶梯」改完**复用同一 nodeId 重渲**（重渲把自检重置为 pending）。项目设置 `shotGate=verdict|frames|off` 控制强度（默认 verdict）。
 
 所有片段渲染完成后按镜头顺序放到画布（group `shot clips`），出选项卡：批准片段并进入交付（推荐）/ 重渲染选定片段 / 修复身份不一致 / 加强品牌锁一致性 / 修复跨片段色彩状态跳变。
 

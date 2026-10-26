@@ -12,7 +12,7 @@ whenToUse: |
 
 当用户想把一句话创意做成完整的故事优先短片时使用本 Skill。流程从创意开发到最终交付，所有主要产物都必须按生产顺序落到画布，并在高成本或关键创意节点用选项卡让用户确认。
 
-核心规则：**先故事、再资产；接到创意后立刻用选项卡确认生产规格（含视觉风格、视频档位、图片档位、字幕开关、片段审查节奏与「声线方案」；有对白时门控必须作答：audition / existing / text-only 三选一）；产物按顺序上画布；所有需要用户确认的地方必须用选项卡；角色卡锁定后先做声线试镜（STEP 3.5）、再场景/道具卡；固定顺序为：七列标准镜头表 → 镜头表自检门 → 单文本分镜文档（可视化模式再加铅笔图）→ 逐镜 prompt 分档库 → 逐镜视频生成（门 3 的人工确认按 `reviewMode` 逐镜或批量）→ 交付复查；成片必须清除所有分镜痕迹。**
+核心规则：**先故事、再资产；接到创意后立刻用选项卡确认生产规格（含视觉风格、视频档位、图片档位、字幕开关、片段审查节奏、逐镜自检门与「声线方案」；有对白时门控必须作答：audition / existing / text-only 三选一）；产物按顺序上画布；所有需要用户确认的地方必须用选项卡；角色卡锁定后先做声线试镜（STEP 3.5）、再场景/道具卡；固定顺序为：七列标准镜头表 → 镜头表自检门 → 单文本分镜文档（可视化模式再加铅笔图）→ 逐镜 prompt 分档库 → 逐镜视频生成（门 3 的人工确认按 `reviewMode` 逐镜或批量）→ 交付复查；成片必须清除所有分镜痕迹。**
 
 参考图硬规则（图内零文字 / 不拼图）由插件工具契约统一定义；入库规则是「单片用户点入库；系列 G-A 批准后 AI 可 asset_ingest」，本文不复述，全流程严格遵守。**角色卡固定出两版（单视图 + 三视图横排）**：视频引用哪一版由 STEP 0 用户选择——`fast` 只能单视图（多主体必出副本或污染画面），`balanced` / `quality` 可选单视图或三视图；非 fast 档成片自检若出现参考图形态类污染，**先传 `ref_variant=single` 重渲本镜**。门禁 G-ref 按**每次调用实际传入的 `tier`** 判定 —— 完整规则与实测证据见「参考图形态与档位」节。
 
@@ -228,13 +228,13 @@ whenToUse: |
 
 | 项 | 单片 | 剧集单集 |
 |---|---|---|
-| 视觉风格 / 画幅 / 时长 / 音频 / 字幕 / 视频档位 / 角色卡版本 / 图片档位 / 交付画质 / 审查节奏 | 读 `single-film-mode.md`，逐项问 | 读集制作包 ⑥ 预填，不再问 |
+| 视觉风格 / 画幅 / 时长 / 音频 / 字幕 / 视频档位 / 角色卡版本 / 图片档位 / 交付画质 / 审查节奏 / 逐镜自检门 | 读 `single-film-mode.md`，逐项问 | 读集制作包 ⑥ 预填，不再问 |
 | 声线方案 | 读 `voice-audition.md`，有对白必须作答 | 读 ⑥ + 台账 `voices[]`；不重跑试镜 |
 | BGM 模式 `bgmMode` | 读 `single-film-mode.md`，问 `none` / `in-model` | 读 ⑥ 预填；`E-STEP 0` 校验，不重问 |
 | `canvas_set_state` | 本 skill 写一次 | production 写；本 skill 只读/校验 |
 | 人工门 | 单片门清单（13 张规格卡 + 阶段卡） | 3 张卡（方案/片段/交付），见系列参考 |
 
-生产规格确认后（**单片由本 skill 写；委托模式由 production 写，本 skill 只校验**；连续短剧分支用集制作包 ⑥ 预填，不再逐项问）用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode = **视频档位** / characterCardVariant = **角色卡引用版本** / reviewMode = **片段审查节奏**：`per-shot` 逐镜 / `batch` 批量），**同一次调用一并传 `groupOrder`**（见下方分组清单），并写入项目简报。这些设置贯穿镜头时长、分辨率推导、分镜、逐镜生成与交付。**「交付画质」「视觉风格」「图片档位」「字幕」「声线方案」「BGM 模式」六项没有对应的 state 字段**，必须写进项目简报——交付画质是后续超分 / 拼接步骤的唯一依据；视觉风格决定每次生成要追加哪一份风格锁后缀；**BGM 模式决定 STEP 5 `BGM` 子字段与 STEP 7 `non_diegetic_music` 写不写**；**图片档位决定 STEP 3 / 4 / 4.5 / 6 生成卡片与分镜图时传哪个 `tier`**；**字幕选择决定 STEP 5 镜头表 `字幕` 列、STEP 7 逐镜 prompt 写不写字幕声明、以及门 3 / 终检把字幕核对换成「无字幕」核对**；**角色卡引用版本（`characterCardVariant`）是 STEP 7 每镜 `ref_variant` 的来源**（fast 镜强制 single），**视频档位（`mode`）决定该选项可不可选 three**；**片段审查节奏（`reviewMode`）有 state 字段**，STEP 7 渲染前 `canvas_get_state` 读回它决定门 3 的人工确认时机（缺省按 `per-shot`）。
+生产规格确认后（**单片由本 skill 写；委托模式由 production 写，本 skill 只校验**；连续短剧分支用集制作包 ⑥ 预填，不再逐项问）用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode = **视频档位** / characterCardVariant = **角色卡引用版本** / reviewMode = **片段审查节奏**：`per-shot` 逐镜 / `batch` 批量 / shotGate = **逐镜自检门**：`verdict` 开启（默认）/ `frames` 只要求抽帧 / `off` 关闭），**同一次调用一并传 `groupOrder`**（见下方分组清单），并写入项目简报。这些设置贯穿镜头时长、分辨率推导、分镜、逐镜生成与交付。**「交付画质」「视觉风格」「图片档位」「字幕」「声线方案」「BGM 模式」六项没有对应的 state 字段**，必须写进项目简报——交付画质是后续超分 / 拼接步骤的唯一依据；视觉风格决定每次生成要追加哪一份风格锁后缀；**BGM 模式决定 STEP 5 `BGM` 子字段与 STEP 7 `non_diegetic_music` 写不写**；**图片档位决定 STEP 3 / 4 / 4.5 / 6 生成卡片与分镜图时传哪个 `tier`**；**字幕选择决定 STEP 5 镜头表 `字幕` 列、STEP 7 逐镜 prompt 写不写字幕声明、以及门 3 / 终检把字幕核对换成「无字幕」核对**；**角色卡引用版本（`characterCardVariant`）是 STEP 7 每镜 `ref_variant` 的来源**（fast 镜强制 single），**视频档位（`mode`）决定该选项可不可选 three**；**片段审查节奏（`reviewMode`）有 state 字段**，STEP 7 渲染前 `canvas_get_state` 读回它决定门 3 的人工确认时机（缺省按 `per-shot`）。
 
 > **每镜必须显式传 `type='r2v'` 与 `tier`**（**工具面 `type` 必填**，缺了直接报错；`type` 与参数冲突——如 r2v 带首/末帧——也会报错）。**连续性靠 `continuity_from`，不靠 `type`**：连续镜头传上一镜节点 id，独立镜头不传。「哪些镜是连续镜头」在 STEP 5 的 `续接` 列里定死。
 > `tier=fast|balanced|quality` 同样逐镜显式写，**不要依赖缺省**——缺省是 `quality`（成本最高档）。同一镜头要换档时改 `tier` 重渲，不要靠「隐式默认」蒙。**同一条链内首遍尺寸必须一致**（≈同档：`fast` 832×480、`balanced`/`quality` 1344×768；链上传递的是首遍 latent，不能缩放；不一致会显式报错）。
@@ -568,9 +568,13 @@ comfy_generate_image(prompt=<同一角色设定 + 正/侧/背三格 + 锁 A/B>, 
 
 **先读回审查节奏**：`canvas_get_state()` 取 `settings.reviewMode`（缺省 `per-shot`）——它决定门 3 的人工确认是**逐镜**还是**批量**。**在渲染第一个片段之前读**，不要凭对话印象或默认值判断；读不到就按 `per-shot` 走并在回复里说明。
 
+**同时读回逐镜自检门**：`settings.shotGate`（缺省 `verdict` = **开启**）。`verdict` → 每镜必须 `extract_frame` + `canvas_record_check(pass)` 才能进下一镜（插件 pre-execute 硬门）；`frames` → 每镜抽帧即可、不强制记录结论；`off` → 门 3 的逐镜 AI 自检关闭（人工确认与失败回退照旧）。读不到按 `verdict` 走并在回复里说明。
+
 **生成档位（视频）**：沿用 Step 0 选择；只有用户要改时才在「改规格卡」里选（切 `fast` 走通全片 / 升到 `balanced` / `quality` / 本镜临时改档）。**逐镜调用必须显式传 `tier=`**（`fast` / `balanced` / `quality`），不要依赖缺省——缺省是 `quality`，成本最高。分辨率由画布 `aspectRatio` + 档位自动推导（`fast` 长边 832、`balanced`/`quality` 长边 1344），不需要单独选分辨率；用户要单镜 hero 画质时才显式传 `width`/`height`。
 
-**片段审查节奏**：沿用 Step 0 选择；只有用户要改时才在「改规格卡」里选 `per-shot` / `batch`。**改了就 `canvas_set_state(reviewMode=…)`**（改 state 即生效，见 STEP 0 与门 3）。这一项只改人工确认的时机，AI 自检两种模式都逐镜做。
+**片段审查节奏**：沿用 Step 0 选择；只有用户要改时才在「改规格卡」里选 `per-shot` / `batch`。**改了就 `canvas_set_state(reviewMode=…)`**（改 state 即生效，见 STEP 0 与门 3）。这一项只改人工确认的时机，AI 自检是否逐镜由 `shotGate` 决定。
+
+**逐镜自检门**：沿用 Step 0 选择；用户要改时在「改规格卡」里选 开启（`verdict`）/ 只要求抽帧（`frames`）/ 关闭（`off`），**改了就 `canvas_set_state(shotGate=…)`**。从下一镜起生效：新渲的片段按新档打标 / 不打标（`off` 不打标 = 不参与门控）；已渲片段不重做。
 
 **档位与能力可用性**：一个能力支持多档，**具体有哪些档、每档什么代价，以 `comfy_list_workflows` 为准**（不同能力可以不同，用户在设置页增删实现后也会变）——不要假设档位数量或名称。请求了该能力没有的档会**显式报错并列出可用档位**（工具不会静默换档）。遇到这类报错就改请求可用档位，**不要原样重试同一请求**。用户选的**交付画质**若是「生成内放大」，要在选档时确认该档解析到的实现确实出高分辨率（显式宽高会被它锁定，工具会回 warning），并确认画幅/单镜帧数在它的限制内。
 
@@ -648,9 +652,11 @@ comfy_generate_image(prompt=<同一角色设定 + 正/侧/背三格 + 锁 A/B>, 
 
 不要重复提交未改动的同一请求。
 
-### 片段门控（门 3：AI 自检逐镜必做，人工确认按 `reviewMode` 逐镜或批量）
+### 片段门控（门 3：逐镜自检按 `shotGate` 开关，人工确认按 `reviewMode` 逐镜或批量）
 
-**两种模式共用的部分（不可省）**：每渲完一镜，AI **立即**自检；**自检绝不允许推迟到全部渲完之后**——`batch` 批量审查省的只是「人工确认次数」，不是「自检次数」。转场镜走同一道门。
+**自检门开关（`settings.shotGate`，STEP 0 用户选择，默认开启）**：`verdict` = 开启——每镜必须抽帧核对并 `canvas_record_check(verdict="pass")` 才能进下一镜；`frames` = 只要求抽帧（不强制记录结论）；`off` = 关闭——本片不做逐镜 AI 自检留痕（**人工确认与失败回退阶梯照旧**，`reviewMode=per-shot` 时变成「渲完 → 直接人工确认」）。渲染前 `canvas_get_state` 读回。
+
+**两种模式共用的部分（`shotGate≠off` 时不可省）**：每渲完一镜，AI **立即**自检；**自检绝不允许推迟到全部渲完之后**——`batch` 批量审查省的只是「人工确认次数」，不是「自检次数」。转场镜走同一道门。
 
 每镜渲染后的 **AI 自检**（渲染完立即执行，任一不过不进审查卡）：
 
@@ -665,7 +671,7 @@ comfy_generate_image(prompt=<同一角色设定 + 正/侧/背三格 + 锁 A/B>, 
 5. **音频与声线**：先查画布节点 `params.audio_ref_nodes` 是否等于镜头表 `声线参考`（对白镜必须传；`silent`/`none` 镜必须为空），以及 `params.audio_ref_declared === true`（prompt 里有 `<Audio N>`）。AI 不能听音——把「对白清晰 / 音色与声线样本是否同一人 / 音效与画面同步 / 无杂音幻听」列入确认卡，由人工听核；转场镜重点核对有无幻听人声。
 6. **风格一致**：本镜画面符合**所选风格锁**（`references/styles/<id>.md`），与已锁定的卡片及相邻镜无风格漂移；风格锁后缀与负向约束确已追加到本镜 prompt。
 
-**自检结论必须落画布（工具层硬门，不可跳过）**：每镜自检结束后立刻 `canvas_record_check(nodeId=<本镜片段节点>, verdict="pass"|"fail", frames=[本镜抽出的帧节点 id], notes=<判定摘要>)`。`pass` 必须有抽帧证据（`extract_frame` 产物，或用 `frames` 显式给出）；**未 pass 的镜头会被插件 pre-execute 门直接挡在下一镜之前**（`comfy_generate_video` 被 deny 并给出下一步），`video_concat` 也要求参与拼接的镜头全部 pass。`fail` 时改 prompt / 参数后**复用同一 nodeId 重渲**（重渲会把自检重置为 `pending`），不要新开节点。人工确认按 `reviewMode` 照旧——自检门只管 AI 自检留痕，不替代人工确认。项目设置 `shotGate` 控制强度：`verdict`（默认，必须 pass）/ `frames`（只要求抽过帧）/ `off`（关闭）。
+**自检结论必须落画布（工具层硬门，不可跳过）**：每镜自检结束后立刻 `canvas_record_check(nodeId=<本镜片段节点>, verdict="pass"|"fail", frames=[本镜抽出的帧节点 id], notes=<判定摘要>)`。`pass` 必须有抽帧证据（`extract_frame` 产物，或用 `frames` 显式给出）；**未 pass 的镜头会被插件 pre-execute 门直接挡在下一镜之前**（`comfy_generate_video` 被 deny 并给出下一步），`video_concat` 也要求参与拼接的镜头全部 pass。`fail` 时改 prompt / 参数后**复用同一 nodeId 重渲**（重渲会把自检重置为 `pending`），不要新开节点。人工确认按 `reviewMode` 照旧——自检门只管 AI 自检留痕，不替代人工确认。项目设置 `shotGate` 控制强度：`verdict`（默认，必须 pass）/ `frames`（只要求抽过帧）/ `off`（关闭——此时不做本段留痕，也不被插件拦；人工确认照旧）。
 
 失败处置：任一不过 → 先 `canvas_record_check(verdict="fail")` 留痕，再走「逐镜失败回退阶梯」重渲本镜（参考图形态类问题先换单视图卡 / 强化 prompt / 缩时长 / 降档 / 简化动作）后重跑自检；**未过自检的片段不进任何审查卡**。若片段与已批准的 `参考锚点` 漂移（门框落到错边、人物从错边离屏、光位翻转），用直接引用 `参考锚点` 块的强化提示重渲。
 
@@ -825,7 +831,7 @@ comfy_generate_image(prompt=<同一角色设定 + 正/侧/背三格 + 锁 A/B>, 
 
 - **单片**：门清单见 `references/single-film-mode.md` §3（13 张规格卡 + 阶段卡；默认 `per-shot`）。
 - **剧集单集**：只出 3 张卡（方案 / 片段 / 交付），见 `references/series-delegated-mode.md`；AI 自检仍逐镜做。
-- **改规格卡**：仅当用户主动要改档位 / 审查节奏 / 交付画质时弹（STEP 0 已定过，不重复问）。
+- **改规格卡**：仅当用户主动要改档位 / 审查节奏 / 逐镜自检门 / 交付画质时弹（STEP 0 已定过，不重复问）。
 - **异常门**：G-ref / 同一镜连续 3 次失败 / 口型字幕不过 / 意图冲突 → 当场打断，不许静默降级。
 
 默认推荐项放最前，始终允许用户自定义输入。用户说「继续」时按选了推荐项处理。
