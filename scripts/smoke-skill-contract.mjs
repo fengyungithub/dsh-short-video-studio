@@ -151,6 +151,8 @@ ok('SSG 指向声线参考', ssg.includes('references/voice-audition.md'))
 ok('单片参考含 13 张规格卡', singleMode.includes('13 张规格卡'))
 ok('剧集参考含 assetMode=library 与 3 张卡', seriesMode.includes('assetMode=library') && seriesMode.includes('3 张卡'))
 ok('声线参考含“不带风格锁 C”', voiceRef.includes('不带风格锁 C'))
+ok('剧集参考含 E-STEP 0 预检', seriesMode.includes('E-STEP 0') && seriesMode.includes('规格偏差卡'))
+ok('runbook 含本集规格卡', run.includes('本集规格'))
 
 console.log('')
 if (fail) {

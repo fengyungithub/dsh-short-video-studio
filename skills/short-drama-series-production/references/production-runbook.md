@@ -4,15 +4,16 @@
 
 ---
 
-## 1. 每集会话开场（六步，必做）
+## 1. 每集会话开场（七步，必做）
 
 ```text
 1) read  series/production-state.json          # 当前集 / stage / doneShots / 资产与声线台账
 2) read  episodes/epNNN.md + 分集目录该行 + series/bible.md（按需段）
 3) asset_list()  →  asset_to_canvas(id=…) × N   # 本集用到的角色/状态/场景/道具
 4) canvas_set_state(…)                          # 一次写全：画幅/时长/音频/档位/卡版本/reviewMode/十个分组
-5) canvas_write_node(kind=text, group="story planning", title="EP003 集制作包", content=…)
-6) 加载 story-short-generator，声明总控与注入点，从 STEP 3 起
+5) canvas_write_node(kind=text, group="story planning", title="EP00X 本集规格", content=…)  # 只读规格卡：参数 + 节点数（动态）
+6) canvas_write_node(kind=text, group="story planning", title="EP00X 集制作包", content=…)
+7) 加载 story-short-generator，声明总控与注入点，从 STEP 3 起
 ```
 
 开场先做的状态写入（**每集唯一写入点；story 只读不写**）：

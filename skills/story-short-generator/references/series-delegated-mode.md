@@ -32,6 +32,36 @@
 - **剧本冲突**：台词/事件与剧本不一致、或镜头装不下时，**停线退回 production/writer**；本 skill 只拆镜/改时长/改表演，**不许自行改写台词或事件**。
 - **反向兼容**：由 `short-drama-series-production` 委托进来时（画布已有集制作包、或对话已声明系列总控），视为已探测命中，跳过门 0。
 
+## E-STEP 0 · 本集规格预检（不重问）
+
+剧集模式**也有 STEP 0**，但它不是“再问一遍 11 项”，而是**读系列规格 + 校验落盘**。参数在系列层 G-S 已经定死；每集只做预检。
+
+| 参数 | 来源 | 预检动作 |
+|---|---|---|
+| 画幅 `9:16` | 系列圣经 §1 + `canvas_set_state.aspectRatio` | 读回校验；缺/不一致 → 停线 |
+| 目标时长（80–110s，默认 90s） | 圣经 + 集制作包 ① / `state.duration` | 校验；例外必须已写 `episodeSecondsException` |
+| 音频 `dialogue-led` | 圣经 + `canvas_set_state.audioMode` | 读回校验 |
+| 视频档位 `balanced` | 圣经 + `canvas_set_state.mode` | 读回校验 |
+| 图片档位 `balanced` | 圣经 + 集制作包 ⑥ | 校验（无 state 字段） |
+| 角色卡版本 `single` | 圣经 + `canvas_set_state.characterCardVariant` | 读回校验 |
+| 审查节奏 `batch` | 圣经 + `canvas_set_state.reviewMode` | 读回校验 |
+| 字幕 `none` | 圣经 + 集制作包 ⑥ | 校验（无 state 字段） |
+| 风格 / 声线方案 / assetMode | 圣经 + ⑥ | 校验 |
+| 节点数（主线/总） | `canvas_list_nodes()` | **只展示、不是参数**；动态 |
+
+**流程**
+
+1. `canvas_get_state()` 读回上述 state；**读不到/不一致 → 停线**，交 production 重写（本 skill 不默认、不静默补）。
+2. 读 `EP00X 本集规格`（production 写的只读卡）与集制作包 ⑥；两者不一致 → 以系列圣经 + ⑥ 为准，报偏差。
+3. 校验 `assetMode`：`library` 时角色/场景/道具/声线必须有 asset id，`toBuild` 为空；否则停线回 G-A。
+4. 校验物化节点 `params.assetId`；缺卡才生成，生成后交回 production 入库。
+5. **不弹规格卡**（参数已在 G-S 批准）。只有偏差时才弹**规格偏差卡**：
+   - 改回系列规格（推荐）
+   - 仅本集例外（必须写入集制作包 ① 与 state，并在交付清单标注）
+   - 取消本集
+
+> 节点数 `28（主线 28）` 是画布状态，不是 STEP 0 的输入参数；不要拿它反推画幅/时长/档位。
+
 ## 委托模式的硬边界
 
 - **门**：production 出 3 张人工卡（方案 / 片段 / 交付）；SKILL 的 门 1 / 门 2 / 分镜模式 / 分镜批准 / 渲染参数卡不再单独弹，但 STEP 5.5 十一项自检与门 3 AI 逐镜自检照做。

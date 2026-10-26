@@ -196,7 +196,7 @@ whenToUse: |
 | 模式 | 必读 | 谁写 state |
 |---|---|---|
 | 单片（短视频故事） | `references/single-film-mode.md` | 本 skill 写 `canvas_set_state` |
-| 剧集单集（委托） | `references/series-delegated-mode.md` | production 写；本 skill 只读/校验 |
+| 剧集单集（委托） | `references/series-delegated-mode.md`（含 **E-STEP 0 本集规格预检**） | production 写；本 skill 只读/校验 |
 | 声线 | `references/voice-audition.md` | — |
 
 ### 门 0 · 模式判定（探测优先）

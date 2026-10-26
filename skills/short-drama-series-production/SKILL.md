@@ -281,15 +281,16 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 ## 8. 阶段 E：量产（每集 SOP，门 G-E）
 
-### 8.1 每集会话开场 SOP（新会话必做；第 7 步仅续跑时执行）
+### 8.1 每集会话开场 SOP（新会话必做；第 8 步仅续跑时执行）
 
 1. **读状态**：`series/production-state.json` → 当前集 / stage / doneShots / 资产台账（含 `voices[]`）。
 2. **读输入**：`episodes/epNNN.md` + 分集目录该行 + `series/bible.md` 相关段（不要全读，按需）。
 3. **物化资产**：只从台账/集制作包的 **asset id** 物化——`asset_list` 校验 → `asset_to_canvas(id=…)` 把本集用到的角色/状态/场景/道具/声线取回画布（复用也要可见）。**不要用上一集的 node id**；`asset_to_canvas` 会在节点写 `params.assetId`，可据此校验来源。
 4. **写画布设置**：`canvas_set_state` 一次写全（§1 代码块：`9:16` / 目标时长（80–110s，默认 90 秒）/ `dialogue-led` / `balanced` / `single` / `batch` / 十个分组）。**这是 `reviewMode` 与 `groupOrder` 的唯一写入点**；story 进入后只读、校验、缺值告警，不重写。**漏了这一步 = story 读不到 `reviewMode`：每集从 3 张卡变成「1 张方案 + 18 张片段 + 1 张交付」（≈20 张）。**
-5. **建集制作包**：按 §10 生成 `package.md`，同时写该集画布文本节点（group `story planning`）。量产集 `params.assetMode=library`；EP01/试产才用 `draft`。
-6. **委托生产**：加载 `story-short-generator`，按 §8.2 从 STEP 3 起执行，并声明**每集 3 张卡的合并规则**（方案 / 片段 / 交付）。
-7. 若 `stage` 已是 `clips` 且有 `doneShots`：**断点续跑**——`canvas_list_nodes` 找回已渲片段，从第一个缺的镜继续（不要重渲已完成的镜）。
+5. **写本集规格卡**：`canvas_write_node(kind="text", group="story planning", title="EP00X 本集规格", content=…)`，只读展示 `9:16 / 目标时长 / dialogue-led / 视频档位 / 图片档位 / 单视图 / batch / 字幕 none / 风格 / 声线方案 / assetMode`，并附**当前节点数（动态，主线/总）**。**它不是新参数来源**：参数来源是系列圣经 §1 + 集制作包 ⑥；节点数只是画布状态。
+6. **建集制作包**：按 §10 生成 `package.md`，同时写该集画布文本节点（group `story planning`）。量产集 `params.assetMode=library`；EP01/试产才用 `draft`。
+7. **委托生产**：加载 `story-short-generator`，按 §8.2 从 STEP 3 起执行，并声明**每集 3 张卡的合并规则**（方案 / 片段 / 交付）。
+8. 若 `stage` 已是 `clips` 且有 `doneShots`：**断点续跑**——`canvas_list_nodes` 找回已渲片段，从第一个缺的镜继续（不要重渲已完成的镜）。
 
 ### 8.2 委托时的覆盖规则（组合税，必须照做）
 
