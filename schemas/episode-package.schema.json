@@ -629,6 +629,14 @@
             "library"
           ],
           "description": "draft=允许画布节点/canvas 声线临时引用（EP01/试产）；library=量产，必须有资产 id"
+        },
+        "bgmMode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "in-model"
+          ],
+          "description": "BGM 模式：none=无 BGM；in-model=H3 逐镜自带 BGM（本期）；separate 下一期"
         }
       }
     },

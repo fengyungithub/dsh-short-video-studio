@@ -456,6 +456,7 @@ node scripts/import-comfy.mjs exported.json \
 - 时长：`duration` 单位是**秒**（1–360），与视频的 `length`（帧数）不是一回事。
 - 带人声：`lyrics` 用 `[Verse]` / `[Chorus]` 分段；BGM 建议纯器乐。
 - 混音尚未自动化：目前只产独立音轨；`loudnorm` / 对白 ducking / loop crossfade 属于后续交付层工作。
+- **BGM 模式**：`bgmMode=none`（默认）/ `in-model`（H3 逐镜自带 BGM，本期支持）/ `separate`（Music 3 独立音轨 + 后期混音，下一期）。`in-model` 的 BGM 烘进片段音轨，不可单独替换/duck，硬切可能换曲；`separate` 时 H3 必须 `N/A`。
 
 ## H3 结构化 prompt（本地版 H3-Context-IR 替代）
 
@@ -507,6 +508,7 @@ node scripts/import-comfy.mjs exported.json \
 - **图片档位默认从 `quality` 改为 `balanced`**（单片与连续短剧一致）：文生图长边 1344，≈6s/张；`quality`（2048，≈45s/张）改为按需选择，不再默认。`fast` 仍只用于抽卡。
 - **系列资产三层**：资产库（唯一身份权威）/ 系列台账（asset id 索引）/ 每集画布（临时副本）；集制作包加 `params.assetMode=draft|library`，EP01 draft、EP02 起 library。
 - **`asset_ingest` 工具**：系列模式下用户批准「入库清单」后由 AI 登记资产（审计字段 / 默认拒绝覆盖 / 幂等）；`asset_ingest` 需重启 DSH 后出现在工具列表。
+- **H3 自带 BGM（本期）**：新增 `bgmMode=none|in-model`；镜头表 `BGM` 子字段 → H3 `non_diegetic_music`；实验见 `docs/research/h3-inmodel-bgm-experiment.md`，方案见 `docs/research/h3-inmodel-bgm-plan.md`。
 - **修复 `extract_frame` / `extract_audio` 路由**：`extract_frame` 不再被通用 prompt 门禁拦截（`image.from_video` 免 prompt）；`extract_audio` 重新把 `exec` 传给会话解析，不传 `sessionId` 也能用当前会话。与「本机是否有 ffmpeg」无关（ffmpeg 只决定抽音轨后端）。
 
 ### v1.14.0 — 声线参考 + BGM + 短剧系列化（2026-10-23）

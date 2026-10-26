@@ -703,7 +703,8 @@
       "shot clips",
       "final delivery"
     ],
-    "assetMode": "draft"
+    "assetMode": "draft",
+    "bgmMode": "none"
   },
   "budget": {
     "estimatedMinutes": 97,

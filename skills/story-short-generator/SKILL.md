@@ -214,7 +214,7 @@ whenToUse: |
 | 完全没有系列上下文 | **才问**：`短视频故事`（单片，默认）/ `连续短剧`（多集）。**选连续短剧 → 立即转 production，停止本 skill** |
 | 用户明确只要单片 / 一句话故事 | 单片，读 `single-film-mode.md`；若说法模糊（如「一个前传」）仍先问片型，不自行假设 |
 
-> 进入委托模式后：读集制作包 ⑥（12 项），不再逐项追问；`canvas_set_state` 由 production 写，本 skill 只校验。单片模式由本 skill 自己问规格、自己写 state。
+> 进入委托模式后：读集制作包 ⑥（13 项），不再逐项追问；`canvas_set_state` 由 production 写，本 skill 只校验。单片模式由本 skill 自己问规格、自己写 state。
 
 **选「连续短剧」后的硬动作（不要继续问规格）**：
 
@@ -229,10 +229,11 @@ whenToUse: |
 |---|---|---|
 | 视觉风格 / 画幅 / 时长 / 音频 / 字幕 / 视频档位 / 角色卡版本 / 图片档位 / 交付画质 / 审查节奏 | 读 `single-film-mode.md`，逐项问 | 读集制作包 ⑥ 预填，不再问 |
 | 声线方案 | 读 `voice-audition.md`，有对白必须作答 | 读 ⑥ + 台账 `voices[]`；不重跑试镜 |
+| BGM 模式 `bgmMode` | 读 `single-film-mode.md`，问 `none` / `in-model` | 读 ⑥ 预填；`E-STEP 0` 校验，不重问 |
 | `canvas_set_state` | 本 skill 写一次 | production 写；本 skill 只读/校验 |
 | 人工门 | 单片门清单（13 张规格卡 + 阶段卡） | 3 张卡（方案/片段/交付），见系列参考 |
 
-生产规格确认后（**单片由本 skill 写；委托模式由 production 写，本 skill 只校验**；连续短剧分支用集制作包 ⑥ 预填，不再逐项问）用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode = **视频档位** / characterCardVariant = **角色卡引用版本** / reviewMode = **片段审查节奏**：`per-shot` 逐镜 / `batch` 批量），**同一次调用一并传 `groupOrder`**（见下方分组清单），并写入项目简报。这些设置贯穿镜头时长、分辨率推导、分镜、逐镜生成与交付。**「交付画质」「视觉风格」「图片档位」「字幕」「声线方案」五项没有对应的 state 字段**，必须写进项目简报——交付画质是后续超分 / 拼接步骤的唯一依据；视觉风格决定每次生成要追加哪一份风格锁后缀；**图片档位决定 STEP 3 / 4 / 4.5 / 6 生成卡片与分镜图时传哪个 `tier`**；**字幕选择决定 STEP 5 镜头表 `字幕` 列、STEP 7 逐镜 prompt 写不写字幕声明、以及门 3 / 终检把字幕核对换成「无字幕」核对**；**角色卡引用版本（`characterCardVariant`）是 STEP 7 每镜 `ref_variant` 的来源**（fast 镜强制 single），**视频档位（`mode`）决定该选项可不可选 three**；**片段审查节奏（`reviewMode`）有 state 字段**，STEP 7 渲染前 `canvas_get_state` 读回它决定门 3 的人工确认时机（缺省按 `per-shot`）。
+生产规格确认后（**单片由本 skill 写；委托模式由 production 写，本 skill 只校验**；连续短剧分支用集制作包 ⑥ 预填，不再逐项问）用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode = **视频档位** / characterCardVariant = **角色卡引用版本** / reviewMode = **片段审查节奏**：`per-shot` 逐镜 / `batch` 批量），**同一次调用一并传 `groupOrder`**（见下方分组清单），并写入项目简报。这些设置贯穿镜头时长、分辨率推导、分镜、逐镜生成与交付。**「交付画质」「视觉风格」「图片档位」「字幕」「声线方案」「BGM 模式」六项没有对应的 state 字段**，必须写进项目简报——交付画质是后续超分 / 拼接步骤的唯一依据；视觉风格决定每次生成要追加哪一份风格锁后缀；**BGM 模式决定 STEP 5 `BGM` 子字段与 STEP 7 `non_diegetic_music` 写不写**；**图片档位决定 STEP 3 / 4 / 4.5 / 6 生成卡片与分镜图时传哪个 `tier`**；**字幕选择决定 STEP 5 镜头表 `字幕` 列、STEP 7 逐镜 prompt 写不写字幕声明、以及门 3 / 终检把字幕核对换成「无字幕」核对**；**角色卡引用版本（`characterCardVariant`）是 STEP 7 每镜 `ref_variant` 的来源**（fast 镜强制 single），**视频档位（`mode`）决定该选项可不可选 three**；**片段审查节奏（`reviewMode`）有 state 字段**，STEP 7 渲染前 `canvas_get_state` 读回它决定门 3 的人工确认时机（缺省按 `per-shot`）。
 
 > **每镜必须显式传 `type='r2v'` 与 `tier`**（**工具面 `type` 必填**，缺了直接报错；`type` 与参数冲突——如 r2v 带首/末帧——也会报错）。**连续性靠 `continuity_from`，不靠 `type`**：连续镜头传上一镜节点 id，独立镜头不传。「哪些镜是连续镜头」在 STEP 5 的 `续接` 列里定死。
 > `tier=fast|balanced|quality` 同样逐镜显式写，**不要依赖缺省**——缺省是 `quality`（成本最高档）。同一镜头要换档时改 `tier` 重渲，不要靠「隐式默认」蒙。**同一条链内首遍尺寸必须一致**（≈同档：`fast` 832×480、`balanced`/`quality` 1344×768；链上传递的是首遍 latent，不能缩放；不一致会显式报错）。
@@ -410,6 +411,7 @@ comfy_generate_image(prompt=<同一角色设定 + 正/侧/背三格 + 锁 A/B>, 
   - `口型` — 逐秒记录嘴部开合；说话人 `mouth-open`，同镜其他角色 `mouth-closed`，`silent` 镜全员 `mouth-closed`。
   - `声线参考` — 本镜说话人的 `voice:<id>` 或 `canvas:<音频节点 id>`（来自 STEP 3.5 声线清单）；`silent` 镜或未做声线的角色写 `none`。同一角色全片必须同一个引用。
   - `音效` — 关键音效，按时间锚定。
+  - `BGM` — `N/A`，或本镜 BGM 计划（`in: 0–3s, sparse solo piano, slow, low under dialogue; out: 4.5s fade`）。**只有 `bgmMode=in-model` 才写；`none` 全表 `N/A`**。逐镜写，H3 看不到整本剧本。
   - `字幕` — 本镜要渲进画面的字幕文本（即台词本身，不加引号/书名号/括号）；`silent` 镜写 `none`；**项目字幕选 `none` 时全表写 `none`**（见 STEP 0）。
   - `表演备注` — 每条对白对应的眼神与身体动作变化。
 
@@ -620,6 +622,7 @@ comfy_generate_image(prompt=<同一角色设定 + 正/侧/背三格 + 锁 A/B>, 
    - **转场镜 / 锚点式重渲（传了首/末帧）→ I2VA / FL2VA 三段式**：对齐指令（首行，独占一段）+ `integrated_multimodal_description` + `overall_soundscape` + `non_diegetic_music`。首帧内容作为 `[Shot 1]` 起点锚点，有末帧时写成首末帧之间的连续运动路径；转场镜只写运镜与光变，不写角色动作与对白。
    - **条件启用**：仅当解析到的工作流 id 前缀为 `minimax-h3-` 时走本路径；其他工作流跳过，直接走 2 的自由格式组装（模型无关，不写死模型名）。
    - 交给重写前先剥离分镜专用标记：**双绑定与续接标签**（`[char:…] [scene:…] [hook:…] [audio_mode:…] [speaker:…] [cont:…]`）与 `[BEAT]` / `[HANDOFF …]`——不能出现在渲染 prompt 里。
+   - **BGM 映射**：`bgmMode=in-model` 时，把镜头表 `音频与对白轨.BGM` 交给 `h3-prompt-writing` 写入 `non_diegetic_music`；`bgmMode=none` 时固定写 `N/A`。`overall_soundscape` 只写环境音/物理音，不写 BGM。
 2. **自由格式兜底（仅非 H3 工作流）**：从单文本分镜文档对应章节（已抽取的镜从独立节点）取每面板四象限内容，逐秒展开成自然语言镜头描述。
 3. **角色形态描述（铁律一，两条路径共用）**：凡在屏角色含非人形 / 非常规解剖形态，其形态描述一律按铁律一正向构造清单（整体形状词 → 比喻锚点 → 部位关系 → 唯一附肢 → 解剖总括句）写入重写素材或自由格式正文——角色卡节点描述里已有合规解剖清单时直接引用，正文禁否定堆叠与"可能长四肢"暗示。
 4. **风格锁后缀**：**所选风格文件的**风格锁后缀（英文关键词串）与负向约束（两条路径都追加）。**铅笔分镜图除外**（见 STEP 6）。
@@ -746,7 +749,7 @@ comfy_generate_image(prompt=<同一角色设定 + 正/侧/背三格 + 锁 A/B>, 
 
 - **拼接本身只做硬切，没有溶解**。跨场景过渡由 Step 7 生成的转场镜承担——把转场镜按顺序放进 `nodes` 即可。如果没做转场镜，成片就是直切。
 - **建议全片同分辨率、同档同实现**。`fast`（长边 832）与 `balanced`/`quality`（长边 1344）**不要混在同一条成片里**——分辨率不同会让成片出现清晰度跳变；`balanced` 与 `quality` 长边同为 1344，拼接本身能过，但**同片混不同实现会导致观感/像素漂移**，非必要不混。**跨档升档要在生成前决定**（全片同档），不要到拼接时才处理。后端差别：**ffmpeg 后端**下 stream copy 失败会**自动重编码**，所以混分辨率不会硬失败（代价是重编码 + 观感跳变）；**ComfyUI 纯节点兜底**走 `ImageBatch` 左折叠，**要求各段尺寸一致**，混了会报错。因此「全片同分辨率」在两种后端下都是安全做法。
-- **BGM 默认不生成**：片段自带对白与音效。需要配乐时用 `comfy_generate_music`（能力 `audio.music`）生成**独立音频节点**；插件没有混音 / 贴轨工具，成片贴 BGM 仍需后期——交付清单把 BGM 列为独立素材 / 点单，**不要声称已混入成片**。
+- **BGM 模式**：`none`（默认，H3 `non_diegetic_music: N/A`）或 `in-model`（H3 逐镜自带 BGM，烘进片段；不可单独替换/duck，硬切可能换曲）。`separate`（Music 3 独立音轨 + 后期混音）下一期；插件目前没有混音/贴轨工具，**不要声称独立 BGM 已混入成片**。
 
 ### 提分辨率 / 超分（按 STEP 0 的「交付画质」选择执行）
 
@@ -775,7 +778,8 @@ comfy_generate_image(prompt=<同一角色设定 + 正/侧/背三格 + 锁 A/B>, 
 
 - 拼接成片的节点 id 与媒体路径、总时长。
 - 按镜头表顺序的片段清单（镜头号 → 画布节点 id → 媒体路径 → 时长）。
-- 未落地项：需要人工补的溶解转场位置、BGM 建议（情绪弧、节奏、在对白与重要音效下 duck 的时间点）。
+- BGM：`bgmMode=none` 写“无 BGM”；`in-model` 写“BGM 已随片（H3 自带），无独立 BGM 轨；硬切/跨场景可能换曲”；`separate` 未实现时列“独立 BGM 建议”（情绪弧、节奏、duck 点）。
+- 未落地项：需要人工补的溶解转场位置（如有）。
 
 **终检清单**（逐条核对并写进交付节点）：
 

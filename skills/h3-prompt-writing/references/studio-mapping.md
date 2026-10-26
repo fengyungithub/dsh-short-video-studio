@@ -26,6 +26,7 @@
 | 镜头表 `音频与对白轨.口型` | `detailed_description` 显式写明「mouth-open: 说话人 / mouth-closed: 其余角色」；旁白用官方句式「says in an off-screen voiceover … while his lips remain completely closed」 |
 | 镜头表 `音频与对白轨.音效` | `overall_soundscape`（环境音、物理音、非语言人声，1–4 句） |
 | 项目简报 BGM 意图 / 情绪音乐 | `non_diegetic_music`（乐器、速度、节奏、动态；无则 `N/A`） |
+| 镜头表 `音频与对白轨.BGM` + 项目 `bgmMode` | `bgmMode=in-model` → 逐镜写入 `non_diegetic_music`（本镜 in/out/乐器/速度/对白下压低）；`none` → `N/A`；`separate`（下一期）→ `N/A` |
 | 镜头表 `字幕` 字段 | 对白进 `<d>`；**字幕在 `detailed_description` 的 `<d>` 对白附近以英文双引号 on-screen text 声明**（`a Chinese subtitle "字幕原文" is displayed centered at the bottom of the frame`），**不用末尾中文指令**（实测：六段式下末尾/内嵌中文指令均不烧录；英文 on-screen 声明 + quality 档正确烧录） |
 
 ### 1.1 续接镜（r2v + `continuity_from`）的额外要求

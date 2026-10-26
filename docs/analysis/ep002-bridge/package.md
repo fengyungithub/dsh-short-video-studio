@@ -617,7 +617,8 @@
       "shot clips",
       "final delivery"
     ],
-    "assetMode": "library"
+    "assetMode": "library",
+    "bgmMode": "none"
   },
   "budget": {
     "estimatedMinutes": 80,

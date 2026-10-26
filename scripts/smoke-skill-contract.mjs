@@ -108,6 +108,7 @@ const run = read('skills/short-drama-series-production/references/production-run
 const singleMode = read('skills/story-short-generator/references/single-film-mode.md')
 const seriesMode = read('skills/story-short-generator/references/series-delegated-mode.md')
 const voiceRef = read('skills/story-short-generator/references/voice-audition.md')
+const h3map = read('skills/h3-prompt-writing/references/studio-mapping.md')
 
 const descOf = (text) => {
   const m = text.match(/^description: \|\n([\s\S]*?)^whenToUse: \||^description: \|\n([\s\S]*?)^trigger-words:/m)
@@ -163,6 +164,11 @@ ok('PROD 不再说 AI 不调用入库', !prod.includes('AI 不调用入库'))
 ok('systemPrompt 禁止 AI 不代劳提示', lib.includes('禁止提示「AI 不代劳'))
 ok('PROD 含 S-STEP 0 系列规格卡', prod.includes('S-STEP 0') && prod.includes('系列规格卡'))
 ok('系列参考指向 S-STEP 0', seriesMode.includes('S-STEP 0'))
+ok('SSG 有 bgmMode 选项', singleMode.includes('bgmMode') && singleMode.includes('in-model'))
+ok('SSG 镜头表有 BGM 子字段', ssg.includes('`BGM` —'))
+ok('PROD 有 bgmMode/in-model', prod.includes('bgmMode') && prod.includes('in-model'))
+ok('h3 映射含 bgmMode', h3map.includes('bgmMode'))
+ok('schema 含 bgmMode', !!readJson('schemas/episode-package.schema.json').properties?.params?.properties?.bgmMode)
 
 console.log('')
 if (fail) {

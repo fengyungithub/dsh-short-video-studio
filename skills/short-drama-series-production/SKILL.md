@@ -110,6 +110,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 | 视频档位 `tier` | `balanced` / `quality` / `fast` | `fast` 只能单视图、G-ref 生效；`quality` 成本约 2.4× |
 | 图片档位 `imageTier` | `balanced` / `quality` / `fast` | 卡片复用锚点；`quality` ≈7× 耗时 |
 | 画面内字幕 `subtitles` | `none` / `burned-in` | `burned-in` 需逐镜烧字，实测要 `quality` 才稳；成本上升 |
+| BGM 模式 `bgmMode` | `none` / `in-model`（本期） | `in-model`=H3 逐镜自带 BGM，烘进片段；不可单独替换/duck，硬切可能换曲。`separate`（Music 3）下一期 |
 | 角色卡版本 `characterCardVariant` | `single` / `three`（仅 balanced/quality） | 9:16 下 three 未实测；切换 = 已产集重渲 |
 | 片段审查 `reviewMode` | `batch` / `per-shot` | per-shot 每镜一张卡，人力 ×N |
 | 声线方案 `voicePlan` | `existing`（复用/缺的补建，推荐）/ `audition`（全部重新试镜）/ `text-only` | text-only 无音色锚点，交付记风险；audition = 新季换声/重做声线 |
@@ -120,7 +121,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 **S-STEP 0 必须用 `ask_user_question` 的四组选项提交（不许静默按默认通过；用户说“按默认”也要回显规格卡确认）**：
 
 1. **画面 / 时长**：`9:16`（推荐）/ `16:9` / `1:1`；`90s`（推荐）/ `80s` / `100s` / `110s` / 自定义。
-2. **画质 / 成本**：视频 `tier` = `balanced`（推荐）/ `quality` / `fast`；图片 `imageTier` = `balanced`（推荐）/ `quality` / `fast`；交付 `delivery` = `native`（推荐）/ `upscale1080` / `upscale2k` / `upscale4k`；字幕 `subtitles` = `none`（推荐）/ `burned-in`。
+2. **画质 / 成本**：视频 `tier` = `balanced`（推荐）/ `quality` / `fast`；图片 `imageTier` = `balanced`（推荐）/ `quality` / `fast`；交付 `delivery` = `native`（推荐）/ `upscale1080` / `upscale2k` / `upscale4k`；字幕 `subtitles` = `none`（推荐）/ `burned-in`；BGM `bgmMode` = `none`（默认）/ `in-model`（H3 逐镜自带，本期）。
 3. **资产 / 声音**：角色卡 `characterCardVariant` = `single`（推荐）/ `three`（仅 balanced/quality）；声线 `voicePlan` = `existing`（推荐，阶段 C 复用/缺的补建）/ `audition`（强制每个说话角色重新试镜）/ `text-only`（降级）。
 4. **审查 / 风格**：`reviewMode` = `batch`（推荐）/ `per-shot`；视觉风格 7 选 1；语言中文 / English（出海，先 1 镜验证）。
 
@@ -198,7 +199,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
               "audioMode": "dialogue-led", "tier": "balanced", "imageTier": "balanced",
               "subtitles": "none", "delivery": "native|upscale1080",
               "characterCardVariant": "single", "reviewMode": "batch",
-              "voicePlan": "audition|existing|text-only", "packageContract": "episode-package/v1", "assetMode": "library" },
+              "voicePlan": "audition|existing|text-only", "bgmMode": "none|in-model", "packageContract": "episode-package/v1", "assetMode": "library" },
   "assets": {
     "characters": [{ "name": "林晚",
                      "states": [{ "state": "常服", "assetIdSingle": "character:…", "assetIdThree": "character:…",
@@ -341,7 +342,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 | 处 | 做什么 | 不许做什么 |
 |---|---|---|
-| STEP 0 | 读 ⑥ 预填表落地；state 已由 §8.1 第 4 步一次写全，这里只校验 | **不许再向用户逐项问十二项**；不许第二次写 state 覆盖 §8.1 |
+| STEP 0 | 读 ⑥ 预填表落地；state 已由 §8.1 第 4 步一次写全，这里只校验 | **不许再向用户逐项问十三项**；不许第二次写 state 覆盖 §8.1 |
 | STEP 1/2 | 跳过（简报/大纲已被系列圣经与集制作包覆盖）；只在 `story planning` 写一页「本集简报」，**必须承载交付画质 / 风格 / 图片档位 / 字幕 / 声线方案五个无 state 字段的配置** | 不许重写整片 8 拍弧 |
 | STEP 3/3.5/4/4.5 | 先 `asset_list` / `asset_to_canvas`；**缺卡才新建**，且按本片型形态（角色双版、场景单视图、道具单视图）。**STEP 3.5 不重跑试镜**：从台账 `voices[]` 取 `voice:<id>`，缺 id 才算缺口 | 不许绕过资产台账另建一套；不许每集重抽声线 |
 | STEP 5 | 用 8 列镜头意图生成七列镜头表；`续接` 按实际场景边界重定；台词逐字 | 不许改台词、不许改事件 |
@@ -403,7 +404,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 3. **对白表**：逐句「说话人 / 台词（逐字）/ 情绪 / 目标时长 / 字幕=`none`」。
 4. **8 列镜头意图**：镜号&时长 / 场 / 说话人&台词 / 表演意图 / 景别&运镜 / 空间位置 / 续接意图 / 集内节拍。
 5. **本集资产清单**：角色（含状态卡）/ 场景（含地标）/ 道具 / **声线（`voice:` 或未入库的 `canvas:<音频节点 id>`，来自台账）**，**优先写资产库 id**；缺卡标 `TO-BUILD`。
-6. **生产参数预填**：⑥ 预填表 12 项（对应 story 的 STEP 0 生产规格 + STEP 6 分镜模式）+ 镜头预算 + 成本估计 + 合规标记。
+6. **生产参数预填**：⑥ 预填表 13 项（对应 story 的 STEP 0 生产规格 + STEP 6 分镜模式）+ 镜头预算 + 成本估计 + 合规标记。
 
 **镜头预算公式**（必须先算再排镜）：
 
@@ -437,7 +438,7 @@ T = 目标时长（80–110s，默认 90s）
 **每集交付包**（`series/delivery/epNNN/` + 该集画布 `final delivery` 组）：
 - 成片（节点 id + 媒体路径 + 时长 + 尺寸 + 档位）
 - 镜头表导出（PDF）+ 本集剧本（`episodes/epNNN.md`）
-- 配乐点单：情绪、入点（秒）、duck 点、建议曲风。插件可生成**独立 BGM 素材**（`comfy_generate_music`，能力 `audio.music`），但**没有混音 / 贴轨工具**，成片贴 BGM 仍需后期；生成的 BGM 作为独立音频节点随交付包提供。
+- BGM：`bgmMode=in-model` → 写「BGM 已随片（H3 自带），无独立轨；硬切可能换曲」；`none` → 写「无 BGM」；`separate`（下一期）→ 写「独立 BGM 素材 + 配乐点单（情绪/入点/duck/曲风），插件无混音/贴轨，需后期」。
 - 终检清单（沿用 story skill 的终检项）+ 本集成本（GPU 分钟 / 重渲镜数）
 - 人工听核项：对白清晰度、音效同步、有无幻听人声
 

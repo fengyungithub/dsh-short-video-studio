@@ -35,6 +35,7 @@
 - 字段与约束：`schemas/episode-package.schema.json`。
 - 版本字段：`episode.scriptVersion` / `packageVersion` / `episodeVersion`；剧本变更时由 writer/production 递增，`gates.changeApprovedAt` 记 G-CHG 批准时间（见 `references/script-change.md`）。
 - `params.assetMode`：`draft`（允许 node id / `canvas:` 声线，EP01/试产）或 `library`（量产：角色必须有 `assetIdSingle/assetIdThree`，场景/道具必须有 `assetId`，声线必须有 `voiceAssetId`）。`library` 下 `toBuild` 必须为空、对白 `voiceRef` 必须是 `voice:`。
+- `params.bgmMode`：`none`（默认，H3 `non_diegetic_music: N/A`）或 `in-model`（H3 逐镜自带 BGM；镜头表 `BGM` 子字段逐镜写）。`separate`（Music 3 独立音轨 + 后期混音）下一期，本期 schema 不收。
 - `assets.voices[].voiceAssetId` 在 `draft` 下可留空，用 `canvasNodeId` 记画布音频节点（未入库临时引用；**单片跨会话前由用户点「入库」；剧集在 G-A 批准后由 production 调 `asset_ingest` 换 `voice:`**）；对白 `voiceRef` 支持 `voice:` / `canvas:` / `none`。
 - 六节照旧必须齐全；机读块与六节不一致时，**以机读块为准并回写六节**。
 - 生成后跑 `node scripts/smoke-skill-contract.mjs`（校验集号 / 镜数 / 声线闭合 / groupOrder / 过期断言）。
@@ -166,7 +167,7 @@ T = 目标时长（80–110s，默认 90s）
 ## ⑥ 生产参数预填
 - 画面比例：9:16 ｜ 集时长：90s ｜ 音频模式：dialogue-led ｜ 语言：中文
 - 画面内字幕：none（全表 `字幕` 列写 none；逐镜负向尾句 `no subtitle, no burned-in dialogue text`）
-- 视频档位：balanced ｜ 图片档位：balanced ｜ 角色卡引用版本：single
+- 视频档位：balanced ｜ 图片档位：balanced ｜ 角色卡引用版本：single ｜ BGM 模式：none
 - 片段审查节奏：batch ｜ 交付画质：原生（768×1344 或按 G-SAMPLE 定的 1080 超分）
 - 声线方案：existing（全季复用/补建 ⑤ 的 `voice:`；audition=全部重新试镜；text-only 才不传参考音频，并记风险）
 - 分镜模式：单文本（默认）/ 单文本+铅笔图（仅可视化预演时）
@@ -193,7 +194,7 @@ T = 目标时长（80–110s，默认 90s）
 
 ---
 
-## 6. ⑥ 预填表 ↔ `story-short-generator` 的 STEP 0 生产规格 + STEP 6 分镜模式（12 项）
+## 6. ⑥ 预填表 ↔ `story-short-generator` 的 STEP 0 生产规格 + STEP 6 分镜模式（13 项）
 
 | STEP 0 项 | 本片型预填值 |
 |---|---|
@@ -206,11 +207,12 @@ T = 目标时长（80–110s，默认 90s）
 | 生成档位（视频） | `balanced` |
 | 角色卡引用版本 | `single` |
 | 图片档位 | `balanced` |
+| BGM 模式 | `none` / `in-model`（H3 逐镜自带；本期） |
 | 交付画质 | 原生（样片后可改逐镜超分 1080） |
 | 片段审查节奏 | `batch` |
 | 分镜模式 | `text`（默认）/ `text+pencil`（仅可视化预演） |
 
-> 预填表是**唯一来源**：生产层不得就这十二项再向用户提问；用户改主意时改集制作包 + 记录到 `production-state.json`，再重渲受影响集。
+> 预填表是**唯一来源**：生产层不得就这十三项再向用户提问；用户改主意时改集制作包 + 记录到 `production-state.json`，再重渲受影响集。
 
 ---
 
@@ -224,7 +226,7 @@ T = 目标时长（80–110s，默认 90s）
 6. 场次数 ≤2；跨场景边界有且仅有 1 个转场镜，且它在两场之间。
 7. 每镜都有景别与空间位置；相邻镜景别不重复。
 8. ⑤ 的资产都写了 id 或 `TO-BUILD`；量产期 `TO-BUILD` ≤2，建卡集（EP01/新角色）≤8 并在方案卡列明。
-9. ⑥ 十二项齐全，与系列圣经一致（画幅/档位/字幕/语言/风格/声线）。
+9. ⑥ 十三项齐全，与系列圣经一致（画幅/档位/字幕/语言/风格/声线）。
 10. 集尾有钩子，下一集开头 30s 内有回应（对齐分集目录）。
 11. **声线闭合**：⑥ `existing` 时 ⑤ 的每个说话角色都有 `voice:` id；`text-only` 时交付清单已记「跨集音色无保证」。
 12. **分镜模式已声明**：默认 `text`；需要铅笔图预演时才写 `text+pencil`（铅笔图不进 `ref_nodes`）。
