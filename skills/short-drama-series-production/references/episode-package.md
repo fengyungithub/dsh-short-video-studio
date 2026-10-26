@@ -21,7 +21,20 @@
 
 落两个地方、内容必须逐字一致：
 1. 文件 `series/episodes/epNNN/package.md`（归档 / 续跑）
-2. 该集画布文本节点，`group="story planning"`，标题 `EP03 集制作包`（生产用）
+2. 该集画布文本节点，`group="story planning"`，标题 `EP003 集制作包`（生产用）
+
+### 1.1 机读块（contract v1，放在文件最上方）
+
+文件与画布节点都在 `# EP{NNN} 集制作包` **之前**放一个 fenced `json` 块（六节内容的结构化副本）：
+
+```json
+{ "contract": "episode-package/v1", "episode": { "number": 3, "id": "EP003", "title": "…", "sourceScript": "episodes/ep003.md" }, "targetSeconds": 90, "shotBudget": 18, "scenes": [], "dialogue": [], "shots": [], "assets": {}, "params": {}, "budget": {}, "gates": {} }
+```
+
+- 下面是**字段骨架**（不可直接送校验；`shots`/`assets` 等需按实际集填满）；完整可校验样例见 `scripts/fixtures/episode-package.example.json`。
+- 字段与约束：`schemas/episode-package.schema.json`。
+- 六节照旧必须齐全；机读块与六节不一致时，**以机读块为准并回写六节**。
+- 生成后跑 `node scripts/smoke-skill-contract.mjs`（校验集号 / 镜数 / 声线闭合 / groupOrder / 过期断言）。
 
 ---
 

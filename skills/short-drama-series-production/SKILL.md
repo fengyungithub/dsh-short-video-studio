@@ -39,9 +39,10 @@ series-writer 剧本（文件）
 1. 没有已批准的分集剧本 → 先加载 `short-drama-series-writer` 跑 `/start` → `/plan` → `/characters` → `/outline`，再回到本 skill 的阶段 B。
 2. 只有一句话创意、目标是一条片子 → 转 `story-short-generator`，不要用本 skill。
 3. 有分集剧本、目标是多集成片 → 本 skill。
-4. **由 `story-short-generator` 的 STEP 0 片型门转入**时，视为「连续短剧」已确认：**不再重复问片型**，直接接住它查到的剧本/集制作包（没有就按本 skill 阶段 A/B 产出），完成后交回它做单集生产。
+4. **由 `story-short-generator` 的门 0 探测转入**（它查到「系列圣经 + 本集制作包」）时：视为「连续短剧」已确认，**不再重复问片型**，直接接住剧本/集制作包（没有就按本 skill 阶段 A/B 产出），完成后交回它做单集生产。
+5. **story 侧探测规则**：有系列上下文 → 直接委托模式、不弹片型门；完全没有上下文才问。本 skill 不依赖用户是否提到「短剧」。
 
-> 用户当前锁定：**整部量产 · 90s/集 · 中文 · 无画面内字幕（balanced 档）**。这四项写进系列圣经，除非用户明确改口，全季不逐集重问。
+> 用户当前锁定：**整部量产 · 80–110s/集（默认 90s）· 中文 · 无画面内字幕（balanced 档）**。这四项写进系列圣经，除非用户明确改口，全季不逐集重问。
 
 ---
 
@@ -146,7 +147,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
               "mode": "domestic",
               "aspectRatio": "9:16", "style": "cinematic-live-action",
               "tier": "balanced", "subtitles": "none", "delivery": "native|upscale1080",
-              "voicePlan": "existing|text-only" },
+              "voicePlan": "existing|text-only", "packageContract": "episode-package/v1" },
   "assets": {
     "characters": [{ "name": "林晚", "assetId": "character:…", "variant": "single",
                      "states": [{ "state": "常服", "assetId": "character:…", "paired": "character:…", "episodes": "1-20" }] }],
@@ -159,7 +160,13 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
     "ep001": { "stage": "script|package|assets|shotlist|clips|final|delivered",
               "package": "series/episodes/ep001/package.md", "shots": 18,
               "doneShots": ["S01","S02"], "clipNodeIds": [], "finalNodeId": "",
-              "costMinutes": 0, "gate": "pending|approved|rejected", "delivery": "" }
+              "costMinutes": 0,
+              "gate": {
+                "package": { "status": "pending|approved|rejected", "at": "" },
+                "clips":   { "status": "pending|approved|rejected", "at": "" },
+                "delivery":{ "status": "pending|approved|rejected", "at": "" }
+              },
+              "delivery": "" }
   },
   "next": "ep002/package"
 }
@@ -286,7 +293,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 5. **逐镜**：按 story STEP 7 执行（prompt bank → r2v → `continuity_from` / `audio_ref_nodes`）；AI 逐镜自检照做。**片段卡（门 3，1 张/集）**：batch 列全部片段 + 自检结论 + 听核点；口型 / 字幕 / 一致性不过关**当场**弹单镜处置卡。
 6. **拼接 + 终检**：`video_concat`（group `final delivery`）→ 按 story 的终检清单逐项核对。
 7. **交付卡（G-E，1 张/集）**：成片 + 终检结论 + 本集成本 + 台账；选项：**批准交付（推荐）** / 重渲某镜 / 重拼 / 逐镜超分 / 补做终检某项。
-8. **回写状态**：`production-state.json`（stage=final/delivered、clipNodeIds、finalNodeId、costMinutes、gate=approved）+ 主会话 `production ledger` 追加一行。
+8. **回写状态**：`production-state.json`（stage=final/delivered、clipNodeIds、finalNodeId、costMinutes、`gate.delivery.status=approved`）+ 主会话 `production ledger` 追加一行。
 
 > 3 张卡之外只有**异常门**（G-ref / 同镜 3 次失败 / 口型字幕不过 / 意图冲突 / 换规格）；不允许把逐门确认悄悄拆回来。
 
@@ -332,7 +339,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 ## 10. 集制作包（唯一交接物）
 
-一个文件 `series/episodes/epNNN/package.md` + 该集画布文本节点（group `story planning`）。固定 6 节，完整模板与 8 列细则见 `references/episode-package.md`：
+一个文件 `series/episodes/epNNN/package.md` + 该集画布文本节点（group `story planning`）。**开头放机读块**（```json，`contract: "episode-package/v1"`，字段见 `schemas/episode-package.schema.json`），其后固定 6 节；六节与机读块同源，生成后跑 `node scripts/smoke-skill-contract.mjs`。完整模板与 8 列细则见 `references/episode-package.md`：
 
 1. **集元数据**：集号/标题/目标时长（80–110s，默认 90s）/是否付费卡点/钩子类型/前情/下集预告/合规标记。
 2. **场次表**：**压缩到 1–2 个物理场景**（同场景不同机位算同一场）；每场写目标、阻力、结果、冲突升级点。
