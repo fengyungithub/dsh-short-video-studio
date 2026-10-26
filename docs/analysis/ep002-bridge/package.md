@@ -6,7 +6,10 @@
     "id": "EP002",
     "title": "灵河岸 · 甘露化形（SC01–SC02 桥接段）",
     "sourceScript": ".dsh-assets/绛珠泪-交付包/04-分集剧本/ep002-灵河岸-甘露化形.md",
-    "sourceDialogueCount": 16
+    "sourceDialogueCount": 16,
+    "scriptVersion": 1,
+    "packageVersion": 1,
+    "episodeVersion": 1
   },
   "targetSeconds": 94.7,
   "shotBudget": 24,
@@ -623,7 +626,9 @@
   },
   "gates": {
     "packageApprovedAt": null,
-    "approvedBy": null
+    "approvedBy": null,
+    "changeApprovedAt": null,
+    "changeRequestId": ""
   }
 }
 ```

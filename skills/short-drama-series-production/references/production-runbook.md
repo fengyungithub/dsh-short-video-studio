@@ -39,7 +39,7 @@ canvas_set_state(aspectRatio="9:16", duration="90 秒（默认；按包 ① 80�
 | production | 物化资产（asset id）、建集制作包、出 3 张人工卡、asset_ingest/台账、状态/成本/交付包 | 不调用图片/视频生成工具、不改拍摄规则 |
 | story | 生成卡片/镜头表/分镜/提示词库/逐镜/拼接、跑 AI 自检与异常门 | 不写系列台账/资产库/交付包 |
 
-**story → production handback**（每集收尾必须交回）：`finalNodeId` / `clipNodeIds` / `shots` / `rework` / `costMinutes` / `warnings` / `assetNodeIds`（本集新生成的卡，交 production 入库）。production 写 `production-state.json` 与 ledger；story 不写这两个文件。
+**story → production handback**（每集收尾必须交回）：`finalNodeId` / `clipNodeIds` / `shots` / `rework` / `costMinutes` / `warnings` / `assetNodeIds`（本集新生成的卡，交 production 入库）。变更集额外交 `changedShots` 与 `scriptVersion`。production 写 `production-state.json` 与 ledger；story 不写这两个文件。
 
 > 拍摄参数与失败梯度**一律照 `story-short-generator` 的 STEP 5 / 6 / 7**；本片型只固定：`tier=balanced`、`ref_variant=single`、字幕 `none`、声线从台账 `voices[]` 取。这里只列系列层动作，不复述调用参数。
 
@@ -96,9 +96,9 @@ video_concat(nodes=[按镜头表顺序，含转场镜], title="EP00X 拼接成�
 会话中断 / 超时 / 换会话后：
 
 ```text
-1) read production-state.json（stage / doneShots / clipNodeIds）
+1) read production-state.json（stage / scriptVersion / packageVersion / doneShots / clipNodeIds）
 2) canvas_list_nodes() 找回 group="shot clips" 的既有片段，与 doneShots 对齐
-3) 从第一个缺失镜继续；已完成的镜**不重渲**
+3) 从第一个缺失镜继续；已完成的镜**不重渲**；若 `scriptVersion` 与当前剧本不一致，先按 `references/script-change.md` 处理，**不要续跑旧稿片段**
 4) 缺提示词库的补写（canvas_write_prompt_bank），缺镜的照 2.3 生成
 5) 续接链：只从「最后一个已完成且支持续接的镜」往后接；中间断点用 `起链` 硬切，并在台账标注接缝
 ```

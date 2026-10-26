@@ -175,6 +175,8 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
   "episodes": {
     "ep001": { "stage": "script|package|assets|shotlist|clips|final|delivered",
               "package": "series/episodes/ep001/package.md", "shots": 18,
+              "scriptVersion": 1, "packageVersion": 1, "episodeVersion": 1,
+              "changeRequest": null,
               "doneShots": ["S01","S02"], "clipNodeIds": [], "finalNodeId": "",
               "costMinutes": 0,
               "gate": {
@@ -409,10 +411,24 @@ T = 目标时长（80–110s，默认 90s）
 | 角色卡被改 / 重出 | 台账版本 +1；**该角色所有未交付集重渲**；已交付集标注作废 |
 | 场景卡失效 | 重出 + 重新核对引用该场景的 `固定地标` / `光位基线` |
 | 换声线 | 该角色**全部对白镜 + 续接下游**重渲；已交付集标作废；台账 `voices[]` 版本 +1 |
-| 剧本改集（已产） | 先改剧本 → 重生成集制作包 → 重出方案卡 → 重渲受影响镜（续接链顺次重渲） |
+| 剧本变更（制作期） | **见 §13.1**：只由 writer 改 → G-CHG 变更卡 → 重建包 → 重新过门 → 按 L1–L4 重渲；不覆盖已交付 |
 | 换档 / 换画幅 / 换字幕开关 | 已产集作废清单化，逐集重渲；不许新旧混拼 |
 | 会话中断 | 读 `production-state.json` + `canvas_list_nodes`，从 `doneShots` 之后续跑 |
 | 画布节点过多（>200） | 新会话重新物化资产；旧集画布只读归档 |
+
+### 13.1 剧本变更（production 期间）
+
+**唯一入口是 writer**：production 不改台词、story 不改台词；需要改就回 `short-drama-series-writer` 改 `episodes/epNNN.md`，`scriptVersion+1`。
+
+1. **停线登记**：`stage=paused`，state 写 `changeRequest`（level L1–L4 / scope / reason / at / status），受影响范围停止提交渲染。
+2. **writer 改稿**：改剧本 + 跑 writer 自检/合规；production 不直接改。
+3. **影响分析 + G-CHG**：production diff 新旧稿，定级、列受影响镜/资产/相邻集、估成本，出**剧本变更卡**（按影响面重渲 / 只改台词 / 整集重做 / 取消）。
+4. **重建包**：新剧本 → 新 `package.md`，`packageVersion+1`，跑 12 项自检。
+5. **重新过门**：G-B（剧本）/ G-CHG / G-P 方案卡（镜头表/分镜/渲染参数变了才出）/ 片段卡（只审受影响）/ G-E；资产变更走 G-A 增量 + `asset_ingest`。
+6. **按级重渲**：L1 首受影响镜 + 下游续接链；L2 受影响场景；L3 整集 + 相邻集；L4 所有引用集（旧交付标 `superseded`）。
+7. **收尾**：写 `scriptVersion/packageVersion/episodeVersion/rework`；交付包带版本；不覆盖旧成片。
+
+> 完整分级、时点代价、三个例子与反模式：[references/script-change.md](references/script-change.md)。铁律：台词变 = 音频/口型都变，不能只换音轨；镜长变 = 下游续接链顺次重渲；已交付不覆盖。
 
 ---
 

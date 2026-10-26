@@ -253,6 +253,8 @@ graph TD
 
 写单集或批量写集前，先确认本轮输出级别并给出推荐选项：**剧情初稿** / **拍摄制作稿（场次 + 动作 + 逐字对白 + 结尾钩子）**；确认对白密度、结尾钩子强度、是否需要强化某条人物关系。**不提供「分镜制作包」选项**——分镜 / 镜头表 / 镜头数由 `short-drama-series-production` 的集制作包与 `story-short-generator` 负责。若用户已明确要求“直接写”“按默认”“继续”，可按既有标准继续。
 
+**制作期修改（production 中）**：制作过程中需要改剧本时，**必须回到本 skill 改 `episodes/epNNN.md`**，并把 `scriptVersion+1`、重跑单集自检/合规；**不接受 production / story 直接改台词**。改完由 production 重生成集制作包并按 `references/script-change.md` 重渲。
+
 **单集剧本格式（国内模式）：**
 
 ```markdown

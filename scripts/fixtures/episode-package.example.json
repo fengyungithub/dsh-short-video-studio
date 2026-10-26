@@ -5,7 +5,10 @@
     "id": "EP003",
     "title": "离婚协议",
     "sourceScript": "episodes/ep003.md",
-    "sourceDialogueCount": 2
+    "sourceDialogueCount": 2,
+    "scriptVersion": 1,
+    "packageVersion": 1,
+    "episodeVersion": 1
   },
   "targetSeconds": 90,
   "shotBudget": 4,
@@ -251,6 +254,8 @@
   },
   "gates": {
     "packageApprovedAt": null,
-    "approvedBy": null
+    "approvedBy": null,
+    "changeApprovedAt": null,
+    "changeRequestId": ""
   }
 }

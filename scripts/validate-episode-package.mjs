@@ -101,6 +101,9 @@ if ((data.assets?.toBuild || []).length > 8) errors.push('toBuild > 8，超出�
 else if ((data.assets?.toBuild || []).length > 2) warnings.push(`toBuild=${data.assets.toBuild.length}（量产期应 ≤2；建卡集需在方案卡列明）`)
 if (data.params && JSON.stringify(data.params.groupOrderVersion) !== JSON.stringify(canonicalGroups)) errors.push('groupOrderVersion 不等于 canonical 10 组')
 
+if ((data.episode?.packageVersion || 1) > 1 && !data.gates?.changeApprovedAt) warnings.push('packageVersion>1 但没有 G-CHG changeApprovedAt（剧本变更未留痕）')
+if ((data.episode?.episodeVersion || 1) > 1 && !data.gates?.changeApprovedAt) warnings.push('episodeVersion>1 但没有 G-CHG 变更批准痕迹')
+
 const mode = data.params?.assetMode
 if (mode === 'library') {
   for (const c of data.assets?.characters || []) {

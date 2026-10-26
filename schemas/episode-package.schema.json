@@ -52,6 +52,21 @@
           "type": "integer",
           "minimum": 0,
           "description": "源剧本对白句数（可大于 dialogue 行数：同说话人连说会合并）"
+        },
+        "scriptVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "剧本版本（writer 每次制作期修改 +1）"
+        },
+        "packageVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "集制作包版本（重建包 +1）"
+        },
+        "episodeVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "该集成片版本（重渲/重交付 +1）"
         }
       }
     },
@@ -655,6 +670,17 @@
             "string",
             "null"
           ]
+        },
+        "changeApprovedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "G-CHG 剧本变更卡批准时间"
+        },
+        "changeRequestId": {
+          "type": "string",
+          "description": "changeRequest id（可选）"
         }
       }
     }

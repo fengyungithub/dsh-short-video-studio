@@ -6,7 +6,10 @@
     "id": "EP001",
     "title": "天刑台 · 一泪成血",
     "sourceScript": ".dsh-assets/绛珠泪-交付包/04-分集剧本/ep001-天刑台-一泪成血.md",
-    "sourceDialogueCount": 24
+    "sourceDialogueCount": 24,
+    "scriptVersion": 1,
+    "packageVersion": 1,
+    "episodeVersion": 1
   },
   "targetSeconds": 105.8,
   "shotBudget": 25,
@@ -709,7 +712,9 @@
   },
   "gates": {
     "packageApprovedAt": null,
-    "approvedBy": null
+    "approvedBy": null,
+    "changeApprovedAt": null,
+    "changeRequestId": ""
   }
 }
 ```
