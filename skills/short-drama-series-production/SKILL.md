@@ -50,7 +50,7 @@ series-writer 剧本（文件）
 | 参数 | 本片型默认 | 说明 / 代价 |
 |---|---|---|
 | 画幅 | `9:16` 竖屏 | 画布 `aspectRatio=9:16`；场景卡跟随；角色卡仍 2:3 竖版（图片档位决定尺寸） |
-| 单集时长 | `90s` | ≈ **17–18 个 124 帧镜**（124 帧 ≈ 5.17s）。短镜用 107（4.46s）/ 90（3.75s） |
+| 单集时长 | **目标 80–110s（默认 90s）** | 由对白反推：`时长 ≈ 台词字数 ÷ 4 字/秒 + 0.5–1s 反应尾`；≈ 17–20 个 124 帧镜。超出区间先砍台词 / 拆镜，**不压语速**；单集例外必须写入集制作包 ① 与 state 的 `episodeSecondsException` |
 | 集数 | 用户指定（50–100） | 分集目录为准；本 skill 按集推进 |
 | 语言 | 中文 | 台词逐字进镜头表 `对白` 与 `字幕` 字段（字幕列全 `none`） |
 | 画面内字幕 | **不要（`none`）** | 全表 `字幕` 列写 `none`；逐镜 prompt 负向尾句加 `no subtitle, no burned-in dialogue text`；**不写任何字幕声明** |
@@ -67,7 +67,7 @@ series-writer 剧本（文件）
 
 ```
 aspectRatio=9:16
-duration=90 秒
+duration=90 秒（默认；按包 ① 目标 80–110s 调整）
 audioMode=dialogue-led
 mode=balanced
 characterCardVariant=single
@@ -77,6 +77,23 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 ```
 
 **切换成本**：改画幅 / 改档位 / 改字幕开关 = 已产集作废、需重渲；改风格 = 全部卡片与片段作废。逐项都要显式确认，不许静默改。
+
+### 1.1 覆盖 / 沿用表（与上下游冲突时以本表为准）
+
+| 项 | 上游 / 下游口径 | 本片型 | 性质 |
+|---|---|---|---|
+| 单集时长 | WRI 旧稿可能仍写 1–3 分钟 / 120s | **80–110s（默认 90s）**，由对白字数反推 | **覆盖** |
+| 镜数 | 旧稿可能写 12 / 15–20 镜 | 17–20 镜（按 §10 预算公式） | **覆盖** |
+| 对白句数 | 旧稿可能写 18–25 句 | ≤ 对白镜数；按台词字数反推 | **覆盖** |
+| 场次 | WRI 的 3–5 个戏剧场次 | 压缩到 1–2 个**物理场景** | **覆盖** |
+| 画面内字幕 | SSG 默认 `burned-in` | `none` | **覆盖** |
+| 角色卡引用版本 | SSG 非 fast 推荐 `three` | 9:16 默认 `single`（three 未实测） | **覆盖** |
+| 转场镜档位 | SSG 旧文写"成片 quality" | 与正片同档（`balanced`） | **覆盖** |
+| 一镜一说话人 / ≤15s/镜 / ≤3 重要角色 | SSG | 同 | **沿用，不可覆盖** |
+| 续接链 / G-ref / 门 3 AI 自检 | SSG | 同 | **沿用，不可覆盖** |
+| 角色卡双版 / 场景单视图 / 道具单视图 | SSG | 同 | **沿用** |
+
+> WRI 从 P1 起已收缩为纯剧本（不再写镜数 / 句数 / 分镜），本表用于防止旧稿与旧文档残留口径回灌。
 
 ---
 
@@ -88,7 +105,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 | B 剧本流水 | 主会话 | `episodes/epNNN.md`（前 10 集优先，之后领先影像 5–10 集） | **G-B**（每批剧本） |
 | C 资产锁定 | **EP01 会话（首个集会话）** | 角色双版本卡 + 状态卡 + 场景卡 + 道具卡 + **声线试镜 / 复用** + 资产台账 | **G-A**（一次批准，跨集复用） |
 | D 样片集 | EP01 会话 | 第 1 集成片 + 三档实测成本 + 一致性基线 | **G-SAMPLE**（决定整季档位/超分/是否放开 three） |
-| E 量产 | 每集一个会话 | 每集成片 + 交付包 + 成本台账 | **G-E**（每集 batch 确认） |
+| E 量产 | 每集一个会话 | 每集成片 + 交付包 + 成本台账 | **G-E**（每集 3 张卡：方案 / 片段 / 交付） |
 | F 收尾 | 主会话 | 整季交付清单 + 成本复盘 + 重渲记录 | **G-F** |
 
 **顺序硬约束**：A → B（至少前 1 集）→ C → D → E。**不允许**在 C 之前开渲片段（否则身份锚点会变，全部返工）。
@@ -104,6 +121,8 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 - 跨会话只靠两样东西：**`series/` 目录**（文件权威）+ **资产库**（身份/环境权威）。
 
 ### 3.2 目录与状态
+
+**集号格式（全项目统一）**：`EP001`（画面标题）/ `ep001`（文件与目录）/ `episodes["ep001"]`（state 键）；一律**三位补零**，禁止 `ep01` / `EP003` 混用。下文 `epNNN` 均指三位补零。
 
 ```
 {项目目录}/
@@ -121,7 +140,10 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 ```json
 {
-  "series": { "title": "", "episodes": 80, "episodeSeconds": 90, "mode": "domestic",
+  "series": { "title": "", "episodes": 80, "episodeSeconds": 90,
+              "episodeSecondsRange": [80, 110],
+              "episodeSecondsException": { "ep001": 105.8 },
+              "mode": "domestic",
               "aspectRatio": "9:16", "style": "cinematic-live-action",
               "tier": "balanced", "subtitles": "none", "delivery": "native|upscale1080",
               "voicePlan": "existing|text-only" },
@@ -134,12 +156,12 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
                  "auditionNodeId": "", "tier": "balanced", "seed": 0, "episodes": "1-60" }]
   },
   "episodes": {
-    "ep01": { "stage": "script|package|assets|shotlist|clips|final|delivered",
-              "package": "series/episodes/ep01/package.md", "shots": 18,
+    "ep001": { "stage": "script|package|assets|shotlist|clips|final|delivered",
+              "package": "series/episodes/ep001/package.md", "shots": 18,
               "doneShots": ["S01","S02"], "clipNodeIds": [], "finalNodeId": "",
               "costMinutes": 0, "gate": "pending|approved|rejected", "delivery": "" }
   },
-  "next": "ep02/package"
+  "next": "ep002/package"
 }
 ```
 
@@ -164,10 +186,10 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
    - 场景清单（名称/内外景/日夜/连续性地标/光位基线）+ 道具清单（签名道具）
    - **声线清单**：哪些角色说话、库内已有 `voice:` 资产、缺哪些（阶段 C 补）
    - 付费卡点集清单（8–12% / 18–25% / 35–45% / 末 3–5 集）+ 每集钩子类型规划
-   - 版式：9:16 · 90s · 17–18 镜 · 每集 1–2 个物理场景
+   - 版式：9:16 · **目标 80–110s（默认 90s）· 17–20 镜** · 每集 1–2 个物理场景
    - 合规基调（series-writer 的 compliance 清单要点）
 4. 初始化 `series/production-state.json`，写主会话 `production ledger` 表头。
-5. **门 G-S**（`ask_user_question`）：批准圣经并开始剧本（推荐）/ 改参数（画幅/档位/字幕/风格）/ 调整卡点与钩子规划 / 先看前 10 集分集目录。
+5. **门 G-S**（`ask_user_question`）：批准圣经并开始剧本（推荐）/ 改参数（画幅/时长区间/档位/字幕/风格）/ 调整卡点与钩子规划 / 先看前 10 集分集目录。
 
 > 圣经是**唯一真相**：后续每集只引用它，不在每集重问参数。
 
@@ -218,7 +240,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 ## 7. 阶段 D：样片集（EP01，门 G-SAMPLE）
 
-样片集是**整季的校准件**，不是「先做一集看看」的随意产物。按 §8 的每集 SOP 走 EP01，另外必须做到：
+样片集是**整季的校准件**，不是「先做一集看看」的随意产物。按 §8 的每集 SOP 走 EP01（**3 张集卡**：方案 / 片段 / 交付），另外必须做到：
 
 1. **三档成本实测**：抽 3 镜在同 seed / 同 prompt 下分别跑 `fast` / `balanced` / `quality`，记录耗时与观感，回填 `production-state.json` 的 `costMinutes`。
 2. **一致性基线**：抽 5 帧（首/中/末 + 两个说话窗）对照角色卡与场景卡，记录漂移项。
@@ -239,9 +261,9 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 1. **读状态**：`series/production-state.json` → 当前集 / stage / doneShots / 资产台账（含 `voices[]`）。
 2. **读输入**：`episodes/epNNN.md` + 分集目录该行 + `series/bible.md` 相关段（不要全读，按需）。
 3. **物化资产**：`asset_list` 查库 → `asset_to_canvas(id=…)` 把本集用到的角色/状态/场景/道具卡取回画布（复用也要可见）。
-4. **写画布设置**：`canvas_set_state` 一次写全（§1 代码块：`9:16` / `90 秒` / `dialogue-led` / `balanced` / `single` / `batch` / 十个分组）。**这是 `reviewMode` 与 `groupOrder` 的唯一写入点**；story 进入后只读、校验、缺值告警，不重写。**漏了这一步 = story 读不到 `reviewMode`，每集从 6 门变 24 门。**
+4. **写画布设置**：`canvas_set_state` 一次写全（§1 代码块：`9:16` / 目标时长（80–110s，默认 90 秒）/ `dialogue-led` / `balanced` / `single` / `batch` / 十个分组）。**这是 `reviewMode` 与 `groupOrder` 的唯一写入点**；story 进入后只读、校验、缺值告警，不重写。**漏了这一步 = story 读不到 `reviewMode`：每集从 3 张卡变成「1 张方案 + 18 张片段 + 1 张交付」（≈20 张）。**
 5. **建集制作包**：按 §10 生成 `package.md`，同时写该集画布文本节点（group `story planning`）。
-6. **委托生产**：加载 `story-short-generator`，按 §8.2 的覆盖规则从 STEP 3 起执行（参数用 ⑥ 预填，不再追问）。
+6. **委托生产**：加载 `story-short-generator`，按 §8.2 从 STEP 3 起执行，并声明**每集 3 张卡的合并规则**（方案 / 片段 / 交付）。
 7. 若 `stage` 已是 `clips` 且有 `doneShots`：**断点续跑**——`canvas_list_nodes` 找回已渲片段，从第一个缺的镜继续（不要重渲已完成的镜）。
 
 ### 8.2 委托时的覆盖规则（组合税，必须照做）
@@ -252,20 +274,21 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 | STEP 1/2 | 跳过（简报/大纲已被系列圣经与集制作包覆盖）；只在 `story planning` 写一页「本集简报」，**必须承载交付画质 / 风格 / 图片档位 / 字幕 / 声线方案五个无 state 字段的配置** | 不许重写整片 8 拍弧 |
 | STEP 3/3.5/4/4.5 | 先 `asset_list` / `asset_to_canvas`；**缺卡才新建**，且按本片型形态（角色双版、场景单视图、道具单视图）。**STEP 3.5 不重跑试镜**：从台账 `voices[]` 取 `voice:<id>`，缺 id 才算缺口 | 不许绕过资产台账另建一套；不许每集重抽声线 |
 | STEP 5 | 用 8 列镜头意图生成七列镜头表；`续接` 按实际场景边界重定；台词逐字 | 不许改台词、不许改事件 |
-| STEP 5.5–8 | **完全照执行**（十一项自检、门 1/2/3、续接链、失败梯度、拼接、终检） | **不可覆盖**——这些是实测资产 |
+| 门 1 / 门 2 / 分镜模式 / 分镜批准 / 渲染参数 | **合并为「方案卡（G-P）」**：包 ①③⑤⑥ + 镜头表 + 分镜 + 渲染参数 + 成本估计，一张卡批准 | **STEP 5.5 十一项自检照跑**；不许把门 1/2 再单独弹给用户 |
+| STEP 5.5–8 | **规则照执行**（十一项自检、门 3 AI 自检、续接链、失败梯度、拼接、终检）；人工门按 **3 张卡**（方案 / 片段 / 交付） | **硬约束不可覆盖**——这些是实测资产；不许把 3 张卡拆回逐门确认 |
 
-### 8.3 本集执行顺序（与 story skill 一致，这里只列系列层要盯的点）
+### 8.3 本集执行顺序（3 张人工卡）
 
-1. 卡片：缺卡才建（图片档位 `quality`）；本集资产先物化。
-2. 七列镜头表（group `shot table`）→ **门 1**（story skill 自检）→ 批准。
-3. 文本分镜（group `text storyboards`）→ 批准。
-4. 逐镜：每镜先 `canvas_write_prompt_bank`（三档同文，QA 只维护 quality 一份），再 `comfy_generate_video(type='r2v', tier='balanced', ref_variant='single', prompt_node=…, ref_nodes=[…], continuity_from=…, audio_ref_nodes=['voice:<id>'], length=124)`。
-   - `续接` 列：同场景后续镜接上一镜；场景第一镜 `起链`；跨场景补 1 个 i2v 转场镜（占 1 镜预算，`length` 建议 56–90）。
-   - 声线：`voicePlan=existing` 时**每个对白镜**都带 `audio_ref_nodes`（来自台账 `voices[]`，同一角色全季同一 id）；`text-only` 时不传，并在交付清单记风险。
-   - 字幕：`none`（不写声明，负向尾句兜底）。
-5. 门 3：**AI 自检逐镜做**；人工确认按 `reviewMode=batch` 全部渲完后一张卡（口型/一致性不过关**当场**弹单镜处置卡）。
-6. `video_concat` 拼接（group `final delivery`）→ 交付。
-7. **回写状态**：`production-state.json`（stage=final/delivered、clipNodeIds、finalNodeId、costMinutes、gate=approved）+ 主会话 `production ledger` 追加一行。
+1. **卡片**：缺卡才建（图片档位 `quality`）；本集资产先物化。建卡后的逐卡锁定**不单独弹卡**，并入方案卡。
+2. **建包**：按 §10 生成 `package.md` + 该集画布节点（①③④⑤⑥ + 镜头预算 + 成本估计）。
+3. **委托 story 跑 STEP 3–6**：缺卡补齐 → 七列镜头表 → STEP 5.5 十一项自检 → 文本分镜（默认单文本；⑥ 声明可视化才加铅笔图）。**不弹 story 的门 1 / 门 2 / 分镜模式 / 分镜批准卡。**
+4. **方案卡（G-P，1 张/集）**：一张卡列「包 ①③⑤⑥ + 镜头表摘要 + 分镜 + 渲染参数（`tier` / `ref_variant` / 审查节奏 / 交付画质）+ 成本估计 + 镜数/时长偏差」；选项：**批准开渲（推荐）** / 改包某节 / 改镜头表或分镜 / 只渲 1 镜试片 / 回改剧本。
+5. **逐镜**：按 story STEP 7 执行（prompt bank → r2v → `continuity_from` / `audio_ref_nodes`）；AI 逐镜自检照做。**片段卡（门 3，1 张/集）**：batch 列全部片段 + 自检结论 + 听核点；口型 / 字幕 / 一致性不过关**当场**弹单镜处置卡。
+6. **拼接 + 终检**：`video_concat`（group `final delivery`）→ 按 story 的终检清单逐项核对。
+7. **交付卡（G-E，1 张/集）**：成片 + 终检结论 + 本集成本 + 台账；选项：**批准交付（推荐）** / 重渲某镜 / 重拼 / 逐镜超分 / 补做终检某项。
+8. **回写状态**：`production-state.json`（stage=final/delivered、clipNodeIds、finalNodeId、costMinutes、gate=approved）+ 主会话 `production ledger` 追加一行。
+
+> 3 张卡之外只有**异常门**（G-ref / 同镜 3 次失败 / 口型字幕不过 / 意图冲突 / 换规格）；不允许把逐门确认悄悄拆回来。
 
 ### 8.4 量产节奏（单卡顺序执行，无并行）
 
@@ -278,7 +301,9 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 ## 9. 成本模型与闸门
 
-### 9.1 本片型（90s / 9:16 / balanced / 无字幕）实测口径
+### 9.1 本片型（目标 80–110s / 9:16 / balanced / 无字幕）实测口径
+
+> 下表按 **90s 典型集（18 镜）** 计；T 在 80–110s 内按镜头数近似线性缩放（±11 镜 ≈ ±15% 成本）。
 
 | 项 | 单值 | 每集（18 镜） |
 |---|---|---|
@@ -309,7 +334,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 一个文件 `series/episodes/epNNN/package.md` + 该集画布文本节点（group `story planning`）。固定 6 节，完整模板与 8 列细则见 `references/episode-package.md`：
 
-1. **集元数据**：集号/标题/目标 90s/是否付费卡点/钩子类型/前情/下集预告/合规标记。
+1. **集元数据**：集号/标题/目标时长（80–110s，默认 90s）/是否付费卡点/钩子类型/前情/下集预告/合规标记。
 2. **场次表**：**压缩到 1–2 个物理场景**（同场景不同机位算同一场）；每场写目标、阻力、结果、冲突升级点。
 3. **对白表**：逐句「说话人 / 台词（逐字）/ 情绪 / 目标时长 / 字幕=`none`」。
 4. **8 列镜头意图**：镜号&时长 / 场 / 说话人&台词 / 表演意图 / 景别&运镜 / 空间位置 / 续接意图 / 集内节拍。
@@ -319,12 +344,15 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 **镜头预算公式**（必须先算再排镜）：
 
 ```
+T = 目标时长（80–110s，默认 90s）
 镜长(s) ≈ 本镜台词字数 ÷ 4 字/秒 + 0.5–1s 反应/动作尾
-90s 集 ≈ 17–18 镜（124 帧 ≈ 5.17s）；跨场景每个边界 −1 镜给转场
+镜头预算 ≈ T ÷ 平均镜长(4–5s)        # 90s ≈ 17–20 镜；跨场景每个边界 −1 镜给转场
 对白镜数 = 镜头预算 − 动作/反应/特写镜(3–4) − 转场镜(0–1)
-对白句数 ≤ 对白镜数        # 一镜一说话人；同一人连说可 2–3 句
-整集台词总字数 ÷ 4 字/秒 ≤ 90s   # 超了先砍台词，别压语速
+对白句数 ≤ 对白镜数                  # 一镜一说话人；同一人连说可 2–3 句
+整集台词字数 ÷ 4 字/秒 + 反应尾 ≤ T   # 超了先砍台词，别压语速
 ```
+
+**时长回写（硬规则）**：STEP 5.5 通过后，若实际时长 > T×1.1 或实际镜数 ≠ 包预算，必须回写集制作包 ① 与 `production-state.json`（`episodeSecondsException` / `shots`），并在方案卡报告偏差；**不许静默超时**（真实项目 EP01 已出现 105.8s / 25 镜，必须走这条而非人工补字段）。
 
 ---
 
@@ -334,7 +362,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 2. **续接不继承身份**：重渲/续接沿用画面，但服装妆容不保证——换装集必须换对应状态卡。
 3. **每集 `起链`**：**跨集不续接**（集间硬切）；集内续接照 story skill。
 4. **风格锁只来自系列圣经**：每镜 prompt 追加同一份风格锁后缀与负向约束（由 story skill 执行，本 skill 只校验）。
-5. **画幅/档位/字幕/语言整季不变**：变了就是「换规格」，已产集必须标注作废或重渲，不许静默混用。
+5. **画幅/档位/字幕/语言/时长目标区间整季不变**：变了就是「换规格」，已产集必须标注作废或重渲，不许静默混用；单集时长例外走 `episodeSecondsException` 并回写包 ①。
 6. **音色**：AV 模型自带声音，跨集音色默认无保证；**优先用统一 `voice:` 参考音频提高一致性**（阶段 C 一次建立，每镜 `audio_ref_nodes`）。「无 TTS」只限制生成新音色 / 后期克隆配音，不限制复用参考音色。跨集一致性尚未实测，样片集必须做听核基线；`text-only` 时交付清单如实记录风险。
 7. **每 5 集抽查**：同一角色跨集对照（脸/发型/身材/服饰主色/签名道具）、同一场景地标位置、风格漂移。
 
@@ -343,12 +371,13 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 ## 12. 交付（每集 + 整季）
 
 **每集交付包**（`series/delivery/epNNN/` + 该集画布 `final delivery` 组）：
-
 - 成片（节点 id + 媒体路径 + 时长 + 尺寸 + 档位）
 - 镜头表导出（PDF）+ 本集剧本（`episodes/epNNN.md`）
 - 配乐点单：情绪、入点（秒）、duck 点、建议曲风。插件可生成**独立 BGM 素材**（`comfy_generate_music`，能力 `audio.music`），但**没有混音 / 贴轨工具**，成片贴 BGM 仍需后期；生成的 BGM 作为独立音频节点随交付包提供。
 - 终检清单（沿用 story skill 的终检项）+ 本集成本（GPU 分钟 / 重渲镜数）
 - 人工听核项：对白清晰度、音效同步、有无幻听人声
+
+**交付卡（G-E）**：每集一张，列成片（节点 id / 时长 / 尺寸 / 档位）+ 终检结论 + 本集成本 + 台账；批准后才把 `stage` 写成 `delivered`。选项：**批准交付（推荐）** / 重渲某镜 / 重拼 / 逐镜超分 / 补做终检某项。
 
 **整季交付**（主会话 `series delivery` 组）：集清单（集号 → 成片路径 → 时长）、未落地项（BGM 贴轨 / `text-only` 音色风险 / 待重渲）、总成本、资产台账快照。
 
@@ -364,7 +393,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 | 角色卡被改 / 重出 | 台账版本 +1；**该角色所有未交付集重渲**；已交付集标注作废 |
 | 场景卡失效 | 重出 + 重新核对引用该场景的 `固定地标` / `光位基线` |
 | 换声线 | 该角色**全部对白镜 + 续接下游**重渲；已交付集标作废；台账 `voices[]` 版本 +1 |
-| 剧本改集（已产） | 先改剧本 → 重生成集制作包 → 跑 story 门 1/2 → 重渲受影响镜（续接链顺次重渲） |
+| 剧本改集（已产） | 先改剧本 → 重生成集制作包 → 重出方案卡 → 重渲受影响镜（续接链顺次重渲） |
 | 换档 / 换画幅 / 换字幕开关 | 已产集作废清单化，逐集重渲；不许新旧混拼 |
 | 会话中断 | 读 `production-state.json` + `canvas_list_nodes`，从 `doneShots` 之后续跑 |
 | 画布节点过多（>200） | 新会话重新物化资产；旧集画布只读归档 |

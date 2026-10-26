@@ -18,7 +18,7 @@
 开场先做的状态写入（**每集唯一写入点；story 只读不写**）：
 
 ```text
-canvas_set_state(aspectRatio="9:16", duration="90 秒", audioMode="dialogue-led",
+canvas_set_state(aspectRatio="9:16", duration="90 秒（默认；按包 ① 80–110s 调整）", audioMode="dialogue-led",
                  mode="balanced", characterCardVariant="single", reviewMode="batch",
                  groupOrder=["story planning","character cards","voice auditions","scene cards",
                              "prop cards","shot table","text storyboards","shot prompts",
@@ -30,83 +30,53 @@ canvas_set_state(aspectRatio="9:16", duration="90 秒", audioMode="dialogue-led"
 
 ---
 
-## 2. 单集生产序列（照抄）
+## 2. 单集生产序列（3 张人工卡）
+
+> 拍摄参数与失败梯度**一律照 `story-short-generator` 的 STEP 5 / 6 / 7**；本片型只固定：`tier=balanced`、`ref_variant=single`、字幕 `none`、声线从台账 `voices[]` 取。这里只列系列层动作，不复述调用参数。
 
 ### 2.1 卡片（缺卡才建）
 
 ```text
-有 id → asset_to_canvas(id)                    # 复用
-缺卡   → comfy_generate_image(tier="quality", width=…, height=…,
-            character="林晚", card_variant="single", title="林晚 角色卡·单视图", group="character cards")
-        → comfy_generate_image(..., card_variant="three", paired_node_id=<上一步 id>, title="林晚 角色卡·三视图")
+有 id → asset_to_canvas(id)                     # 复用
+缺卡   → 按 story STEP 3 生成 single + three（图片档位 quality、两版配对）
 ```
 
-- 角色：`single` 2:3 竖版（quality 1344×2016）+ `three` 16:9（2048×1152）。
-- 场景：跟随画布比例 9:16（quality → 1152×2048）。
-- 道具：1:1（quality 2048×2048），只给关键道具。
-- 两版都查（自检点 1），并核对跨版本是同一角色。
+- 建卡后的逐卡锁定**不单独弹卡**，并入 §2.2 的方案卡。
+- 场景 / 道具 / 声线已在阶段 C 建好；本集只物化，不重画。
 
-### 2.2 七列镜头表 + 门 1
+### 2.2 建包 → 镜头表 → 分镜 → 方案卡（G-P，1 张/集）
 
 ```text
-canvas_write_node(kind=table, group="shot table", title="EP003 镜头表", content=<七列>)
-→ 跑 STEP 5.5 十一项自检
-→ 表节点顶部加 "shot-table self-check: passed at <时间戳>"
-→ ask_user_question（门 1）
+按 §10 建包（①③④⑤⑥ + 镜头预算 + 成本）
+→ 按 story STEP 5 出七列镜头表 → 跑 STEP 5.5 十一项自检 → 表节点加自检戳
+→ 按 story STEP 6 出文本分镜（默认单文本；⑥ 声明可视化才加铅笔图）
+→ ask_user_question（方案卡）：包 ①③⑤⑥ + 镜头表摘要 + 分镜 + 渲染参数 + 成本 + 偏差
 ```
 
-### 2.3 文本分镜 + 门 2
+方案卡选项：**批准开渲（推荐）** / 改包某节 / 改镜头表或分镜 / 只渲 1 镜试片 / 回改剧本。
+**不要**在方案卡之外再弹 story 的门 1 / 门 2 / 分镜批准 / 渲染参数卡。
+
+### 2.3 逐镜 → 片段卡（门 3，1 张/集）
 
 ```text
-canvas_write_node(kind=text, group="text storyboards", title="EP003 text storyboards", content=…)
-→ ask_user_question（门 2：批准分镜并渲染）
+按 story STEP 7：每镜 prompt bank（三档同文）→ r2v（continuity_from / audio_ref_nodes）→ AI 逐镜自检
+全部渲完且全部通过 → 一张片段卡（batch）
+口型 / 字幕 / 一致性不过 → 当场弹单镜处置卡（不压到批量卡）
 ```
 
-### 2.4 逐镜生成（每镜三件套）
+- 续接 / 转场镜（i2v 双端锚定）按 story STEP 7 执行；跨场景每个边界 1 个转场镜。
+- 片段卡逐条列：镜号 → 节点 id → 时长 → 自检结论（含抽帧核对项）→ 人工听核要点。
+
+### 2.4 拼接 + 终检 → 交付卡（G-E，1 张/集）
 
 ```text
-canvas_write_prompt_bank(title="S03 提示词（分档）", group="shot prompts",
-                         prompts={fast:p, balanced:p, quality:p})       # 三档同文，p 是 quality 全文
-→ comfy_generate_video(type="r2v", tier="balanced", ref_variant="single",
-                       prompt_node=<上一步 id>,
-                       ref_nodes=[角色卡…, 场景卡, 道具卡?],
-                       audio_ref_nodes=["voice:<id>"],               # 仅对白镜 + voicePlan=existing
-                       continuity_from=<上一镜 id，起链不传>,
-                       length=124, title="S03", group="shot clips")
+video_concat(nodes=[按镜头表顺序，含转场镜], title="EP00X 拼接成片", group="final delivery")
+→ 按 story 终检清单核对
+→ ask_user_question（交付卡）：成片 + 终检结论 + 本集成本 + 台账
+→ 批准后写 series/delivery/epNNN/、state=delivered、ledger 追加一行
 ```
 
-- `续接` 列：同场景后续镜传 `continuity_from`；场景第一镜 `起链`。
-- 声线：`voicePlan=existing` 时对白镜必须带 `audio_ref_nodes`（台账 `voices[]`，同角色同一 id）；`text-only` 不传。
-- 转场镜（跨场景，1 个）：
-
-```text
-extract_frame(video_node=<前一场景尾镜>, frame_index=-1, title="S10 末帧", group="shot clips")
-extract_frame(video_node=<下一场景首镜>, frame_index=0,  title="S12 首帧", group="shot clips")
-comfy_generate_video(type="i2v", tier="balanced", first_frame_node=…, last_frame_node=…,
-                     length=73, title="S11 转场", group="shot clips")
-```
-
-- 字幕 `none`：prompt 里不写任何字幕声明，负向尾句 `no subtitle, no burned-in dialogue text`。
-
-### 2.5 门 3（batch）
-
-```text
-每渲完一镜：立即自检（抽首/中/末帧 + 说话窗帧，对照卡片与镜头表）
-全部渲完且全部通过 → 一张 ask_user_question（批量审查卡）
-口型/一致性不过关 → 当场弹单镜处置卡（不压到批量卡）
-```
-
-批量卡必须逐条列：镜号 → 节点 id → 时长 → 自检结论（含抽帧核对项）→ 人工听核要点。
-
-### 2.6 拼接 + 交付
-
-```text
-video_concat(nodes=[S01…S18 节点 id，含转场镜], title="EP003 拼接成片", group="final delivery")
-→ 终检（story skill 清单）
-→ 写 series/delivery/epNNN/ 交付清单 + 配乐点单
-→ 更新 production-state.json（stage=delivered, finalNodeId, costMinutes, gate=approved）
-→ 主会话 production ledger 追加一行
-```
+交付卡选项：**批准交付（推荐）** / 重渲某镜 / 重拼 / 逐镜超分 / 补做终检某项。
 
 ---
 
@@ -118,7 +88,7 @@ video_concat(nodes=[S01…S18 节点 id，含转场镜], title="EP003 拼接成�
 1) read production-state.json（stage / doneShots / clipNodeIds）
 2) canvas_list_nodes() 找回 group="shot clips" 的既有片段，与 doneShots 对齐
 3) 从第一个缺失镜继续；已完成的镜**不重渲**
-4) 缺提示词库的补写（canvas_write_prompt_bank），缺镜的照 2.4 生成
+4) 缺提示词库的补写（canvas_write_prompt_bank），缺镜的照 2.3 生成
 5) 续接链：只从「最后一个已完成且支持续接的镜」往后接；中间断点用 `起链` 硬切，并在台账标注接缝
 ```
 
