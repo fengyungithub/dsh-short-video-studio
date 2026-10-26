@@ -112,7 +112,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 | 画面内字幕 `subtitles` | `none` / `burned-in` | `burned-in` 需逐镜烧字，实测要 `quality` 才稳；成本上升 |
 | 角色卡版本 `characterCardVariant` | `single` / `three`（仅 balanced/quality） | 9:16 下 three 未实测；切换 = 已产集重渲 |
 | 片段审查 `reviewMode` | `batch` / `per-shot` | per-shot 每镜一张卡，人力 ×N |
-| 声线方案 `voicePlan` | `existing`（阶段 C 建/复用） / `text-only` | text-only 无音色锚点，交付记风险 |
+| 声线方案 `voicePlan` | `existing`（复用/缺的补建，推荐）/ `audition`（全部重新试镜）/ `text-only` | text-only 无音色锚点，交付记风险；audition = 新季换声/重做声线 |
 | 交付画质 `delivery` | `native` / `upscale1080` / `upscale2k` / `upscale4k` | 超分 ≈+78 min/集（1080）；整季二选一 |
 | 视觉风格 | `cinematic-live-action` / 其余 6 套 | 改 = 全部卡片与片段作废 |
 | 语言 / 出海 | 中文 / English（出海） | 英文台词+字幕未实测，先 1 镜验证 |
@@ -121,7 +121,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 1. **画面 / 时长**：`9:16`（推荐）/ `16:9` / `1:1`；`90s`（推荐）/ `80s` / `100s` / `110s` / 自定义。
 2. **画质 / 成本**：视频 `tier` = `balanced`（推荐）/ `quality` / `fast`；图片 `imageTier` = `balanced`（推荐）/ `quality` / `fast`；交付 `delivery` = `native`（推荐）/ `upscale1080` / `upscale2k` / `upscale4k`；字幕 `subtitles` = `none`（推荐）/ `burned-in`。
-3. **资产 / 声音**：角色卡 `characterCardVariant` = `single`（推荐）/ `three`（仅 balanced/quality）；声线 `voicePlan` = `existing`（推荐，阶段 C 建/复用）/ `text-only`。
+3. **资产 / 声音**：角色卡 `characterCardVariant` = `single`（推荐）/ `three`（仅 balanced/quality）；声线 `voicePlan` = `existing`（推荐，阶段 C 复用/缺的补建）/ `audition`（强制每个说话角色重新试镜）/ `text-only`（降级）。
 4. **审查 / 风格**：`reviewMode` = `batch`（推荐）/ `per-shot`；视觉风格 7 选 1；语言中文 / English（出海，先 1 镜验证）。
 
 **规格卡还要写**：预计单集成本、整季成本、样片集是否先做、是否需要三档实测。用户改任意一项 → 回到本卡重选，并按「切换成本」处理已产集。
@@ -198,7 +198,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
               "audioMode": "dialogue-led", "tier": "balanced", "imageTier": "balanced",
               "subtitles": "none", "delivery": "native|upscale1080",
               "characterCardVariant": "single", "reviewMode": "batch",
-              "voicePlan": "existing|text-only", "packageContract": "episode-package/v1", "assetMode": "library" },
+              "voicePlan": "audition|existing|text-only", "packageContract": "episode-package/v1", "assetMode": "library" },
   "assets": {
     "characters": [{ "name": "林晚",
                      "states": [{ "state": "常服", "assetIdSingle": "character:…", "assetIdThree": "character:…",
@@ -283,7 +283,8 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 - **每个说话角色一条声线**，阶段 C 一次做完、全季复用：先 `asset_list(type=voice)` 命中即复用；没有就按 `story-short-generator` 的 STEP 3.5（`references/voice-audition.md`）生成试镜（单人单句、无环境音、balanced），`extract_audio` 后由用户点「入库」得到 `voice:<id>`。本 skill 只登记台账，不重跑 story 的规则。
 - 声线方案写进系列圣经与集制作包 ⑥：
-  - `existing`（默认）：每个说话角色都有 `voice:` → 每集对白镜带 `audio_ref_nodes`。
+  - `existing`（默认，推荐）：先 `asset_list(type=voice)` 复用；**没有的才试镜补建**；每个说话角色最终都有 `voice:` → 每集对白镜带 `audio_ref_nodes`。
+  - `audition`：**强制每个说话角色重新试镜**（即使库内已有 voice），产生新的 `voice:` 资产/版本；旧 voice 标 `deprecated`；所有后续集用新声线，已交付集标 stale（换声线 = 全对白镜+下游链重渲）。
   - `text-only`：不做试镜、不传参考音频；交付清单必须记「跨集音色无保证」。
 - **换声线 = 该角色全部对白镜 + 续接下游重渲**（story skill 铁律），必须在阶段 C 定死；样片集只做基线抽检，不重选。
 
