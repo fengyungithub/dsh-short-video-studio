@@ -1,7 +1,7 @@
 # 短剧三 skill 的结构分析与优化建议（讨论稿）
 
 > 日期：2026-10-26 ｜ 范围：`story-short-generator`（下称 **SSG**）、`short-drama-series-writer`（**WRI**）、`short-drama-series-production`（**PROD**）
-> 性质：只读分析与提案，**未修改任何 skill**。落地方案待讨论后执行。
+> 性质：分析 + 分阶段实施。**P0 已落地**（2026-10-26，分支 `feat/short-drama-skills-structure`，见 §8）；P1/P2 按讨论继续。
 > 证据附件（本轮独立审计，均带 `文件:行号`）：
 > - [交接契约与口径冲突](analysis/contract-conflicts.md)（15 条冲突 C1–C15 + 29 字段契约）
 > - [端到端流程与人工门清点](analysis/flow-and-human-gates.md)（46 道门 + 触达次数）
@@ -352,14 +352,18 @@ PROD 与 SSG 都写 `canvas_set_state`、都声明 groupOrder（9 vs 10）；PRO
 
 ## 8. 落地路线与验收
 
-### P0（0.5–1 天，只改文本，先止血）
+### P0（已实施 · 2026-10-26，分支 `feat/short-drama-skills-structure`）
 
-1. 三个 description 前 500 字重写（路由）。
-2. 补声线缺口：06 预填表 + PROD §1 + 资产台账 + groupOrder 第 10 组；PROD §11.6 改口径。
-3. 补 `reviewMode` 落地：PROD §8.1 第 3 步加 `canvas_set_state`（含 10 组）。
-4. 修 3 处过期断言：BGM、无 TTS、转场 quality。
-5. 修 README「3D 动画短片」旧标签。
-   **验收**：三条路由探针语命中正确；单集新会话 `canvas_get_state` 读到 `reviewMode=batch`；预填表含声线方案。
+1. ✅ 三个 description 前 500 字重写（路由）：SSG 的「连续短剧 / 片型」落在第 17 / 33 字，PROD 的「不拍片」第 59 字，WRI 的「只出文本」第 10 字。
+2. ✅ 声线补链：PROD §1 声线方案、state `voices[]`、`groupOrder` 第 10 组（`voice auditions`）、阶段 C 新增「6.2 声线」、G-A 卡与台账、样片听核基线、集制作包 ⑤/⑥ 与自检第 11–12 项、runbook 对白镜 `audio_ref_nodes`；SSG STEP 3.5 增加「委托模式从台账取、不重抽」。
+3. ✅ `reviewMode` 落地：PROD §8.1 第 4 步 + runbook 第 4 步写 `canvas_set_state`（十组），并声明「唯一写入点，story 只读」。
+4. ✅ 过期断言：BGM 改为「可生成独立素材、但无混音/贴轨工具」；「无 TTS」收窄为「不能生成新音色 / 克隆配音」；转场镜改为「与正片同档」。
+5. ✅ README「3D 动画短片」→「故事短片（7 套风格）」、`十项自检门`→`十一项`；WRI `/export` 标注「非生产输入」。
+6. ✅ 额外收口：阶段 C 固定到 EP01 会话（主会话不建卡，避免节点掉进未声明分组）；SSG 委托入口区分「production 已写 state 则只校验」。
+
+**P0 验收**：三份 frontmatter YAML 解析通过；`description` 关键路由词均在前 500 字；SSG / PROD / runbook 的 groupOrder 均为 10 组且顺序一致；集制作包自检 12 项连续编号；`git diff --check` 通过；未改任何 skill 目录名。
+
+**P0 遗留（进 P1/P2）**：集制作包仍无人工批准门（G-P）；PROD §8.3 / runbook 仍在复述 SSG 调用序列；编号仍 `epNNN` / `ep01` 混用；90s 仍是硬口径；契约仍无 schema。
 
 ### P1（2–3 天，职责与口径）
 
@@ -386,13 +390,15 @@ PROD 与 SSG 都写 `canvas_set_state`、都声明 groupOrder（9 vs 10）；PRO
 
 ## 9. 需要一起决定的 7 件事
 
-| # | 问题 | 我的建议 |
+> **2026-10-26 已拍板**：结构方案 **1**（三层收敛 + 契约，P0→P2 分阶段）；命名 **A**（三个 id 都不改，只改描述）。下列第 1 项已定，第 5 项已按建议在 P0 落地，其余待继续讨论。
+
+| # | 问题 | 决定 / 我的建议 |
 |---|---|---|
-| 1 | 三个 id 改不改？ | **先不改**，只改描述（A）；若一定要动，只改 PROD → `short-drama-series-producer`（A′）；`short-drama-generator` 等拆分后再用 |
+| 1 | 三个 id 改不改？ | ✅ **已定 A**：三个 id 都不改，只改描述；`short-drama-generator` 等拆分 `short-drama-episode` 后再用 |
 | 2 | 单片和连续短剧是否统一成一条 pipeline（模式参数）？ | 统一，但**入口做上下文探测**：有 `series/` 或集制作包就是委托模式，否则才问片型 |
-| 3 | writer 的「分集制作包」怎么处理？ | **降级为审阅归档**，删除分镜稿 / 12 镜口径；生产只认 PROD 的集制作包 |
+| 3 | writer 的「分集制作包」怎么处理？ | **降级为审阅归档**（P0 已标注非生产输入）；P1 删分镜稿 / 12 镜口径，生产只认 PROD 的集制作包 |
 | 4 | 90s 硬标准还是时长由对白反推？ | 改成**目标区间 80–110s**（`时长 ≈ 对白字数 ÷ 4 + 反应尾`），90s 只作默认目标；保留例外字段并强制回写 |
-| 5 | 声线：系列层做一次试镜，还是默认 text-only？ | **系列层阶段 C 一次试镜**（每说话角色），预填 `existing`；text-only 仅作降级并在交付清单记风险 |
+| 5 | 声线：系列层做一次试镜，还是默认 text-only？ | ✅ **P0 已落地**：系列层阶段 C 一次试镜（每说话角色），预填 `existing`；text-only 仅作降级并在交付清单记风险 |
 | 6 | 门合并到什么程度？ | 项目规格 1 + 资产 1 + 每集方案 1 + 成片 1；per-shot 改成"自动推进 + 随时可停"需你单独确认 |
 | 7 | 每集交付要不要单独验收卡？ | 要，但**与门 3 batch 合并**（同一张卡里含终检与交付），不另开一张 |
 

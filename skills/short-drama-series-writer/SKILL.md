@@ -1,7 +1,7 @@
 ---
 name: short-drama-series-writer
 description: |
-  微短剧全流程剧本创作助手。用于从短剧选题、目标受众、人物关系、爽点节奏、付费卡点、分集大纲到单集剧本与完整导出，系统生成 50-100 集短剧方案与剧本。适合国内竖屏短剧、出海 ReelShort/DramaBox、战神、萌宝、逆袭、甜宠、复仇等类型。Trigger words: 短剧, 微短剧, 竖屏剧, 短剧剧本, 分集大纲, 爽点, 付费卡点, ReelShort, DramaBox.
+  微短剧剧本创作（**只出文本、不出视频**）：选题 → 创作方案 → 人物 → 分集目录 → 单集剧本 → 自检 → 合规 → 导出，系统生成 50–100 集短剧方案与剧本；支持国内竖屏与出海 ReelShort / DramaBox。**在 dsh-short-video-studio 生产链路里只负责剧本层**：成片由 `short-drama-series-production` 在系列层主导、并委托 `story-short-generator` 拍摄；它的「集制作包」才是生产交接物，本 skill `/export` 的「分集制作包」仅供审阅归档，生产链不读取。触发词：短剧、微短剧、竖屏剧、短剧剧本、分集大纲、爽点、付费卡点、ReelShort、DramaBox。不适用于要成片 / 镜头表 / 分镜 / 角色卡的请求。
 trigger-words: [短剧, 微短剧, 竖屏剧, 短剧剧本, 分集大纲, 爽点, 付费卡点, ReelShort, DramaBox]
 ---
 
@@ -423,6 +423,8 @@ CLOSE-UP - {key detail}
 **前置条件：** 至少完成部分集数
 
 **导出硬规则（必须遵守）：**
+
+> **在 dsh-short-video-studio 生产链路里**：本目录**仅供审阅 / 归档，不是生产输入**。生产交接物是 `short-drama-series-production` 的「集制作包」（`series/episodes/epNNN/package.md`：6 节 + 8 列镜头意图 + 资产清单 + 预填参数）；生产链**不读取** `export/episodes-production/`。分镜稿、12 镜、18–25 句是剧本文本口径，实际镜数以集制作包的镜头预算为准。
 
 1. **禁止只导出一个总文档就结束。** 完整导出必须同时生成：
    - `export/{剧名}-完整剧本.md`：总文档

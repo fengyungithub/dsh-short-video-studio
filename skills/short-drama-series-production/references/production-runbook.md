@@ -4,23 +4,26 @@
 
 ---
 
-## 1. 每集会话开场（五步，必做）
+## 1. 每集会话开场（六步，必做）
 
 ```text
-1) read  series/production-state.json          # 当前集 / stage / doneShots / 资产台账
+1) read  series/production-state.json          # 当前集 / stage / doneShots / 资产与声线台账
 2) read  episodes/epNNN.md + 分集目录该行 + series/bible.md（按需段）
 3) asset_list()  →  asset_to_canvas(id=…) × N   # 本集用到的角色/状态/场景/道具
-4) canvas_write_node(kind=text, group="story planning", title="EP003 集制作包", content=…)
-5) 加载 story-short-generator，声明总控与 5 处注入，从 STEP 3 起
+4) canvas_set_state(…)                          # 一次写全：画幅/时长/音频/档位/卡版本/reviewMode/十个分组
+5) canvas_write_node(kind=text, group="story planning", title="EP003 集制作包", content=…)
+6) 加载 story-short-generator，声明总控与注入点，从 STEP 3 起
 ```
 
-开场先做的三件状态写入：
+开场先做的状态写入（**每集唯一写入点；story 只读不写**）：
 
 ```text
 canvas_set_state(aspectRatio="9:16", duration="90 秒", audioMode="dialogue-led",
                  mode="balanced", characterCardVariant="single", reviewMode="batch",
-                 groupOrder=["story planning","character cards","scene cards","prop cards",
-                             "shot table","text storyboards","shot prompts","shot clips","final delivery"])
+                 groupOrder=["story planning","character cards","voice auditions","scene cards",
+                             "prop cards","shot table","text storyboards","shot prompts",
+                             "shot clips","final delivery"])
+# 声线方案无 state 字段：existing（阶段 C 建）/ text-only（降级），写进系列圣经与集制作包 ⑥
 ```
 
 > `production-state.json` 的 `stage` 从 `package` 走到 `delivered`，**每步都先写文件再回复用户**。
@@ -67,11 +70,13 @@ canvas_write_prompt_bank(title="S03 提示词（分档）", group="shot prompts"
 → comfy_generate_video(type="r2v", tier="balanced", ref_variant="single",
                        prompt_node=<上一步 id>,
                        ref_nodes=[角色卡…, 场景卡, 道具卡?],
+                       audio_ref_nodes=["voice:<id>"],               # 仅对白镜 + voicePlan=existing
                        continuity_from=<上一镜 id，起链不传>,
                        length=124, title="S03", group="shot clips")
 ```
 
 - `续接` 列：同场景后续镜传 `continuity_from`；场景第一镜 `起链`。
+- 声线：`voicePlan=existing` 时对白镜必须带 `audio_ref_nodes`（台账 `voices[]`，同角色同一 id）；`text-only` 不传。
 - 转场镜（跨场景，1 个）：
 
 ```text
