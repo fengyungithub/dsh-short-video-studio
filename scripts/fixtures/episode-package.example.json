@@ -4,7 +4,8 @@
     "number": 3,
     "id": "EP003",
     "title": "离婚协议",
-    "sourceScript": "episodes/ep003.md"
+    "sourceScript": "episodes/ep003.md",
+    "sourceDialogueCount": 2
   },
   "targetSeconds": 90,
   "shotBudget": 4,
@@ -18,12 +19,21 @@
       "intExt": "内",
       "location": "总裁办公室",
       "dayNight": "日",
-      "cast": ["林晚", "顾言"],
+      "cast": [
+        "林晚",
+        "顾言"
+      ],
       "event": "林晚递上离婚协议，顾言羞辱她净身出户",
       "escalation": "从冷嘲到当众扔协议",
       "landmarks": [
-        { "name": "door-frame", "position": "右侧 1/3" },
-        { "name": "desk", "position": "画面中" }
+        {
+          "name": "door-frame",
+          "position": "右侧 1/3"
+        },
+        {
+          "name": "desk",
+          "position": "画面中"
+        }
       ],
       "lightBaseline": "冷白顶光主光 + 右侧窗光补光"
     },
@@ -32,12 +42,21 @@
       "intExt": "内",
       "location": "办公室外走廊",
       "dayNight": "日",
-      "cast": ["林晚", "助理"],
+      "cast": [
+        "林晚",
+        "助理"
+      ],
       "event": "助理追上递回股权代持文件",
       "escalation": "反转揭示：她才是控股方",
       "landmarks": [
-        { "name": "window-light", "position": "左侧" },
-        { "name": "elevator", "position": "画面中" }
+        {
+          "name": "window-light",
+          "position": "左侧"
+        },
+        {
+          "name": "elevator",
+          "position": "画面中"
+        }
       ],
       "lightBaseline": "走廊顶部暖光 + 左侧窗光"
     }
@@ -137,13 +156,31 @@
       {
         "name": "总裁办公室",
         "assetId": "scene:demo-office",
-        "landmarks": ["door-frame:右1/3", "desk:画面中"],
+        "landmarks": [
+          {
+            "name": "door-frame",
+            "position": "右1/3"
+          },
+          {
+            "name": "desk",
+            "position": "画面中"
+          }
+        ],
         "lightBaseline": "冷白顶光主光 + 右侧窗光补光"
       },
       {
         "name": "办公室外走廊",
         "assetId": "scene:demo-corridor",
-        "landmarks": ["window-light:左侧", "elevator:画面中"],
+        "landmarks": [
+          {
+            "name": "window-light",
+            "position": "左侧"
+          },
+          {
+            "name": "elevator",
+            "position": "画面中"
+          }
+        ],
         "lightBaseline": "走廊顶部暖光 + 左侧窗光"
       }
     ],

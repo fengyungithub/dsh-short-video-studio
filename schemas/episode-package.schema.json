@@ -19,27 +19,76 @@
     "params"
   ],
   "properties": {
-    "contract": { "const": "episode-package/v1" },
+    "contract": {
+      "const": "episode-package/v1"
+    },
     "episode": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["number", "id", "title", "sourceScript"],
+      "required": [
+        "number",
+        "id",
+        "title",
+        "sourceScript"
+      ],
       "properties": {
-        "number": { "type": "integer", "minimum": 1 },
-        "id": { "type": "string", "pattern": "^EP[0-9]{3}$" },
-        "title": { "type": "string", "minLength": 1 },
-        "sourceScript": { "type": "string", "minLength": 1 }
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^EP[0-9]{3}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceScript": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceDialogueCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "源剧本对白句数（可大于 dialogue 行数：同说话人连说会合并）"
+        }
       }
     },
-    "targetSeconds": { "type": "number", "minimum": 60, "maximum": 180 },
-    "shotBudget": { "type": "integer", "minimum": 4, "maximum": 40 },
-    "paywall": { "type": "boolean" },
+    "targetSeconds": {
+      "type": "number",
+      "minimum": 60,
+      "maximum": 180
+    },
+    "shotBudget": {
+      "type": "integer",
+      "minimum": 4,
+      "maximum": 40
+    },
+    "paywall": {
+      "type": "boolean"
+    },
     "hookType": {
       "type": "string",
-      "enum": ["setup", "visual-joke", "reversal", "reveal", "callback", "suspense", "tender", "chase", "expression-beat", "climax"]
+      "enum": [
+        "setup",
+        "visual-joke",
+        "reversal",
+        "reveal",
+        "callback",
+        "suspense",
+        "tender",
+        "chase",
+        "expression-beat",
+        "climax"
+      ]
     },
-    "prevRecap": { "type": "string" },
-    "nextTeaser": { "type": "string" },
+    "prevRecap": {
+      "type": "string"
+    },
+    "nextTeaser": {
+      "type": "string"
+    },
     "scenes": {
       "type": "array",
       "minItems": 1,
@@ -47,28 +96,83 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "intExt", "location", "dayNight", "cast", "event", "escalation", "landmarks", "lightBaseline"],
+        "required": [
+          "id",
+          "intExt",
+          "location",
+          "dayNight",
+          "cast",
+          "event",
+          "escalation",
+          "landmarks",
+          "lightBaseline"
+        ],
         "properties": {
-          "id": { "type": "string", "pattern": "^SC[0-9]{2}$" },
-          "intExt": { "type": "string", "enum": ["内", "外", "内外"] },
-          "location": { "type": "string", "minLength": 1 },
-          "dayNight": { "type": "string", "enum": ["日", "夜", "晨", "昏"] },
-          "cast": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-          "event": { "type": "string", "minLength": 1 },
-          "escalation": { "type": "string", "minLength": 1 },
+          "id": {
+            "type": "string",
+            "pattern": "^SC[0-9]{2}$"
+          },
+          "intExt": {
+            "type": "string",
+            "enum": [
+              "内",
+              "外",
+              "内外"
+            ]
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dayNight": {
+            "type": "string",
+            "enum": [
+              "日",
+              "夜",
+              "晨",
+              "昏"
+            ]
+          },
+          "cast": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "event": {
+            "type": "string",
+            "minLength": 1
+          },
+          "escalation": {
+            "type": "string",
+            "minLength": 1
+          },
           "landmarks": {
             "type": "array",
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["name", "position"],
+              "required": [
+                "name",
+                "position"
+              ],
               "properties": {
-                "name": { "type": "string", "minLength": 1 },
-                "position": { "type": "string", "minLength": 1 }
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "position": {
+                  "type": "string",
+                  "minLength": 1
+                }
               }
             }
           },
-          "lightBaseline": { "type": "string", "minLength": 1 }
+          "lightBaseline": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
@@ -77,16 +181,49 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["no", "speaker", "text", "emotion", "targetSeconds", "subtitle", "voiceRef"],
+        "required": [
+          "no",
+          "speaker",
+          "text",
+          "emotion",
+          "targetSeconds",
+          "subtitle",
+          "voiceRef"
+        ],
         "properties": {
-          "no": { "type": "integer", "minimum": 1 },
-          "speaker": { "type": "string", "minLength": 1 },
-          "text": { "type": "string", "minLength": 1 },
-          "emotion": { "type": "string" },
-          "targetSeconds": { "type": "number", "minimum": 0.5, "maximum": 15 },
-          "subtitle": { "type": "string" },
-          "voiceRef": { "type": "string", "pattern": "^(voice:[A-Za-z0-9:_-]+|none)$" },
-          "sfx": { "type": "array", "items": { "type": "string" } }
+          "no": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "speaker": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "emotion": {
+            "type": "string"
+          },
+          "targetSeconds": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 15
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "voiceRef": {
+            "type": "string",
+            "pattern": "^(voice:[A-Za-z0-9:_-]+|none)$"
+          },
+          "sfx": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -97,20 +234,66 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["shotId", "seconds", "sceneId", "speaker", "line", "performance", "shotSizeCamera", "screenPositions", "chainIntent", "beat"],
+        "required": [
+          "shotId",
+          "seconds",
+          "sceneId",
+          "speaker",
+          "line",
+          "performance",
+          "shotSizeCamera",
+          "screenPositions",
+          "chainIntent",
+          "beat"
+        ],
         "properties": {
-          "shotId": { "type": "string", "pattern": "^S[0-9]{2,3}$" },
-          "seconds": { "type": "number", "minimum": 1, "maximum": 15 },
-          "sceneId": { "type": "string", "pattern": "^SC[0-9]{2}$" },
-          "speaker": { "type": ["string", "null"] },
-          "line": { "type": ["string", "null"] },
-          "performance": { "type": "string", "minLength": 1 },
-          "shotSizeCamera": { "type": "string", "minLength": 1 },
-          "screenPositions": { "type": "string", "minLength": 1 },
-          "chainIntent": { "type": "string", "pattern": "^(起链|接 S[0-9]{2,3}|转场)$" },
+          "shotId": {
+            "type": "string",
+            "pattern": "^S[0-9]{2,3}$"
+          },
+          "seconds": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 15
+          },
+          "sceneId": {
+            "type": "string",
+            "pattern": "^(SC[0-9]{2}|TRANSITION)$",
+            "description": "关联场次；跨场景转场镜写 TRANSITION"
+          },
+          "speaker": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "line": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "performance": {
+            "type": "string",
+            "minLength": 1
+          },
+          "shotSizeCamera": {
+            "type": "string",
+            "minLength": 1
+          },
+          "screenPositions": {
+            "type": "string",
+            "minLength": 1
+          },
+          "chainIntent": {
+            "type": "string",
+            "pattern": "^(起链|接 S[0-9]{2,3}|转场|硬切)$",
+            "description": "起链=场景首镜；接 Sxx=同场景续接；转场=跨场景转场镜；硬切=同场景刻意硬切（需在连续性衔接写明理由）"
+          },
           "beat": {
             "type": "string",
-            "enum": ["钩子", "爽点-打脸", "反转", "揭露", "情绪点", "危机", "💰卡点", "动作", "特写"]
+            "minLength": 1,
+            "description": "集内节拍（建议：钩子/爽点-打脸/爽点-护/反转/揭露/情绪点/甜/危机/💰卡点/转场）"
           }
         }
       }
@@ -118,21 +301,45 @@
     "assets": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["characters", "scenes", "props", "voices", "toBuild"],
+      "required": [
+        "characters",
+        "scenes",
+        "props",
+        "voices",
+        "toBuild"
+      ],
       "properties": {
         "characters": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "state", "singleNodeId", "threeNodeId", "episodes"],
+            "required": [
+              "name",
+              "state",
+              "singleNodeId",
+              "threeNodeId",
+              "episodes"
+            ],
             "properties": {
-              "name": { "type": "string" },
-              "state": { "type": "string" },
-              "singleNodeId": { "type": "string" },
-              "threeNodeId": { "type": "string" },
-              "assetId": { "type": "string" },
-              "episodes": { "type": "string" }
+              "name": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "singleNodeId": {
+                "type": "string"
+              },
+              "threeNodeId": {
+                "type": "string"
+              },
+              "assetId": {
+                "type": "string"
+              },
+              "episodes": {
+                "type": "string"
+              }
             }
           }
         },
@@ -141,12 +348,43 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "assetId", "landmarks", "lightBaseline"],
+            "required": [
+              "name",
+              "assetId",
+              "landmarks",
+              "lightBaseline"
+            ],
             "properties": {
-              "name": { "type": "string" },
-              "assetId": { "type": "string" },
-              "landmarks": { "type": "array", "items": { "type": "string" } },
-              "lightBaseline": { "type": "string" }
+              "name": {
+                "type": "string"
+              },
+              "assetId": {
+                "type": "string"
+              },
+              "landmarks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "position"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "position": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "lightBaseline": {
+                "type": "string"
+              }
             }
           }
         },
@@ -155,11 +393,21 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "assetId", "episodes"],
+            "required": [
+              "name",
+              "assetId",
+              "episodes"
+            ],
             "properties": {
-              "name": { "type": "string" },
-              "assetId": { "type": "string" },
-              "episodes": { "type": "string" }
+              "name": {
+                "type": "string"
+              },
+              "assetId": {
+                "type": "string"
+              },
+              "episodes": {
+                "type": "string"
+              }
             }
           }
         },
@@ -168,64 +416,217 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["character", "voiceAssetId", "source", "tier", "seed", "episodes"],
+            "required": [
+              "character",
+              "voiceAssetId",
+              "source",
+              "tier",
+              "seed",
+              "episodes"
+            ],
             "properties": {
-              "character": { "type": "string" },
-              "voiceAssetId": { "type": "string", "pattern": "^(voice:[A-Za-z0-9:_-]+|none)$" },
-              "source": { "type": "string", "enum": ["audition", "existing", "text-only"] },
-              "auditionNodeId": { "type": "string" },
-              "tier": { "type": "string", "enum": ["fast", "balanced", "quality"] },
-              "seed": { "type": "integer", "minimum": 0 },
-              "episodes": { "type": "string" }
+              "character": {
+                "type": "string"
+              },
+              "voiceAssetId": {
+                "type": "string",
+                "pattern": "^(voice:[A-Za-z0-9:_-]+|none)$"
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "audition",
+                  "existing",
+                  "text-only"
+                ]
+              },
+              "auditionNodeId": {
+                "type": "string"
+              },
+              "tier": {
+                "type": "string",
+                "enum": [
+                  "fast",
+                  "balanced",
+                  "quality"
+                ]
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "episodes": {
+                "type": "string"
+              }
             }
           }
         },
-        "toBuild": { "type": "array", "items": { "type": "string" }, "maxItems": 2 }
+        "toBuild": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 8,
+          "description": "本集缺卡清单；量产期 ≤2，建卡集（EP01/新角色）≤8"
+        }
       }
     },
     "params": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "styleId", "aspectRatio", "duration", "audioMode", "subtitleMode",
-        "videoTier", "imageTier", "characterCardVariant", "deliveryQuality",
-        "reviewMode", "voicePlan", "storyboardMode", "groupOrderVersion"
+        "styleId",
+        "aspectRatio",
+        "duration",
+        "audioMode",
+        "subtitleMode",
+        "videoTier",
+        "imageTier",
+        "characterCardVariant",
+        "deliveryQuality",
+        "reviewMode",
+        "voicePlan",
+        "storyboardMode",
+        "groupOrderVersion"
       ],
       "properties": {
         "styleId": {
           "type": "string",
-          "enum": ["pixar-3d", "cinematic-live-action", "ghibli-2d", "anime-cel", "ink-wash-oriental", "comic-halftone", "guofeng-xianxia"]
+          "enum": [
+            "pixar-3d",
+            "cinematic-live-action",
+            "ghibli-2d",
+            "anime-cel",
+            "ink-wash-oriental",
+            "comic-halftone",
+            "guofeng-xianxia"
+          ]
         },
-        "aspectRatio": { "type": "string", "pattern": "^[0-9]+:[0-9]+$" },
-        "duration": { "type": "string", "minLength": 1 },
-        "audioMode": { "type": "string", "enum": ["dialogue-led", "silent"] },
-        "subtitleMode": { "type": "string", "enum": ["burned-in", "none"] },
-        "videoTier": { "type": "string", "enum": ["fast", "balanced", "quality"] },
-        "imageTier": { "type": "string", "enum": ["fast", "balanced", "quality"] },
-        "characterCardVariant": { "type": "string", "enum": ["single", "three"] },
-        "deliveryQuality": { "type": "string", "enum": ["native", "upscale1080", "upscale2k", "upscale4k"] },
-        "reviewMode": { "type": "string", "enum": ["per-shot", "batch"] },
-        "voicePlan": { "type": "string", "enum": ["audition", "existing", "text-only"] },
-        "storyboardMode": { "type": "string", "enum": ["text", "text+pencil"] },
-        "groupOrderVersion": { "type": "array", "minItems": 10, "maxItems": 10, "items": { "type": "string" } }
+        "aspectRatio": {
+          "type": "string",
+          "pattern": "^[0-9]+:[0-9]+$"
+        },
+        "duration": {
+          "type": "string",
+          "minLength": 1
+        },
+        "audioMode": {
+          "type": "string",
+          "enum": [
+            "dialogue-led",
+            "silent"
+          ]
+        },
+        "subtitleMode": {
+          "type": "string",
+          "enum": [
+            "burned-in",
+            "none"
+          ]
+        },
+        "videoTier": {
+          "type": "string",
+          "enum": [
+            "fast",
+            "balanced",
+            "quality"
+          ]
+        },
+        "imageTier": {
+          "type": "string",
+          "enum": [
+            "fast",
+            "balanced",
+            "quality"
+          ]
+        },
+        "characterCardVariant": {
+          "type": "string",
+          "enum": [
+            "single",
+            "three"
+          ]
+        },
+        "deliveryQuality": {
+          "type": "string",
+          "enum": [
+            "native",
+            "upscale1080",
+            "upscale2k",
+            "upscale4k"
+          ]
+        },
+        "reviewMode": {
+          "type": "string",
+          "enum": [
+            "per-shot",
+            "batch"
+          ]
+        },
+        "voicePlan": {
+          "type": "string",
+          "enum": [
+            "audition",
+            "existing",
+            "text-only"
+          ]
+        },
+        "storyboardMode": {
+          "type": "string",
+          "enum": [
+            "text",
+            "text+pencil"
+          ]
+        },
+        "groupOrderVersion": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
     "budget": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["estimatedMinutes", "shotCount", "dialogueCount"],
+      "required": [
+        "estimatedMinutes",
+        "shotCount",
+        "dialogueCount"
+      ],
       "properties": {
-        "estimatedMinutes": { "type": "number", "minimum": 0 },
-        "shotCount": { "type": "integer", "minimum": 1 },
-        "dialogueCount": { "type": "integer", "minimum": 0 }
+        "estimatedMinutes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "shotCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dialogueCount": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "gates": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "packageApprovedAt": { "type": ["string", "null"] },
-        "approvedBy": { "type": ["string", "null"] }
+        "packageApprovedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approvedBy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     }
   }
