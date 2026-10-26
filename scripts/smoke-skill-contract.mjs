@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p) => readFileSync(join(root, p), 'utf8')
 const readJson = (p) => JSON.parse(read(p))
+const lib = read('lib/index.js')
 
 let pass = 0
 let fail = 0
@@ -157,6 +158,9 @@ ok('SSG 连续短剧硬停', ssg.includes('立即停止本 skill 流程') && ssg
 ok('系列参考含 story 立即停止', seriesMode.includes('立即停止'))
 ok('PROD 缺失剧本时走完整 writer 流水', prod.includes('完整剧本流水') && prod.includes('不代写剧本'))
 ok('WRI 声明被 production 调用时完整流水', wri.includes('被 `short-drama-series-production` 调用时'))
+ok('PROD 资产总览 + 是否入库询问', prod.includes('资产总览') && prod.includes('是否入库'))
+ok('PROD 不再说 AI 不调用入库', !prod.includes('AI 不调用入库'))
+ok('systemPrompt 禁止 AI 不代劳提示', lib.includes('禁止提示「AI 不代劳'))
 ok('PROD 含 S-STEP 0 系列规格卡', prod.includes('S-STEP 0') && prod.includes('系列规格卡'))
 ok('系列参考指向 S-STEP 0', seriesMode.includes('S-STEP 0'))
 

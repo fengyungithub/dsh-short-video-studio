@@ -22,7 +22,7 @@ series-writer 剧本（文件）
   → 每集交付包 + 成本台账 + 下一集
 ```
 
-参考图硬规则（图内零文字 / 不拼图 / 入库由用户人工点按钮）、双版本角色卡、三档同文提示词库、续接链硬约束——**全部由插件契约与 `story-short-generator` 定义，本文不复述**。
+参考图硬规则（图内零文字 / 不拼图）、双版本角色卡、三档同文提示词库、续接链硬约束；入库规则是「单项目用户点入库；系列 G-A 批准后 AI 可 asset_ingest」——**全部由插件契约与 `story-short-generator` 定义，本文不复述**。
 
 ---
 
@@ -277,11 +277,11 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 - 每个角色**两版**（`single` 单视图 2:3 竖版 + `three` 三视图 16:9 横排）都建，`character` / `card_variant` / `paired_node_id` 配对——即使视频只用 `single`，两版也要齐（换档/试三视图时不用返工）。
 - **状态卡**：只有「持续 ≥3 镜或跨 ≥2 集」的变化才建（换装/受伤等级/妆发/年龄跨度）。每状态一对卡，标题「角色名 + 状态 + 版本」；只持续 1–2 镜的变化写进镜头 prompt，不建卡。
-- **入库由用户人工点按钮**（AI 不调用入库）：**一次集中入库**，之后每集 `asset_list` 直接引用资产 id。资产 id 永久不变，改名不影响引用。
+- **入库**：阶段 C 的**资产总览卡**审核通过后，由 production 写「资产入库清单（已批准）」并调用 `asset_ingest`（**系列模式例外**；未批准不得入库）。**一次集中入库**，之后每集 `asset_list` 直接引用资产 id。资产 id 永久不变，改名不影响引用。单项目/未批准场景仍由用户点「入库」。
 
 ### 6.2 声线（有对白角色；与角色卡同门锁定）
 
-- **每个说话角色一条声线**，阶段 C 一次做完、全季复用：先 `asset_list(type=voice)` 命中即复用；没有就按 `story-short-generator` 的 STEP 3.5（`references/voice-audition.md`）生成试镜（单人单句、无环境音、balanced），`extract_audio` 后由用户点「入库」得到 `voice:<id>`。本 skill 只登记台账，不重跑 story 的规则。
+- **每个说话角色一条声线**，阶段 C 一次做完、全季复用：先 `asset_list(type=voice)` 命中即复用；没有就按 `story-short-generator` 的 STEP 3.5（`references/voice-audition.md`）生成试镜（单人单句、无环境音、balanced），`extract_audio` 后进入**资产总览卡**；批准后由 production 调 `asset_ingest` 得到 `voice:<id>`（单项目/未批准仍由用户点「入库」）。本 skill 只登记台账，不重跑 story 的规则。
 - 声线方案写进系列圣经与集制作包 ⑥：
   - `existing`（默认，推荐）：先 `asset_list(type=voice)` 复用；**没有的才试镜补建**；每个说话角色最终都有 `voice:` → 每集对白镜带 `audio_ref_nodes`。
   - `audition`：**强制每个说话角色重新试镜**（即使库内已有 voice），产生新的 `voice:` 资产/版本；旧 voice 标 `deprecated`；所有后续集用新声线，已交付集标 stale（换声线 = 全对白镜+下游链重渲）。
@@ -294,10 +294,17 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 - 道具卡单视图单件、1:1；**只给叙事关键且反复出现的道具建卡**（每张卡占一个参考槽位，单镜 `ref_nodes` >2 未实测）。
 - 资产库**没有 `prop` 类型**：道具归 `scene`（`scene:prop-<name>`），台账里注明真实语义。
 
-### 6.4 门 G-A
+### 6.4 门 G-A：资产审核 + 是否入库
 
-`ask_user_question`：锁定全部资产与声线并进入样片集（推荐）/ 重出某角色 / 补状态卡 / 换某角色声线（重听）/ 调整场景光位 / 先看资产总览。
-锁定后把资产 id 与 `voice:` 写进 `production-state.json` 的 `assets`（含 `voices[]`），并在主会话 `series bible` 组写一张资产台账表（角色/状态/场景/道具/声线 → 资产 id → 适用集范围）。
+资产生成完（角色/场景/道具/声线都齐）后，**必须先出「资产总览卡」让用户审核，并明确询问是否入库**；不许跳过，也不许说“AI 不代劳、请自己点入库”。
+
+`ask_user_question`（资产总览 + 入库）：
+- **批准全部并入资产库（推荐）** → production 写「EP00X 资产入库清单（已批准）」（正文含 `asset-ingest-approved` + 每个 nodeId/srcPath/name/type/character/cardVariant/source）→ 调 `asset_ingest` → `asset_list` 校验 → 台账
+- **只批准选中项** → 只列选中的条目，其余保持画布引用
+- **先不入库（仅本会话）** → 允许 EP01/试产；量产集 `assetMode=library` 会拦，跨会话不可复用
+- **重出某卡 / 补状态卡 / 换某角色声线（重听）/ 调场景光位**
+
+批准后把资产 id 与 `voice:` 写进 `production-state.json` 的 `assets`（含 `voices[]`），并在主会话 `series bible` 组写一张资产台账表（角色/状态/场景/道具/声线 → 资产 id → 适用集范围）。**未批准的条目不得入库**；`asset_ingest` 默认拒绝覆盖同名。
 
 ---
 

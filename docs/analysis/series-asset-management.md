@@ -7,7 +7,7 @@
 
 ## 0. 一句话结论
 
-- **资产库**（`.dsh-assets/library.json` + 文件）是**跨会话唯一身份权威**，由用户人工「入库」写入，id 永久稳定。
+- **资产库**（`.dsh-assets/library.json` + 文件）是**跨会话唯一身份权威**，由用户批准后写入（系列模式 AI 执行 `asset_ingest`，单项目人工点「入库」），id 永久稳定。
 - **系列台账**（`series/production-state.json` 的 `assets`）是**系列层索引**：角色/状态/场景/道具/声线 → 资产 id → 适用集范围 → 版本/状态。
 - **每集画布**（`canvas/session-<id>/`）是**临时工作副本**：进入一集时用 `asset_to_canvas` 从资产 id 物化，渲染完可归档；节点 id 不跨集复用。
 - **集制作包**是「单集采购单」：只写资产 id 或 `TO-BUILD`，不把节点 id 当持久引用。
@@ -21,7 +21,7 @@
 
 | 层 | 位置 | 作用 | 生命周期 |
 |---|---|---|---|
-| 资产库 | `.dsh-assets/library.json` + `.dsh-assets/images/` | 跨会话素材：character / scene / style / clip / text / voice | 永久；用户点「入库」写入 |
+| 资产库 | `.dsh-assets/library.json` + `.dsh-assets/images/` | 跨会话素材：character / scene / style / clip / text / voice | 永久；用户批准 → 入库（系列 AI 执行；单项目人工） |
 | 系列台账 | `series/production-state.json` 的 `assets` | 系列索引：角色状态 / 场景 / 道具 / 声线 → id | 全季 |
 | 每集画布 | `canvas/session-<id>/` | 该集实际渲染节点（卡片、片段、音频） | 一集；可归档 |
 
@@ -58,7 +58,7 @@
 │  voice:3ac1…（绛珠声线）                       │
 │  唯一身份权威；id 永久；用户批准 → 入库        │
 └───────────────▲──────────────────────────────┘
-                │ 入库（人工，一次）
+                │ 入库（G-A 批准，一次）
 ┌───────────────┴──────────────────────────────┐
 │ 系列台账 series/production-state.json assets  │
 │  角色状态 → assetIdSingle / assetIdThree      │

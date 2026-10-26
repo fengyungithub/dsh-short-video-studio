@@ -84,7 +84,7 @@ extract_audio(video_node=<试镜节点>, title='Mia 声线样本', group='voice 
 **两条路径共用**：
 
 - 用户点该音频卡「入库」→ 类型选「音频」→ 得到 `voice:<hex>`。
-- 写一份「声线清单」文本节点（group `voice auditions`）：`角色 | voice:<id> 或 canvas:<音频节点 id> | 来源（audition/existing/仅文本）| 试镜节点 id | tier | seed | 时长`。**后续镜头表与 STEP 7 只认这份清单里的 id**；`canvas:` 是未入库的临时引用（仅同会话可用，跨会话前必须点「入库」换 `voice:`）。
+- 写一份「声线清单」文本节点（group `voice auditions`）：`角色 | voice:<id> 或 canvas:<音频节点 id> | 来源（audition/existing/仅文本）| 试镜节点 id | tier | seed | 时长`。**后续镜头表与 STEP 7 只认这份清单里的 id**；`canvas:` 是未入库的临时引用（仅同会话可用）。**单片**由用户点「入库」换 `voice:`；**剧集**在阶段 C 资产总览卡批准后由 production 调 `asset_ingest` 换 `voice:`。
 
 ### 3.5.5 后续使用（STEP 5 / STEP 7 引用）
 
