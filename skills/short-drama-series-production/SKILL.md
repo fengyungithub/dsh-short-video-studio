@@ -244,7 +244,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 ### 6.2 声线（有对白角色；与角色卡同门锁定）
 
-- **每个说话角色一条声线**，阶段 C 一次做完、全季复用：先 `asset_list(type=voice)` 命中即复用；没有就按 `story-short-generator` 的 STEP 3.5 生成试镜（单人单句、无环境音、balanced），`extract_audio` 后由用户点「入库」得到 `voice:<id>`。本 skill 只登记台账，不重跑 story 的规则。
+- **每个说话角色一条声线**，阶段 C 一次做完、全季复用：先 `asset_list(type=voice)` 命中即复用；没有就按 `story-short-generator` 的 STEP 3.5（`references/voice-audition.md`）生成试镜（单人单句、无环境音、balanced），`extract_audio` 后由用户点「入库」得到 `voice:<id>`。本 skill 只登记台账，不重跑 story 的规则。
 - 声线方案写进系列圣经与集制作包 ⑥：
   - `existing`（默认）：每个说话角色都有 `voice:` → 每集对白镜带 `audio_ref_nodes`。
   - `text-only`：不做试镜、不传参考音频；交付清单必须记「跨集音色无保证」。

@@ -1,7 +1,7 @@
 # 短剧三 skill 的结构分析与优化建议（讨论稿）
 
 > 日期：2026-10-26 ｜ 范围：`story-short-generator`（下称 **SSG**）、`short-drama-series-writer`（**WRI**）、`short-drama-series-production`（**PROD**）
-> 性质：分析 + 分阶段实施。**P0–P2 已落地，并完成 EP001 / EP002 两次真实剧本桥接**（2026-10-26，分支 `feat/short-drama-skills-structure`，见 §8）；P3（拆分/改名）为可选项，待定。
+> 性质：分析 + 分阶段实施。**P0–P2 已落地，并完成 EP001 / EP002 两次真实剧本桥接**；**P3 采用方案 B（同引擎 + 模式参考，不拆 skill）**（2026-10-26，分支 `feat/short-drama-skills-structure`）。完整拆分（两个独立 skill）暂缓。
 > 证据附件（本轮独立审计，均带 `文件:行号`）：
 > - [交接契约与口径冲突](analysis/contract-conflicts.md)（15 条冲突 C1–C15 + 29 字段契约）
 > - [端到端流程与人工门清点](analysis/flow-and-human-gates.md)（46 道门 + 触达次数）
@@ -309,7 +309,17 @@ PROD 与 SSG 都写 `canvas_set_state`、都声明 groupOrder（9 vs 10）；PRO
 6. **编号 / 路径 / 状态统一**：`EP{三位补零}`；`state.episodes["ep001"]`；`series/episodes/ep001/package.md`；状态文件建议改名 `series/state.json`（避开与外部 `shortdrama-memory` 的同名 `production-state.json`）；加 `contract.version` 与 gate 结构（`{id,status,at,by}`）。
 7. **路由与描述**：三个 description 的前 500 字重写到能自解释分工与交接（SSG 写"连续短剧只做单集，系列层转 PROD"；PROD 写"制片总控，不拍片"；WRI 写"只出文本，两类包不同"）；加显式排除句（Hub 版 / `shortdrama-*` / `film-assets`）；修 README 的「3D 动画短片」旧标签。
 
-### 6.3 命名建议
+### 6.3 何时才把单片 / 剧集拆成两个 skill
+
+方案 B 已做内部拆分；只有满足任一条件才进入完整拆分：
+
+1. **模式差异进入核心**：卡片 / 镜头表 / 逐镜规则出现实质分叉，不只是入口/门数；
+2. **SKILL 压不下来**：B 后仍 >700 行，或 references 被频繁漏读导致返工；
+3. **受众真的分家**：大量单片用户抱怨系列内容干扰，或剧集需要独立的 3 卡引擎。
+
+拆分路径：先做 **thin adapter**（`short-drama-episode` 只承载 3 卡/委托规则，内部仍加载 story STEP 3–8），验证路由与 handoff 后再拆成两个独立 skill。不要一步跳到“复制两份核心规则”。
+
+### 6.4 命名建议
 
 | 选项 | 内容 | 评价 |
 |---|---|---|
@@ -387,12 +397,17 @@ PROD 与 SSG 都写 `canvas_set_state`、都声明 groupOrder（9 vs 10）；PRO
 15. ✅ **EP002 资产复用桥接**：前两场 24 镜 / 94.7s / 16 行 / **0 TO-BUILD** / **0 warning**；又修 3 处（场景/道具 `nodeId` 字段、同地点日夜按物理地点判断转场、声线 `canvasNodeId` 临时引用）。**声线试镜 v2 已通过用户听核并入库**；EP02 已切 `assetMode=library` + `existing`（`voice:` 资产）。完整 EP02 的 SC03 还缺兼美/仙婢甲乙三张卡。详见 [EP002 桥接报告](analysis/ep002-bridge/report.md) 与 [声线试镜记录](analysis/voice-audition/report.md)。
     **P2 验收**：`node scripts/smoke-skill-contract.mjs` 31/31；`npm run validate:bridge` EP001 0/2 + EP002 0/0；`git diff --check` 通过；单片门数保持 28（仅删重复问询）。
 
-### P3（可选，1 周）
+### P3（方案 B 已实施 · 2026-10-26）
 
 > 前置设计：**资产管理层**（资产库 / 系列台账 / 每集画布三层）见 [连续短剧资产管理设计](analysis/series-asset-management.md)——量产前必须先定，否则 80 集会重复“节点 id 当资产”的坑。
 
-14. 拆出 `short-drama-episode`（方案 2）+ SSG 回到纯单片 + 改名。
-15. BGM 能力接入交付流程（可选点单）。
+14. ✅ **方案 B：同引擎 + 模式参考（不拆 skill）**：
+    - `references/single-film-mode.md`：复用范围、11 项规格卡、简报/大纲、单片门清单；
+    - `references/series-delegated-mode.md`：探测、3 张卡、assetMode=library、handback、剧本冲突停线；
+    - `references/voice-audition.md`：STEP 3.5 试镜全流程（含锁 C 实测教训）；
+    - SKILL 985 → **841 行**，只留模式判定 + 共享流水线 + 指针；smoke 新增 6 条模式参考检查（37/37）。
+    - **完整拆分（`short-drama-single` + `short-drama-episode`）暂缓**：共享引擎约 70%，复制成本高、路由重叠会加剧；触发条件见 §6.3。
+15. ⏸ BGM 能力接入交付流程（可选点单）。
 
 ---
 

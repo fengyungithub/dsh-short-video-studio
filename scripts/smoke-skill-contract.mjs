@@ -104,6 +104,9 @@ const prod = read('skills/short-drama-series-production/SKILL.md')
 const wri = read('skills/short-drama-series-writer/SKILL.md')
 const pack = read('skills/short-drama-series-production/references/episode-package.md')
 const run = read('skills/short-drama-series-production/references/production-runbook.md')
+const singleMode = read('skills/story-short-generator/references/single-film-mode.md')
+const seriesMode = read('skills/story-short-generator/references/series-delegated-mode.md')
+const voiceRef = read('skills/story-short-generator/references/voice-audition.md')
 
 const descOf = (text) => {
   const m = text.match(/^description: \|\n([\s\S]*?)^whenToUse: \||^description: \|\n([\s\S]*?)^trigger-words:/m)
@@ -142,6 +145,12 @@ ok('state 含 voices 台账', Array.isArray(state?.assets?.voices))
 ok('state 含 voicePlan / 时长区间 / 例外', state?.series?.voicePlan !== undefined && Array.isArray(state?.series?.episodeSecondsRange) && state?.series?.episodeSecondsException !== undefined)
 ok('PROD 声明 contract v1', prod.includes('episode-package/v1') || pack.includes('episode-package/v1'))
 ok('PACK 指向 schema', pack.includes('schemas/episode-package.schema.json'))
+ok('SSG 指向单片模式参考', ssg.includes('references/single-film-mode.md'))
+ok('SSG 指向剧集委托模式参考', ssg.includes('references/series-delegated-mode.md'))
+ok('SSG 指向声线参考', ssg.includes('references/voice-audition.md'))
+ok('单片参考含 13 张规格卡', singleMode.includes('13 张规格卡'))
+ok('剧集参考含 assetMode=library 与 3 张卡', seriesMode.includes('assetMode=library') && seriesMode.includes('3 张卡'))
+ok('声线参考含“不带风格锁 C”', voiceRef.includes('不带风格锁 C'))
 
 console.log('')
 if (fail) {

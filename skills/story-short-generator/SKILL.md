@@ -189,86 +189,39 @@ whenToUse: |
 
 - 形态：整体形状词给了吗？比喻锚点有吗？唯一附肢清单列了吗？总括句锁定总数了吗？还有否定堆叠 / "可能长前肢"暗示要删吗？
 
-## STEP 0：接收需求、查库与生产规格
+## STEP 0：模式判定与生产规格
 
-捕捉：一句话创意或粗略故事；**片型（短视频故事 / 连续短剧）——先按门 0 探测系列上下文；探测不到才问**；目标产物（只要蓝图 / 只要资产 / 到镜头表 / 到分镜 / 到逐镜片段 / 到交付）；用户已说明的时长与画幅；视觉基调（默认 `pixar-3d`，见上方「视觉风格」节）；台词需求；**字幕需求（用户已说明就沿用，没说明就走下面的选项卡，不要默认）**。**只有用户明确指定台词语言时才锁定语言，不要默认英文台词。**
+**开工前先读模式参考**（不读不得进入下一步）：
 
-### 门 0 · 入口探测（上下文优先，提问兜底）
-
-**第一件事不是提问，是探测。** 按**画布 → 资产库 → 工作区**查系列上下文，查到即停：
-
-| 级 | 怎么查 | 命中标志 |
+| 模式 | 必读 | 谁写 state |
 |---|---|---|
-| 1 画布 | `canvas_list_nodes()` | 标题/正文含「系列圣经 / 集制作包 / 分集剧本 / EP0xx」，或 group 是 `series bible` / `episode plan` |
-| 2 资产库 | `asset_list(type=text)` | 名字或描述含「剧本 / 分集 / 集制作包 / 系列圣经 / 短剧」；命中就 `asset_to_canvas(id=…)` 物化 |
-| 3 工作区 | `glob` 搜索（项目根或子目录都算） | `**/series/bible.md`、`**/series/episodes/epNNN/package.md`、`**/episodes/epNNN.md` |
+| 单片（短视频故事） | `references/single-film-mode.md` | 本 skill 写 `canvas_set_state` |
+| 剧集单集（委托） | `references/series-delegated-mode.md` | production 写；本 skill 只读/校验 |
+| 声线 | `references/voice-audition.md` | — |
 
-判定与去向（**有上下文就直接进委托模式，不弹片型门**）：
+### 门 0 · 模式判定（探测优先）
 
-| 探测结果 | 去向 |
+**先探测系列上下文，不要先问片型。** 按**画布 → 资产库 → 工作区**查：
+
+| 探测到 | 模式 / 去向 |
 |---|---|
-| 系列圣经 + **本集制作包** | **委托模式**：读包 ⑥ 预填表（12 项，含声线方案 / 分镜模式）→ 校验 `canvas_set_state`（已由 production 写入则只校验；从本 skill 直接进入且尚未写入时才补写一次）→ **从 STEP 3 起**生产本集（跳过 STEP 1/2 与全部 STEP 0 选项卡） |
-| 只有分集剧本，或只有系列圣经但**缺本集制作包** | 加载 `short-drama-series-production`，先补系列圣经 / 该集制作包（阶段 A→C），完成后回本 skill STEP 3 |
-| 有系列圣经/目录，但**没有本集剧本** | 加载 `short-drama-series-production`（它会转 `short-drama-series-writer` 写该集），补包后回 STEP 3 |
-| **完全没有系列上下文** | **才弹门 0**：`短视频故事`（单片，默认）/ `连续短剧`（多集）。选连续短剧后再按本表走 |
-| 用户明确只要单片 / 一句话故事 | 跳过探测，直接走单片流程 |
+| 系列圣经 + 本集制作包 | **剧集委托模式**；读 `series-delegated-mode.md`，从 STEP 3 起 |
+| 有剧本/圣经但缺包或缺本集剧本 | 加载 `short-drama-series-production` 补齐，再回 STEP 3 |
+| 完全没有系列上下文 | **才问**：`短视频故事`（单片，默认）/ `连续短剧`（多集） |
+| 用户明确只要单片 / 一句话故事 | 单片，读 `single-film-mode.md` |
 
-- 选「连续短剧」但系列 skill 未安装、且用户同意 → 降级为单片，并在简报里注明「无系列上下文」。
-- **不重复问**：进入委托模式后，生产规格与分镜模式由集制作包 ⑥ 预填（12 项），不再逐项追问，只补问包里缺的项；与 `short-drama-series-production` 冲突时以它为准。
-- **委托模式的门合并**：每集人工确认由 production 合并为 **3 张卡**（方案卡 = 集制作包 + 镜头表 + 分镜 + 渲染参数；片段卡 = 门 3 batch；交付卡 = 终检 + 交付）。本 skill 的**门 1 / 门 2 / 分镜模式 / 分镜批准 / 渲染参数卡不再单独弹**，但 **STEP 5.5 十一项自检与门 3 的 AI 逐镜自检照做**——省的是人工确认次数，不是自检。遇到 G-ref / 同镜 3 次失败 / 口型字幕不过 / 意图冲突，仍按本 skill 的异常门当场打断。
-- **委托模式的资产/交付边界**：资产**物化、入库、台账**由 production 负责；本 skill 只校验物化节点 `params.assetId`，缺卡时生成后**交回 production 入库**，不自己写资产库。交付包 / 系列台账 / 成本由 production 汇总；本 skill 只写**本集终检结论与片段清单**，委托模式下**不弹交付卡、不写系列交付包**。
-- **委托模式的 handback**：每集收尾向 production 交回 `finalNodeId` / `clipNodeIds` / `shots` / `rework` / `costMinutes` / `warnings` / `assetNodeIds`（本集新生成的卡）；production 写 `production-state.json` 与 ledger。
-- **剧本冲突**：台词/事件与剧本不一致、或镜头装不下时，**停线退回 production/writer**；本 skill 只拆镜/改时长/改表演，**不许自行改写台词或事件**。
-- **反向兼容**：由 `short-drama-series-production` 委托进来时（画布已有集制作包、或对话已声明系列总控），视为已探测命中，跳过门 0。
+> 进入委托模式后：读集制作包 ⑥（12 项），不再逐项追问；`canvas_set_state` 由 production 写，本 skill 只校验。单片模式由本 skill 自己问规格、自己写 state。
 
-选了「短视频故事」后，会话开始先 `asset_list()` 查跨会话资产库。库非空时先出【复用范围】选项卡：列出库内已有资产（如 `character:luna`、`scene:bridge`），问本次复用 / 全新 / 部分复用（可混选）。复用的资产后续直接以资产 id 引用，不再重新生成对应卡片。
+### 生产规格来源（按模式）
 
-随后（无论库是否为空）在项目简报或任何下一步之前，必须依次出以下选项卡：
+| 项 | 单片 | 剧集单集 |
+|---|---|---|
+| 视觉风格 / 画幅 / 时长 / 音频 / 字幕 / 视频档位 / 角色卡版本 / 图片档位 / 交付画质 / 审查节奏 | 读 `single-film-mode.md`，逐项问 | 读集制作包 ⑥ 预填，不再问 |
+| 声线方案 | 读 `voice-audition.md`，有对白必须作答 | 读 ⑥ + 台账 `voices[]`；不重跑试镜 |
+| `canvas_set_state` | 本 skill 写一次 | production 写；本 skill 只读/校验 |
+| 人工门 | 单片门清单（13 张规格卡 + 阶段卡） | 3 张卡（方案/片段/交付），见系列参考 |
 
-**视觉风格**：`pixar-3d` 皮克斯感 3D 卡通（推荐，默认）/ `cinematic-live-action` 电影真人写实 / `ghibli-2d` 吉卜力 2D 手绘 / `anime-cel` 日式二次元赛璐璐 / `ink-wash-oriental` 水墨东方古风 / `comic-halftone` 欧美漫画半调 / `guofeng-xianxia` 国风仙侠 3D（仙侠 / 修真 / 玄幻推荐）。**选定后立刻读取 `references/styles/<id>.md`**，并把风格 id 写进项目简报。
-**画面比例**：16:9 横屏（电影短片推荐）/ 9:16 竖屏短视频 / 1:1 方形 / 4:5 社媒竖图 / 自定义。
-**总时长**：30–60 秒（推荐）/ 15–30 秒 / 60–90 秒 / 90–180 秒 / 自定义。
-**音频模式**：`dialogue-led` 对白主导（一镜一人 + 反应切镜，说话人绑定 + 非说话人闭嘴）/ `silent` 静音（纯画面 + SFX，口型风险为 0）。旁白主导不在本 Skill 范围。
-
-**声线方案（声音一致性门控）**：`audition` 试镜取声（**推荐，默认**）/ `existing` 使用已有声音 / `text-only` 仅文本音色描述（不生成、不传参考）。
-  - **触发规则（硬）**：`audioMode=dialogue-led` 或故事里出现对白 → **门控必须作答**，三选一（不许跳过、不许由 AI 默认）。`text-only` **允许在有对白时选择**，但必须明确告知：跨镜音色没有保证（H3 没有声纹注册，参考音频是唯一锚点）。
-  - `audition`：STEP 3.5 为每个说话角色生成试镜片段 → `extract_audio` → 入库 `voice:`；STEP 7 对白镜必须带 `audio_ref_nodes`。
-  - `existing`：**先查** `asset_list(type=voice)` 与画布已有音频节点；有合适资源就 `asset_to_canvas` / 直接引用并入库复用。**都没有**时再让用户上传 **2–15s 干声**（单人、无 BGM、无混响）。STEP 7 对白镜必须带 `audio_ref_nodes`。
-  - `text-only`：**不生成试镜、不传参考音频**，只靠 prompt 里的音色描述；镜头表 `声线参考` 全写 `none`；STEP 3.5 整步跳过、STEP 7 不传 `audio_ref_nodes`。
-  - `audioMode=silent` 且确认无对白 → 自动落 `text-only`、本项免问。
-  - 选定后**写进项目简报**（没有 state 字段，STEP 3.5 / STEP 7 从简报读回）；换方案 = 该角色所有对白镜 + 续接下游连锁重渲。
-
-**字幕（画面内原生字幕，是否烧录）**：`burned-in` **要字幕**（推荐，默认）/ `none` **不要字幕**。
-  - `burned-in`：每个 `dialogue` 镜把台词按镜头表 `字幕` 字段**逐字烧进画面**；**写法唯一权威仍是 `h3-prompt-writing`「字幕与画面内文案」**——本项只决定「要不要」，不定义「怎么写」。
-  - `none`：对白**照常发声**（与 `dialogue-led` 不冲突、说话人绑定不变、`<d>…</d>` 照写），但**不写任何字幕声明**；镜头表 `字幕` 列全表写 `none`；逐镜 prompt 负向尾句加 `no subtitle, no burned-in dialogue text`。**本流程没有后期字幕轨**（不做 .srt 叠加、也不做后期烧录），所以「不要字幕」= 成片里彻底不出现字幕。
-  - **只管字幕，不管画面内文案**：片内本来就该出现的招牌 / UI / 品牌文案（`h3-prompt-writing` 的「画面内文案」）不受本项影响；只有用户明确说「画面里也别出现任何文字」时才连带关掉。
-  - 与 `audioMode` 的关系：`audioMode=silent` 时项目本来就没有对白与字幕，**自动记 `none`、跳过本项**；只有 `dialogue-led` 才需要问。
-  - 选定后写进项目简报（**没有对应的 state 字段**，`canvas_get_state` 读不到，STEP 7 从简报读回）。**中途可改**：改简报并重写受影响镜的提示词库后重渲（已渲片段不自动重做；开关字幕会改 prompt，**必须重渲**，不能后期补 / 裁）。
-**生成档位（视频）**：`fast`（调试 / 调构图，长边 832）/ `balanced`（日常，画质与耗时平衡，长边 1344）/ `quality`（成片，长边 1344）。允许先 fast 走通全片再升档重出（`fast`→`balanced`、`fast`→`quality`、`balanced`→`quality` 都允许）。**选 `fast` 会启用参考图形态门禁（G-ref）**：进 `ref_nodes` 的参考图必须是单主体 / 单视图 / 零文字 / 无拼图。**本项只管视频片段**；图片用的档位见下一项。
-
-**角色卡引用版本（视频 `ref_nodes`）**：**单视图** / **三视图**。**如果上一项选了 `fast`，则只有「单视图」一个选项**（fast 档多主体参考图必出副本 / 画面污染）；`balanced` / `quality` 可选**单视图**或**三视图**（三视图为推荐——实测只出 1 个角色）。
-  - **这是用户选择，不是 AI 按档位自动选版**：两版角色卡都会生成，这一项只决定视频引用哪一版；**不要替用户默认**。
-  - 选定后写进项目简报，并 `canvas_set_state(characterCardVariant='single'|'three')` 持久化。
-  - STEP 7 逐镜生成时按 state 的版本传 `ref_variant`；**如果某镜临时改成 `fast`，该镜强制 `ref_variant='single'`**（不改变项目选择），并在自检留痕。
-**图片档位（角色卡 / 场景卡 / 道具卡 / 铅笔分镜图）**：`balanced`（**推荐，默认**，文生图长边 1344）/ `quality`（更高细节，长边 2048，成本约 7×）/ `fast`（**仅**用于抽卡试构图）。**图片档位与视频档位相互独立**——不必跟着视频走。
-  - **默认与推荐都是 `balanced`**：卡片是全程复用的身份 / 环境锚点，1344 长边的脸部、服装、材质已够用；`quality` 只在高细节/大尺寸交付时选，**不要默认**。成本：balanced ≈6s/张，quality ≈45s/张（同一张卡差 7 倍）。
-  - ⚠️ **两条路径的尺寸口径不同**（别混）：**文生图**按「长边 × 画布比例」定尺寸（`fast` 1024 / `balanced` 1344 / `quality` 2048）；**参考图改绘（`image.image2image`）没有固定长边**——输出尺寸**跟随第一张参考图**，按该档的「参考图预算」等比缩放并 32 对齐，显式 `width`/`height` 不参与。所以要靠改绘出大图，**参考图本身不能太小**（喂 512 的图进 `quality` 也只会得到 1K 级产物）。
-  - `fast` 的**唯一正当用途是抽卡**：快速看构图与风格是否对。**抽卡产物不得直接锁定**——必须在锁定前用选定档位重出定稿。
-**交付画质（是否用超分）**：本 Skill 支持到 2K / 4K 交付，但**要不要、走哪条路必须问用户**，不要替他默认——
-  - **原生**（最省时省成本的起步档）：交付尺寸＝该档原生尺寸，不额外放大。适合先出片看效果、之后再决定要不要放大。
-  - **后处理逐镜超分**（想在原生档成本下拿到 2K/4K 就选它）：片段生成完再用 `video_upscale` 对**单个分镜**放大 ×2/×4（逐帧 CNN，**不经过 H3、不重画内容**、音轨原样带回）。代价线性（≈2.2–2.6 s/帧，124 帧约 156–241s），**与续接链完全兼容**（它发生在生成之后）。能到什么档、倍率多少用 `comfy_list_workflows` 查 `video.upscale` 能力。
-  - **生成内放大**（只有当画幅＝16:9 且目标时长使单镜 ≤124 帧时才可选）：让该档解析到放大类实现，**一次生成就出 2K**。代价是同档普通实现的好几倍耗时、**比例与单镜帧数受限**；且全片要固定同一档。竖版 / 长镜头直接排除这一项。
-
-  选定后把结论写进项目简报（STEP 1），后续 STEP 7 生成、STEP 8 拼接交付都按它执行。**任何时候都可以改**——用户改主意就按新结论走（已生成的片段不会被自动重做，按需重新放大或重渲）。
-
-**片段审查节奏（门 3 的人工确认时机）**：`per-shot` 逐镜审查（**推荐，默认**）/ `batch` 批量审查。
-  - **`per-shot` 逐镜审查**：每渲完一镜 → AI 自检 → **人工确认本镜** → 才渲下一镜。坏镜头当场发现，返工最小、不会连锁；代价是人力往返最多（N 个片段 = N 次确认）。
-  - **`batch` 批量审查**：正片镜（+ 转场镜）全部渲完、AI 自检全部通过后，出**一张批量审查卡**一次看过、一次批准。人力往返最少；代价是坏镜头晚发现，且**续接链上重渲会连锁**（该镜下游的续接镜与转场镜必须顺次重渲，见「重渲与续接链」）。
-  - **两种模式下 AI 自检都逐镜执行、不许推迟**——这项只决定**人工确认的时机**，不是「先渲完再看质量」的偷懒开关。
-  - 想要少往返又怕中途跑偏：选 `batch` 时**先按 `fast` 档走通全片**（视频档位允许先 fast 后升档），全片通了一次性升档重出。
-  - 选定后**写进项目简报**，并 `canvas_set_state(reviewMode='per-shot'|'batch')` 持久化。**中途可改**：改 state 即生效——`per-shot → batch` 从下一镜起不再逐镜弹卡；`batch → per-shot` 从下一镜起恢复逐镜确认（已渲片段不重做）。
-
-生产规格确认后（连续短剧分支用集制作包 ⑥ 预填，不再逐项问）用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode = **视频档位** / characterCardVariant = **角色卡引用版本** / reviewMode = **片段审查节奏**：`per-shot` 逐镜 / `batch` 批量），**同一次调用一并传 `groupOrder`**（见下方分组清单），并写入项目简报。这些设置贯穿镜头时长、分辨率推导、分镜、逐镜生成与交付。**「交付画质」「视觉风格」「图片档位」「字幕」「声线方案」五项没有对应的 state 字段**，必须写进项目简报——交付画质是后续超分 / 拼接步骤的唯一依据；视觉风格决定每次生成要追加哪一份风格锁后缀；**图片档位决定 STEP 3 / 4 / 4.5 / 6 生成卡片与分镜图时传哪个 `tier`**；**字幕选择决定 STEP 5 镜头表 `字幕` 列、STEP 7 逐镜 prompt 写不写字幕声明、以及门 3 / 终检把字幕核对换成「无字幕」核对**；**角色卡引用版本（`characterCardVariant`）是 STEP 7 每镜 `ref_variant` 的来源**（fast 镜强制 single），**视频档位（`mode`）决定该选项可不可选 three**；**片段审查节奏（`reviewMode`）有 state 字段**，STEP 7 渲染前 `canvas_get_state` 读回它决定门 3 的人工确认时机（缺省按 `per-shot`）。
+生产规格确认后（**单片由本 skill 写；委托模式由 production 写，本 skill 只校验**；连续短剧分支用集制作包 ⑥ 预填，不再逐项问）用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode = **视频档位** / characterCardVariant = **角色卡引用版本** / reviewMode = **片段审查节奏**：`per-shot` 逐镜 / `batch` 批量），**同一次调用一并传 `groupOrder`**（见下方分组清单），并写入项目简报。这些设置贯穿镜头时长、分辨率推导、分镜、逐镜生成与交付。**「交付画质」「视觉风格」「图片档位」「字幕」「声线方案」五项没有对应的 state 字段**，必须写进项目简报——交付画质是后续超分 / 拼接步骤的唯一依据；视觉风格决定每次生成要追加哪一份风格锁后缀；**图片档位决定 STEP 3 / 4 / 4.5 / 6 生成卡片与分镜图时传哪个 `tier`**；**字幕选择决定 STEP 5 镜头表 `字幕` 列、STEP 7 逐镜 prompt 写不写字幕声明、以及门 3 / 终检把字幕核对换成「无字幕」核对**；**角色卡引用版本（`characterCardVariant`）是 STEP 7 每镜 `ref_variant` 的来源**（fast 镜强制 single），**视频档位（`mode`）决定该选项可不可选 three**；**片段审查节奏（`reviewMode`）有 state 字段**，STEP 7 渲染前 `canvas_get_state` 读回它决定门 3 的人工确认时机（缺省按 `per-shot`）。
 
 > **每镜必须显式传 `type='r2v'` 与 `tier`**（**工具面 `type` 必填**，缺了直接报错；`type` 与参数冲突——如 r2v 带首/末帧——也会报错）。**连续性靠 `continuity_from`，不靠 `type`**：连续镜头传上一镜节点 id，独立镜头不传。「哪些镜是连续镜头」在 STEP 5 的 `续接` 列里定死。
 > `tier=fast|balanced|quality` 同样逐镜显式写，**不要依赖缺省**——缺省是 `quality`（成本最高档）。同一镜头要换档时改 `tier` 重渲，不要靠「隐式默认」蒙。**同一条链内首遍尺寸必须一致**（≈同档：`fast` 832×480、`balanced`/`quality` 1344×768；链上传递的是首遍 latent，不能缩放；不一致会显式报错）。
@@ -288,26 +241,14 @@ whenToUse: |
 9. 单镜头视频片段（video，group `shot clips`）
 10. 拼接成片（video）+ 交付清单与终检（text），均 group `final delivery`
 
+> **剧集委托模式**：跳过 1/2（用「本集简报」代替），从 3 开始；交付清单/终检由 production 汇总，本 skill 只写终检与片段清单。
+
 **分组名由本 Skill 定义**（插件本身不预设任何片型词汇）。在 Step 0 用 `canvas_set_state(groupOrder=["story planning","character cards","voice auditions","scene cards","prop cards","shot table","text storyboards","shot prompts","shot clips","final delivery"])` 一次性声明展示顺序，画布即按此顺序渲染分组。之后所有 `group` 参数必须用这十个精确名字；未声明的分组会排在末尾。
 
-## STEP 1：项目简报
+## STEP 1–2：简报 / 大纲（单片）
 
-写一份精炼简报到画布文本节点（group `story planning`）。包含：工作标题、一句话 What-if、情绪前提、目标观众感受、主要交付物计划、已确认的**视觉风格 id** / 画面比例 / 总时长 / 音频模式 / **字幕（`burned-in` 要 / `none` 不要；`none` 时全片无字幕、对白照常发声）** / **声线方案（`audition` / `existing` / `text-only`；有对白时必须作答，text-only 需记录“音色无保证”风险）** / 生成档位（视频）/ **角色卡双版本（单视图 + 三视图）** / **角色卡引用版本（STEP 0 用户选择；fast 只能 single）** / **图片档位** / **交付画质（是否超分、走哪条路、目标尺寸）** / **片段审查节奏（`per-shot` 逐镜确认 / `batch` 全部渲完一次确认）**、台词模式与语言（用户未指定就写 `language not specified`，保持最小化对白或后续再确认）、初始风险、台词意图。
-
-选项卡：沿用此方向继续（推荐）/ 重新生成前提选项 / 修订情绪前提 / 调整台词方向。
-
-## STEP 2：故事大纲与守门
-
-写故事大纲到画布文本节点（group `story planning`）。包含：主角 Want / Need / 缺陷、核心世界规则、8 拍因果故事骨架、情绪锚点与回收、音频脊柱（每拍的对白/静默意图）、红线检查。
-
-守门检查：主角是主动的；危机由主角缺陷放大；巧合不能解决问题；结局回收早前情绪锚点；反派压力不是扁平反派；台词揭示关系变化而非解释主题。
-
-**声线方案复核（遵循 STEP 0，不强制改选）**：大纲里出现对白（`<d>` / 台词节拍 / 说话人）时——
-  - STEP 0 选 `audition` / `existing` → 按原方案继续（STEP 3.5 造样本 / 复用已有声音）；
-  - STEP 0 选 `text-only` → **继续沿用**，不生成试镜、不传参考音频；把“该角色跨镜音色无保证”写进项目简报与交付清单的风险项。
-  - 只有用户**主动要求**声音一致性时才回 STEP 0 改方案；若原 `audioMode=silent` 但大纲有对白，先把音频模式改为 `dialogue-led`（声线方案可保持 text-only）。
-
-选项卡：批准故事并继续（推荐）/ 修订节拍 / 修订情绪曲线 / 修订台词节拍 / 返回前提。
+- **单片**：按 `references/single-film-mode.md` §2 执行（项目简报 → 故事大纲 → 守门）。
+- **剧集单集**：跳过 8 拍弧；只在 `story planning` 写一页「本集简报」，配置来自集制作包 ⑥（见 `series-delegated-mode.md`）。
 
 ## STEP 3：角色卡（每个角色两版：单视图 + 三视图）
 
@@ -370,94 +311,10 @@ comfy_generate_image(prompt=<同一角色设定 + 正/侧/背三格 + 锁 A/B>, 
 
 锁定后提示用户：想跨会话复用就在画布点该卡的「入库」按钮人工登记（AI 不自动入库；两版分别入库，标题带版本后缀）。同时警告：后续修改已锁定的角色设计会连带重做镜头表、分镜与已渲片段。
 
-## STEP 3.5：声线试镜（角色卡锁定后、镜头表之前；只在有对白角色时做）
+## STEP 3.5：声线（按模式）
 
-**做不做（先读声线方案，不再自行判断）**：
-
-- **被 `short-drama-series-production` 委托时（连续短剧单集）**：方案与 `voice:` 来自集制作包 ⑥ 与 `production-state.json` 的 `voices[]`。`existing` 且台账已有 id → 只做 3.5.4 的「已有声音」校验（物化到画布、核对 id），**不在本集重跑试镜**；台账缺 id 才算缺口，回阶段 C 补（换声线会连锁重渲，不能每集重抽）。`text-only` → 整步跳过。
-- **单片模式**：读 STEP 0 的声线方案——
-  - `audition`（无现成声音时的默认）→ 走本节全部流程，每个说话角色一份声线样本；不说话的配角跳过；
-  - `existing` → **跳过 3.5.1–3.5.3**，执行 3.5.4 的「已有声音」分支（资产库 / 画布音频 / 用户上传 → 入库 → 声线清单）；
-  - `text-only` → **整步跳过**（不生成试镜）；镜头表 `声线参考` 全写 `none`，STEP 7 不传 `audio_ref_nodes`。
-
-**为什么必须在这里**：声线样本是镜头表 `声线参考` 列与 STEP 7 `audio_ref_nodes` 的来源；换声线会让该角色**所有对白镜 + 续接下游**连锁重渲，所以必须在镜头表之前定死。
-
-### 3.5.1 写试镜提示词（每角色一份，三档同文）
-
-**硬要求**：单镜、单人、一句台词、**无环境音、无音乐、无音效、无字幕**、口型清晰可见、背景中性。用 `canvas_write_prompt_bank(title="Mia 试镜 提示词（分档）", group="voice auditions", prompts={fast: p, balanced: p, quality: p})`，三档逐字一致。
-
-**试镜只用风格锁 A + B，不带 C**（实测 2026-10-26：带 C 的试镜中段人物消失、只剩云海/建筑——C 的环境词会把纯底试镜拉成场景镜头）。同时写死：`plain neutral seamless studio wall` / `static camera` / `no cut` / `framing stays identical from first to last frame` / `subject remains in frame the whole time`。
-
-**若 A+B 仍带明显环境声**（AV 模型可能自己补 room tone），改走 **v3 路径：只带锁 B + 棚拍后缀**，并在 `detailed_description` 里明确写 `AUDIO: close-mic dry studio recording; only the voice is audible; the rest of the track is digital silence; no room tone, no ambience, no air, no wind, no water, no birds, no reverb, no echo, no music, no sound effects`。
-
-模板（Ref2VA 六段式，H3 路径）：
-
-```text
-subject_definitions:
-<Subject 1> is the young woman with long dark hair and a light-blue blouse in <Picture 1>.
-summary:
-[reference generation] A single clean audition shot of <Subject 1> speaking one short line to the camera.
-retention_analysis:
-<Subject 1> (appears in [Shot 1]): fully_preserved - identity, hair and clothing retained.
-detailed_description:
-[Shot 1] A medium close-up of <Subject 1> in front of a plain neutral wall, static camera, mouth clearly visible. The recording is clean and dry: no room tone, no background noise, no music, no sound effects — only the voice. <Subject 1> (S1) looks into the lens and says: <d>[Chinese] 这是我自己的声音。</d> Her lips close after the line.
-overall_soundscape: N/A
-non_diegetic_music: N/A
-```
-
-- **`overall_soundscape: N/A` 与 `non_diegetic_music: N/A` 是硬要求**（禁环境音/配乐），正文再写一遍 "clean and dry … only the voice"。
-- 台词 **8–14 字、单句、中性语气**，不要拟声词/笑声/叹气；语言与后续对白一致（中文项目就用中文）。
-- 试镜阶段**还没有参考音频**：不要写 `<Audio 1>`，也不要传 `audio_ref_nodes`。
-- 风格锁后缀照常追加；但试镜只用于抽声，画面可以丢。
-
-### 3.5.2 生成试镜片段
-
-```text
-comfy_generate_video(type='r2v', tier='balanced', prompt_node=<试镜提示词库>, ref_nodes=[<角色卡节点>],
-                     ref_variant=<single|three>, length=124, title='Mia 试镜', group='voice auditions')
-```
-
-- 默认 **`balanced`**（166s/条）：`fast` 是 4 步 turbo，官方说明会削弱音频，**不能把 fast 产物当定稿声线**；项目全程 fast 时可先用 fast 看走向，定稿前用 balanced 重出一条。
-- 不要传场景卡、首末帧、`continuity_from`；`length=124` ≈5.17s，满足参考音频 2–15s 下限。
-
-### 3.5.3 人工确认（选项卡）
-
-试镜片段渲完、AI 自检（单人 / 口型清晰 / 无字幕）通过后出选项卡；**环境音与配乐由人工在卡里听核**（AI 不能听音）：
-
-**只听声线通过（推荐）** / 声线+画面都通过 / 换 seed 重抽（≤3 次）/ 上传真人声线 / 该角色改为仅文本音色（记录风险）
-
-- 重抽复用同一个 `prompt_node`，只换 seed；连续 3 次不过就换真人声线或跳过，不要无限抽。
-- 用户选「该角色改为仅文本音色」时，该角色的镜头 `声线参考` 填 `none`、STEP 7 不传它的参考音频，并在声线清单与交付清单记录“该角色音色无保证”。
-
-### 3.5.4 得到声线样本 → 上画布 → 入库
-
-**`audition` 路径（有试镜片段）**：
-
-```text
-extract_audio(video_node=<试镜节点>, title='Mia 声线样本', group='voice auditions')
-```
-
-- 产物是**画布 audio 节点**（工具自动上画布，**不要只留文件路径**）；本机无 ffmpeg 时走 ComfyUI，产物为 `.flac`（32kHz）。
-- 试镜里的环境音会被一起抽进去 —— 所以 3.5.1 必须禁环境音；确认时若听到底噪/音乐/第二人声，重抽或改真人声线。
-
-**`existing` 路径（没有试镜，直接用已有声音）**：
-
-1. `asset_list(type=voice)` 查资产库；命中就 `asset_to_canvas` 物化到画布（group `voice auditions`），或直接拿资产 id 给 STEP 7 用；
-2. 再看画布上是否已有可用音频节点（之前上传/抽取的）；
-3. 都没有 → 让用户通过画布「＋ 上传素材」上传 **2–15s、单人、干声、无 BGM、无混响** 的音频（wav/mp3/m4a/flac），落到 `voice auditions` 组；
-4. 画布音频节点/上传节点**不需要再 `extract_audio`**。
-
-**两条路径共用**：
-
-- 用户点该音频卡「入库」→ 类型选「音频」→ 得到 `voice:<hex>`。
-- 写一份「声线清单」文本节点（group `voice auditions`）：`角色 | voice:<id> 或 canvas:<音频节点 id> | 来源（audition/existing/仅文本）| 试镜节点 id | tier | seed | 时长`。**后续镜头表与 STEP 7 只认这份清单里的 id**；`canvas:` 是未入库的临时引用（仅同会话可用，跨会话前必须点「入库」换 `voice:`）。
-
-### 3.5.5 后续使用（STEP 5 / STEP 7 引用）
-
-- 镜头表「音频与对白轨 → `声线参考`」填 `voice:<id>`（入库后）、`canvas:<音频节点 id>`（未入库临时）或 `none`；**同一角色全片（连续短剧为全季）必须同一个引用**。
-- 方案为 `audition` / `existing` 时，STEP 7 对白镜传 `audio_ref_nodes=['voice:<id>']`（未入库时直接传画布音频节点 id），prompt 里写 `<Audio 1> is the voice-timbre reference for <Subject 1> (S1).` + `<Audio 1>: reference - …`（写法委托 `h3-prompt-writing`）；`text-only` 时两者都不写（只保留文本音色描述）。
-- 只有 `type='r2v'` 支持；`i2v` / 2K / hires 实现会报 `audio-ref-unsupported`；≤3 段、每段 2–15s、总 ≤15s。
-- 换 `voice:` 资产 = 该角色全部对白镜 + 续接下游重渲。
+- **单片**：读 `references/voice-audition.md`，按 3.5.1–3.5.5 执行（试镜 → 抽声线 → 听核 → 入库 → 声线清单）。
+- **剧集单集**：不重跑试镜；从台账 `voices[]` 取 `voice:`（`assetMode=library` 时必须是 `voice:`，不能只用 canvas 节点）；缺 id 才回阶段 C 补，不在本集重抽。
 
 ## STEP 4：场景卡
 
@@ -868,6 +725,8 @@ extract_audio(video_node=<试镜节点>, title='Mia 声线样本', group='voice 
 
 ## STEP 8：拼接、交付与终检
 
+**模式差异**：单片写交付清单 + 弹交付卡；剧集委托模式只写本集终检/片段清单，**不弹交付卡、不写系列交付包**（见 `references/series-delegated-mode.md`）。
+
 ### 拼接全片
 
 全部片段**经门 3 批准**后（`per-shot` 逐镜批准 / `batch` 批量审查卡批准），用 `video_concat(nodes=[按镜头表顺序的片段节点 id，含转场镜], title="拼接成片", group="final delivery")` 拼成完整成片（含音轨）。后端由插件自动选择——本机有 ffmpeg 走 ffmpeg，没有就走 ComfyUI 纯节点链路，两者对本 Skill 透明。
@@ -944,16 +803,12 @@ extract_audio(video_node=<试镜节点>, title='Mia 声线样本', group='voice 
 
 ## 用户选项卡纪律
 
-每个需要用户确认的地方都用 `ask_user_question` 选项卡，不允许用纯对话问题或散文代替。**委托模式例外**：每集只出 3 张卡（方案 / 片段 / 交付，见门 0「入口探测」），AI 自检仍照做。强制门：
+每个需要用户确认的地方都用 `ask_user_question`，不允许用纯对话问题或散文代替。
 
-- 查库后（库非空）：复用范围
-- 任何产物之前：视觉风格 / 画面比例 / 总时长 / 音频模式 / **字幕（要 `burned-in`，默认 / 不要 `none`；`audioMode=silent` 时自动 `none`、免问）** / 生成档位（视频）/ **角色卡引用版本（fast 只能单视图；其余档可选单视图或三视图）**/ 图片档位 / **片段审查节奏（`per-shot` 逐镜审查，推荐 / `batch` 批量审查）** / 交付画质
-- 项目简报后 · 故事大纲后 · 角色卡后 · 场景卡后 · 道具卡后（若建卡）
-- 镜头表后（门 1：批准表格进入自检）
-- 自检通过后（门 2：批准自检，并立即选分镜模式）
-- 分镜后 · **片段门（门 3：AI 自检逐镜必做；人工确认按 `reviewMode`——`per-shot` 每镜一次、`batch` 全部渲完后一次）** · 交付后
-- **改规格确认卡**：仅当用户主动要改档位 / 审查节奏 / 交付画质时弹（STEP 0 已定过，不重复问）
-- 任何「同一镜连续 3 次失败」的求助点
+- **单片**：门清单见 `references/single-film-mode.md` §3（13 张规格卡 + 阶段卡；默认 `per-shot`）。
+- **剧集单集**：只出 3 张卡（方案 / 片段 / 交付），见 `references/series-delegated-mode.md`；AI 自检仍逐镜做。
+- **改规格卡**：仅当用户主动要改档位 / 审查节奏 / 交付画质时弹（STEP 0 已定过，不重复问）。
+- **异常门**：G-ref / 同一镜连续 3 次失败 / 口型字幕不过 / 意图冲突 → 当场打断，不许静默降级。
 
 默认推荐项放最前，始终允许用户自定义输入。用户说「继续」时按选了推荐项处理。
 
