@@ -1,7 +1,7 @@
 # 短剧三 skill 的结构分析与优化建议（讨论稿）
 
 > 日期：2026-10-26 ｜ 范围：`story-short-generator`（下称 **SSG**）、`short-drama-series-writer`（**WRI**）、`short-drama-series-production`（**PROD**）
-> 性质：分析 + 分阶段实施。**P0 已落地**（2026-10-26，分支 `feat/short-drama-skills-structure`，见 §8）；P1/P2 按讨论继续。
+> 性质：分析 + 分阶段实施。**P0–P2 已落地**（2026-10-26，分支 `feat/short-drama-skills-structure`，见 §8）；P3（拆分/改名）为可选项，待定。
 > 证据附件（本轮独立审计，均带 `文件:行号`）：
 > - [交接契约与口径冲突](analysis/contract-conflicts.md)（15 条冲突 C1–C15 + 29 字段契约）
 > - [端到端流程与人工门清点](analysis/flow-and-human-gates.md)（46 道门 + 触达次数）
