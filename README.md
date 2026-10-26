@@ -507,6 +507,7 @@ node scripts/import-comfy.mjs exported.json \
 - **图片档位默认从 `quality` 改为 `balanced`**（单片与连续短剧一致）：文生图长边 1344，≈6s/张；`quality`（2048，≈45s/张）改为按需选择，不再默认。`fast` 仍只用于抽卡。
 - **系列资产三层**：资产库（唯一身份权威）/ 系列台账（asset id 索引）/ 每集画布（临时副本）；集制作包加 `params.assetMode=draft|library`，EP01 draft、EP02 起 library。
 - **`asset_ingest` 工具**：系列模式下用户批准「入库清单」后由 AI 登记资产（审计字段 / 默认拒绝覆盖 / 幂等）；`asset_ingest` 需重启 DSH 后出现在工具列表。
+- **修复 `extract_frame` / `extract_audio` 路由**：`extract_frame` 不再被通用 prompt 门禁拦截（`image.from_video` 免 prompt）；`extract_audio` 重新把 `exec` 传给会话解析，不传 `sessionId` 也能用当前会话。与「本机是否有 ffmpeg」无关（ffmpeg 只决定抽音轨后端）。
 
 ### v1.14.0 — 声线参考 + BGM + 短剧系列化（2026-10-23）
 
