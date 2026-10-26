@@ -157,6 +157,8 @@ ok('SSG 连续短剧硬停', ssg.includes('立即停止本 skill 流程') && ssg
 ok('系列参考含 story 立即停止', seriesMode.includes('立即停止'))
 ok('PROD 缺失剧本时走完整 writer 流水', prod.includes('完整剧本流水') && prod.includes('不代写剧本'))
 ok('WRI 声明被 production 调用时完整流水', wri.includes('被 `short-drama-series-production` 调用时'))
+ok('PROD 含 S-STEP 0 系列规格卡', prod.includes('S-STEP 0') && prod.includes('系列规格卡'))
+ok('系列参考指向 S-STEP 0', seriesMode.includes('S-STEP 0'))
 
 console.log('')
 if (fail) {

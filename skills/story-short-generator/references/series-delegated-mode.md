@@ -36,7 +36,7 @@
 
 ## E-STEP 0 · 本集规格预检（不重问）
 
-剧集模式**也有 STEP 0**，但它不是“再问一遍 11 项”，而是**读系列规格 + 校验落盘**。参数在系列层 G-S 已经定死；每集只做预检。
+剧集模式**也有 STEP 0**，但它不是“再问一遍 11 项”，而是**读系列规格 + 校验落盘**。参数由 production 的 **S-STEP 0 系列规格卡**在系列层选定（写入系列圣经 §1 + `production-state.series`）；每集只做预检。
 
 | 参数 | 来源 | 预检动作 |
 |---|---|---|
@@ -48,6 +48,7 @@
 | 角色卡版本 `single` | 圣经 + `canvas_set_state.characterCardVariant` | 读回校验 |
 | 审查节奏 `batch` | 圣经 + `canvas_set_state.reviewMode` | 读回校验 |
 | 字幕 `none` | 圣经 + 集制作包 ⑥ | 校验（无 state 字段） |
+| 交付画质 `delivery` | 圣经 + 集制作包 ⑥（native / upscale1080 / 2k / 4k） | 校验；整季二选一 |
 | 风格 / 声线方案 / assetMode | 圣经 + ⑥ | 校验 |
 | 节点数（主线/总） | `canvas_list_nodes()` | **只展示、不是参数**；动态 |
 

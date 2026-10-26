@@ -46,7 +46,7 @@ series-writer 剧本（文件）
 4. **由 `story-short-generator` 的门 0 转入**（它查到系列上下文，或用户选了「连续短剧」）时：story **必须立即停止提问**，本 skill 接住；**不再重复问片型**，直接接住剧本/集制作包（没有就按本 skill 阶段 A/B 产出），完成后交回它做单集生产。
 5. **story 侧探测规则**：有系列上下文 → 直接委托模式、不弹片型门；完全没有上下文才问。本 skill 不依赖用户是否提到「短剧」。
 
-> 用户当前锁定：**整部量产 · 80–110s/集（默认 90s）· 中文 · 无画面内字幕（balanced 档）**。这四项写进系列圣经，除非用户明确改口，全季不逐集重问。
+> 推荐基线（**S-STEP 0 可改，不是写死**）：**整部量产 · 80–110s/集（默认 90s）· 中文 · 无画面内字幕 · balanced**。S-STEP 0 选定后写进系列圣经，全季不逐集重问；改规格按「切换成本」处理。
 
 ### 0.1 职责边界（RACI，先看这张表）
 
@@ -64,12 +64,13 @@ series-writer 剧本（文件）
 
 ---
 
-## 1. 本片型锁定参数（开场一次性确认，写入系列圣经）
+## 1. 本片型参数（S-STEP 0 一次选定；默认只是推荐）
 
-| 参数 | 本片型默认 | 说明 / 代价 |
+| 参数 | 推荐默认（可改） | 说明 / 代价 |
 |---|---|---|
 | 画幅 | `9:16` 竖屏 | 画布 `aspectRatio=9:16`；场景卡跟随；角色卡仍 2:3 竖版（图片档位决定尺寸） |
 | 单集时长 | **目标 80–110s（默认 90s）** | 由对白反推：`时长 ≈ 台词字数 ÷ 4 字/秒 + 0.5–1s 反应尾`；≈ 17–20 个 124 帧镜。超出区间先砍台词 / 拆镜，**不压语速**；单集例外必须写入集制作包 ① 与 state 的 `episodeSecondsException` |
+| 音频模式 | `dialogue-led` | 对白主导；`silent` 仅纯画面 + SFX（短剧一般不用） |
 | 集数 | 用户指定（50–100） | 分集目录为准；本 skill 按集推进 |
 | 语言 | 中文 | 台词逐字进镜头表 `对白` 与 `字幕` 字段（字幕列全 `none`） |
 | 画面内字幕 | **不要（`none`）** | 全表 `字幕` 列写 `none`；逐镜 prompt 负向尾句加 `no subtitle, no burned-in dialogue text`；**不写任何字幕声明** |
@@ -82,7 +83,7 @@ series-writer 剧本（文件）
 | 交付画质 | **先原生，样片后定** | 原生 768×1344；要 1080×1920 只能**逐镜超分**（9:16 不支持生成内放大），代价 +≈78 min/集，见 §9 |
 | 视觉风格 | `cinematic-live-action` | 真人写实最适合国内竖屏短剧；由用户最终确认（7 选 1，见 story skill） |
 
-**开场必须用 `canvas_set_state` 一次写全**（主会话与每集会话各写一次）：
+**开场必须用 `canvas_set_state` 一次写全**（主会话与每集会话各写一次；下面是**示例**，实际值按 S-STEP 0 结果填）：
 
 ```
 aspectRatio=9:16
@@ -96,6 +97,36 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 ```
 
 **切换成本**：改画幅 / 改档位 / 改字幕开关 = 已产集作废、需重渲；改风格 = 全部卡片与片段作废。逐项都要显式确认，不许静默改。
+
+### 1.1 S-STEP 0：系列规格卡（一次，默认不跳过）
+
+**表里的默认值只是推荐，不是写死。** 开场用**一张「系列规格卡」**让用户逐项选（可一次全选推荐，也可改单项）；选完才写系列圣经 §1 + `canvas_set_state` + `production-state.series`，再进 G-S。
+
+| 项 | 可选值（推荐在前） | 选择后的影响 |
+|---|---|---|
+| 画幅 | `9:16` / `16:9` / `1:1` | 改 = 全部卡片与片段重做 |
+| 单集时长 | `90s` / `80s` / `100s` / `110s` / 自定义 | 改 = 镜头预算/成本重算；例外写 `episodeSecondsException` |
+| 音频模式 | `dialogue-led` / `silent` | `silent` 无对白/声线；短剧一般不用 |
+| 视频档位 `tier` | `balanced` / `quality` / `fast` | `fast` 只能单视图、G-ref 生效；`quality` 成本约 2.4× |
+| 图片档位 `imageTier` | `balanced` / `quality` / `fast` | 卡片复用锚点；`quality` ≈7× 耗时 |
+| 画面内字幕 `subtitles` | `none` / `burned-in` | `burned-in` 需逐镜烧字，实测要 `quality` 才稳；成本上升 |
+| 角色卡版本 `characterCardVariant` | `single` / `three`（仅 balanced/quality） | 9:16 下 three 未实测；切换 = 已产集重渲 |
+| 片段审查 `reviewMode` | `batch` / `per-shot` | per-shot 每镜一张卡，人力 ×N |
+| 声线方案 `voicePlan` | `existing`（阶段 C 建/复用） / `text-only` | text-only 无音色锚点，交付记风险 |
+| 交付画质 `delivery` | `native` / `upscale1080` / `upscale2k` / `upscale4k` | 超分 ≈+78 min/集（1080）；整季二选一 |
+| 视觉风格 | `cinematic-live-action` / 其余 6 套 | 改 = 全部卡片与片段作废 |
+| 语言 / 出海 | 中文 / English（出海） | 英文台词+字幕未实测，先 1 镜验证 |
+
+**S-STEP 0 必须用 `ask_user_question` 的四组选项提交（不许静默按默认通过；用户说“按默认”也要回显规格卡确认）**：
+
+1. **画面 / 时长**：`9:16`（推荐）/ `16:9` / `1:1`；`90s`（推荐）/ `80s` / `100s` / `110s` / 自定义。
+2. **画质 / 成本**：视频 `tier` = `balanced`（推荐）/ `quality` / `fast`；图片 `imageTier` = `balanced`（推荐）/ `quality` / `fast`；交付 `delivery` = `native`（推荐）/ `upscale1080` / `upscale2k` / `upscale4k`；字幕 `subtitles` = `none`（推荐）/ `burned-in`。
+3. **资产 / 声音**：角色卡 `characterCardVariant` = `single`（推荐）/ `three`（仅 balanced/quality）；声线 `voicePlan` = `existing`（推荐，阶段 C 建/复用）/ `text-only`。
+4. **审查 / 风格**：`reviewMode` = `batch`（推荐）/ `per-shot`；视觉风格 7 选 1；语言中文 / English（出海，先 1 镜验证）。
+
+**规格卡还要写**：预计单集成本、整季成本、样片集是否先做、是否需要三档实测。用户改任意一项 → 回到本卡重选，并按「切换成本」处理已产集。
+
+> **写入位置**：系列圣经 §1 + `production-state.series` + 主会话 `canvas_set_state`（只有 state 字段的项）；`imageTier` / `subtitles` / `delivery` / `voicePlan` / `style` 无 state 字段，必须写圣经与本卡。E-STEP 0 只读校验，不再问。
 
 ### 1.1 覆盖 / 沿用表（与上下游冲突时以本表为准）
 
@@ -164,7 +195,9 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
               "episodeSecondsException": { "ep001": 105.8 },
               "mode": "domestic",
               "aspectRatio": "9:16", "style": "cinematic-live-action",
-              "tier": "balanced", "subtitles": "none", "delivery": "native|upscale1080",
+              "audioMode": "dialogue-led", "tier": "balanced", "imageTier": "balanced",
+              "subtitles": "none", "delivery": "native|upscale1080",
+              "characterCardVariant": "single", "reviewMode": "batch",
               "voicePlan": "existing|text-only", "packageContract": "episode-package/v1", "assetMode": "library" },
   "assets": {
     "characters": [{ "name": "林晚",
@@ -207,7 +240,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 ## 4. 阶段 A：立项与系列圣经（门 G-S）
 
-1. 确认第 1 节的参数（不改默认就按推荐项走），`canvas_set_state` 落地。
+1. **S-STEP 0 系列规格卡（§1.1）**：逐项选（默认只是推荐），写系列圣经 §1 / state / 规格卡；**不默认跳过**。
 2. 没有剧本 → 加载 `short-drama-series-writer`，跑 A 段 `/start` → `/plan` → `/characters` → `/outline`（**它的 references 按阶段读，不要一次全读**）；**writer 的 A 段只做剧本/目录；系列圣经仍由本 skill 第 3 步写，制作包在阶段 B 写**。
 3. 写 `series/bible.md`，同时落主会话文本节点（group `series bible`）。必须包含：
    - 一句话故事 + 三幕结构（集数范围）+ 全剧节奏波形（高潮/低谷/卡点位置）
@@ -218,7 +251,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
    - 版式：9:16 · **目标 80–110s（默认 90s）· 17–20 镜** · 每集 1–2 个物理场景
    - 合规基调（series-writer 的 compliance 清单要点）
 4. 初始化 `series/production-state.json`，写主会话 `production ledger` 表头。
-5. **门 G-S**（`ask_user_question`）：批准圣经并开始剧本（推荐）/ 改参数（画幅/时长区间/档位/字幕/风格）/ 调整卡点与钩子规划 / 先看前 10 集分集目录。
+5. **门 G-S**（`ask_user_question`）：批准圣经并开始剧本（推荐）/ 回 S-STEP 0 改规格 / 调整卡点与钩子规划 / 先看前 10 集分集目录。
 
 > 圣经是**唯一真相**：后续每集只引用它，不在每集重问参数。
 
@@ -291,7 +324,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 2. **读输入**：`episodes/epNNN.md` + 分集目录该行 + `series/bible.md` 相关段（不要全读，按需）。
 3. **物化资产**：只从台账/集制作包的 **asset id** 物化——`asset_list` 校验 → `asset_to_canvas(id=…)` 把本集用到的角色/状态/场景/道具/声线取回画布（复用也要可见）。**不要用上一集的 node id**；`asset_to_canvas` 会在节点写 `params.assetId`，可据此校验来源。
 4. **写画布设置**：`canvas_set_state` 一次写全（§1 代码块：`9:16` / 目标时长（80–110s，默认 90 秒）/ `dialogue-led` / `balanced` / `single` / `batch` / 十个分组）。**这是 `reviewMode` 与 `groupOrder` 的唯一写入点**；story 进入后只读、校验、缺值告警，不重写。**漏了这一步 = story 读不到 `reviewMode`：每集从 3 张卡变成「1 张方案 + 18 张片段 + 1 张交付」（≈20 张）。**
-5. **写本集规格卡**：`canvas_write_node(kind="text", group="story planning", title="EP00X 本集规格", content=…)`，只读展示 `9:16 / 目标时长 / dialogue-led / 视频档位 / 图片档位 / 单视图 / batch / 字幕 none / 风格 / 声线方案 / assetMode`，并附**当前节点数（动态，主线/总）**。**它不是新参数来源**：参数来源是系列圣经 §1 + 集制作包 ⑥；节点数只是画布状态。
+5. **写本集规格卡**：`canvas_write_node(kind="text", group="story planning", title="EP00X 本集规格", content=…)`，只读展示 `9:16 / 目标时长 / dialogue-led / 视频档位 / 图片档位 / 单视图 / batch / 字幕 none / 交付画质（native/upscale…）/ 风格 / 声线方案 / assetMode`，并附**当前节点数（动态，主线/总）**。**它不是新参数来源**：参数来源是系列圣经 §1 + 集制作包 ⑥；节点数只是画布状态。
 6. **建集制作包**：按 §10 生成 `package.md`，同时写该集画布文本节点（group `story planning`）。量产集 `params.assetMode=library`；EP01/试产才用 `draft`。
 7. **委托生产**：加载 `story-short-generator`，按 §8.2 从 STEP 3 起执行，并声明**每集 3 张卡的合并规则**（方案 / 片段 / 交付）。
 8. 若 `stage` 已是 `clips` 且有 `doneShots`：**断点续跑**——`canvas_list_nodes` 找回已渲片段，从第一个缺的镜继续（不要重渲已完成的镜）。

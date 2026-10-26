@@ -94,6 +94,8 @@ DSH 的技能选择是**模型读目录里的 `name + description` 前 500 字**
 
 ### 整部 / 单集
 
+> 系列规格（画幅/时长/视频 tier/图片 imageTier/字幕/交付 delivery/声线 voicePlan/卡版本 characterCardVariant/审查/风格）由 production 的 **S-STEP 0「系列规格卡」逐项选**，默认只是推荐，不是写死。
+>
 > 如果还没有剧本：production 会调用 `short-drama-series-writer` 的**完整流水**（`/start` → `/plan` → `/characters` → `/outline` → `/episode` → `/review`），不是只让它出大纲；production 不代写台词/设定。writer 不可用则停线告知。
 
 ```
