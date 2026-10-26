@@ -45,9 +45,9 @@ DSH 的技能选择是**模型读目录里的 `name + description` 前 500 字**
 | 「生成一条视频」 | video-generate / story | video-generate | 单个镜头 → video-generate；完整片子 → story |
 | 「审核 / 门」 | production / shortdrama-review | production | 本插件门名是 G-S/G-B/G-A/G-SAMPLE/G-E/G-F 与门 1/2/3 |
 
-### 2.2 与外部 `shortdrama-*` 家族（ai-show 那套）
+### 2.2 与外部 `shortdrama-*` 家族（ai-show 那套）——**本项目明确不用**
 
-本机目录里有 5 个外部 skill：`shortdrama-director / character / comfyui / memory / review`。它们**不是本插件的一部分**，而且是**另一套技术栈**（LTX-2 / shotlist.json / G1–G7 / 自己的 `production-state.json`）。重叠很重：
+本项目**不使用**这 5 个外部 skill：`shortdrama-director / character / comfyui / memory / review`。下面只作为**误路由排查**，不是推荐用法。它们**不是本插件的一部分**，而且是**另一套技术栈**（LTX-2 / shotlist.json / G1–G7 / 自己的 `production-state.json`）：
 
 | 外部 skill | 它做什么 | 与本插件谁重叠 | 混用风险 |
 |---|---|---|---|
@@ -57,9 +57,9 @@ DSH 的技能选择是**模型读目录里的 `name + description` 前 500 字**
 | `shortdrama-memory` | `production-state.json` + 每集进度 | production 的 `series/production-state.json` | **同名文件、不同 schema**，可能互相覆盖 |
 | `shortdrama-review` | G1–G7 审核状态机 | production 的 G-S…G-F 门 | 两套门号混淆 |
 
-**建议**：
-1. 用本插件时，**显式 `/story-short-generator` / `/short-drama-series-production` / `/short-drama-series-writer`**，不要只说「短剧」。
-2. 如果不用 ai-show 那套，建议把它们移出技能目录/工作区，减少目录噪声——它们的描述短而泛，很容易抢「短剧」。
+**建议（本项目）**：
+1. **只用** `/story-short-generator` / `/short-drama-series-production` / `/short-drama-series-writer`；不要调用 `shortdrama-*`。
+2. 如果想让它们从目录里彻底消失：把 `~/Workspace/ai-show/skills` 移到备份目录（如 `skills.disabled-20261026`），或从技能中心移除；**不要删除**，先备份。移走后重启/刷新技能目录。
 3. **绝不要**让两条流水线共用同一个 `production-state.json`；本插件的状态在 `series/production-state.json`，外部在项目根/它自己的目录。
 
 ### 2.3 其他相邻 skill
