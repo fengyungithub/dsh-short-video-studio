@@ -77,7 +77,7 @@
     "prepublishOnly": "npm run smoke",
     "e2e:tier": "node scripts/e2e-tier-pipeline.mjs",
     "e2e:voice": "node scripts/e2e-voice-ref.mjs",
-    "validate:bridge": "node scripts/validate-episode-package.mjs docs/analysis/ep001-bridge/package.md",
+    "validate:bridge": "node scripts/validate-episode-package.mjs docs/analysis/ep001-bridge/package.md && node scripts/validate-episode-package.mjs docs/analysis/ep002-bridge/package.md",
     "variants:check": "node scripts/make-image-variants.mjs --check"
   },
   "dependencies": {

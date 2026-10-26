@@ -88,7 +88,8 @@ for (let i = 1; i < shots.length; i++) {
     warnings.push(`${s.shotId}: 同场景紧随 ${prev.shotId} 却标起链（新契约要求同场景后续接上一镜）`)
   }
 }
-if (new Set((data.scenes || []).map((s) => s.id)).size >= 2 && transitions === 0) warnings.push('两场以上但没有 TRANSITION 转场镜')
+const distinctLocations = new Set((data.scenes || []).map((s) => s.location))
+if (distinctLocations.size >= 2 && transitions === 0) warnings.push('两个以上物理地点但没有 TRANSITION 转场镜')
 if (transitions > 1) warnings.push(`TRANSITION 镜有 ${transitions} 个（本片型建议 ≤1）`)
 if (data.targetSeconds < 80 || data.targetSeconds > 110) warnings.push(`targetSeconds=${data.targetSeconds} 不在 80–110s 目标区间`)
 if (shots.length < 17 || shots.length > 26) warnings.push(`镜数 ${shots.length} 不在 17–26 典型区间（对白密集例外需在方案卡说明）`)

@@ -384,6 +384,10 @@
               },
               "lightBaseline": {
                 "type": "string"
+              },
+              "nodeId": {
+                "type": "string",
+                "description": "画布节点 id（未入库时用它复用）"
               }
             }
           }
@@ -407,6 +411,10 @@
               },
               "episodes": {
                 "type": "string"
+              },
+              "nodeId": {
+                "type": "string",
+                "description": "画布节点 id（未入库时用它复用）"
               }
             }
           }
