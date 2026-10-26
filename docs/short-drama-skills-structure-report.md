@@ -384,7 +384,7 @@ PROD 与 SSG 都写 `canvas_set_state`、都声明 groupOrder（9 vs 10）；PRO
 12. ⏸ **单片门合并：按决定暂不做**。单片仍保留 6 道门（28 张 / per-shot 38）；只删重复问询——渲染参数卡改为「仅用户要改档/节奏/画质时弹」，交付前不再重复确认画质。
 13. ✅ **入口上下文探测**：SSG 门 0 改为「探测优先」——画布/资产库/工作区查到系列上下文就直接进委托模式，不弹片型门；完全没有上下文才问。`production-state.json` 增加 `packageContract` 与结构化 `gate`（package / clips / delivery）。
 14. ✅ **真实剧本桥接（EP001）**：绛珠泪 EP001（25 镜 / 105.8s / 21 行对白 / 7 张缺卡）迁移到 v1 后 **0 error / 2 warning**；真实数据反过来修正了 7 处契约（TO-BUILD 上限、beat 枚举、TRANSITION 场、`硬切` 续接值、镜数区间、地标结构、sourceDialogueCount）。详见 [EP001 桥接报告](analysis/ep001-bridge/report.md)。
-15. ✅ **EP002 资产复用桥接**：前两场 24 镜 / 94.7s / 16 行 / **0 TO-BUILD** / **0 warning**；又修 2 处（场景/道具 `nodeId` 字段、同地点日夜按物理地点判断转场）。暴露：真实 state 只有 node id 没有 asset id、无 `voice:` 资产、完整 EP02 的 SC03 还缺兼美/仙婢甲乙三张卡。详见 [EP002 桥接报告](analysis/ep002-bridge/report.md)。
+15. ✅ **EP002 资产复用桥接**：前两场 24 镜 / 94.7s / 16 行 / **0 TO-BUILD** / **0 warning**；又修 3 处（场景/道具 `nodeId` 字段、同地点日夜按物理地点判断转场、声线 `canvasNodeId` 临时引用）。**声线试镜 v2 已通过用户听核**，EP02 已切 `existing`（canvas 节点临时引用，跨会话前需入库换 `voice:`）。完整 EP02 的 SC03 还缺兼美/仙婢甲乙三张卡。详见 [EP002 桥接报告](analysis/ep002-bridge/report.md) 与 [声线试镜记录](analysis/voice-audition/report.md)。
     **P2 验收**：`node scripts/smoke-skill-contract.mjs` 31/31；`npm run validate:bridge` EP001 0/2 + EP002 0/0；`git diff --check` 通过；单片门数保持 28（仅删重复问询）。
 
 ### P3（可选，1 周）

@@ -62,6 +62,7 @@ STYLE LOCK-C — luminous crisp cloud seas with clearly separated layers, bright
   - ⚠️ **绝不能带锁 B**——实测即使只把 `hanfu` / `skin` 这类服饰皮肤词留在环境段里，空场景也会冒出人物。
 - **道具卡**：单件道具单视图 + **只加锁 A**；法器 / 剑 / 玉佩 / 丹药炉写明材质（金属 / 玉 / 木 / 瓷）。
 - **视频片段（r2v / i2v）**：**锁 A + 锁 B + 锁 C**，追加在 H3 结构化 prompt **之后**。御剑 / 轻功镜用平滑长弧线与长镜头；法术镜写「聚集 → 爆发」两段。**对白镜建议 `quality`**。
+  - ⚠ **试镜镜头例外**：只用 **锁 A + 锁 B**，不带 C。C 的环境词会把纯底试镜拉成云海/建筑场景（2026-10-26 实测：中段人物消失、只剩云海）。试镜 prompt 同时写死 `plain neutral seamless studio wall` / `static camera` / `no cut` / `subject remains in frame the whole time`。若结果仍带明显环境声，改用**只带锁 B + 棚拍后缀**，并在正文写 `AUDIO: close-mic dry studio recording; only the voice; rest is digital silence`。
 - **铅笔分镜图**：**不套任何风格锁**（始终纯黑白线稿）。
 
 ## 6. 与参考图契约的关系

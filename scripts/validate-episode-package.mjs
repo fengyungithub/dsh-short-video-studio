@@ -68,9 +68,13 @@ if (data.budget && data.shots?.length !== data.budget.shotCount) errors.push(`sh
 
 const charNames = new Set(data.assets?.characters?.map((c) => c.name) || [])
 if (data.dialogue) for (const d of data.dialogue) if (!charNames.has(d.speaker)) errors.push(`对白说话人「${d.speaker}」不在 assets.characters`)
-const voiceIds = new Set((data.assets?.voices || []).map((v) => v.voiceAssetId))
+const voiceRefs = new Set()
+for (const v of data.assets?.voices || []) {
+  if (v.voiceAssetId && v.voiceAssetId !== 'none') voiceRefs.add(v.voiceAssetId)
+  if (v.canvasNodeId) voiceRefs.add(`canvas:${v.canvasNodeId}`)
+}
 for (const d of data.dialogue || []) {
-  if (d.voiceRef !== 'none' && !voiceIds.has(d.voiceRef)) errors.push(`对白 voiceRef ${d.voiceRef} 不在 voices 台账`)
+  if (d.voiceRef !== 'none' && !voiceRefs.has(d.voiceRef)) errors.push(`对白 voiceRef ${d.voiceRef} 不在 voices 台账`)
   if (data.params?.voicePlan === 'existing' && d.voiceRef === 'none') errors.push(`voicePlan=existing 但对白 ${d.no} 的 voiceRef=none`)
 }
 if (data.params?.voicePlan === 'text-only' && (data.assets?.voices || []).length) warnings.push('voicePlan=text-only 但 voices 台账非空，确认是否应改 existing')

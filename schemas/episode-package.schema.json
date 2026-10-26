@@ -216,7 +216,8 @@
           },
           "voiceRef": {
             "type": "string",
-            "pattern": "^(voice:[A-Za-z0-9:_-]+|none)$"
+            "pattern": "^(voice:[A-Za-z0-9:_-]+|canvas:[A-Za-z0-9-]+|none)$",
+            "description": "voice:<资产id> / canvas:<画布音频节点id> / none"
           },
           "sfx": {
             "type": "array",
@@ -438,7 +439,8 @@
               },
               "voiceAssetId": {
                 "type": "string",
-                "pattern": "^(voice:[A-Za-z0-9:_-]+|none)$"
+                "pattern": "^(voice:[A-Za-z0-9:_-]+|none|)$",
+                "description": "入库后的 voice:<id>；未入库可留空并用 canvasNodeId"
               },
               "source": {
                 "type": "string",
@@ -465,6 +467,10 @@
               },
               "episodes": {
                 "type": "string"
+              },
+              "canvasNodeId": {
+                "type": "string",
+                "description": "未入库时的画布音频节点 id（仅同会话可用）"
               }
             }
           }

@@ -78,7 +78,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.2,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -88,7 +88,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -98,7 +98,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 2.8,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -108,7 +108,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.8,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -118,7 +118,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.2,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -128,7 +128,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.0,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -138,7 +138,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -148,7 +148,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.8,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -158,7 +158,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.2,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -168,7 +168,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.8,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -178,7 +178,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.2,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -188,7 +188,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -198,7 +198,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -208,7 +208,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -218,7 +218,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.0,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -228,7 +228,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.0,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     }
   ],
@@ -571,7 +571,26 @@
         "nodeId": "89294279-1081-4f68-b2d6-c27c4754d3da"
       }
     ],
-    "voices": [],
+    "voices": [
+      {
+        "character": "绛珠",
+        "voiceAssetId": "",
+        "canvasNodeId": "1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
+        "source": "audition",
+        "tier": "balanced",
+        "seed": 0,
+        "episodes": "1-60"
+      },
+      {
+        "character": "神瑛",
+        "voiceAssetId": "",
+        "canvasNodeId": "e22f2c25-7154-4922-bf66-768d46945a45",
+        "source": "audition",
+        "tier": "balanced",
+        "seed": 0,
+        "episodes": "1-60"
+      }
+    ],
     "toBuild": []
   },
   "params": {
@@ -585,7 +604,7 @@
     "characterCardVariant": "single",
     "deliveryQuality": "native",
     "reviewMode": "batch",
-    "voicePlan": "text-only",
+    "voicePlan": "existing",
     "storyboardMode": "text",
     "groupOrderVersion": [
       "story planning",
@@ -695,7 +714,7 @@
   - 灵河岸 · node `e5ad4eb1-e87b-4046-8deb-471e80562e7f` · 地标 `river:右1/3`、`bank:下1/3`、`grass:中下`、`three-life-stone:下1/3`（夜场）
 - 道具（复用 EP01）
   - 露瓶 · node `89294279-1081-4f68-b2d6-c27c4754d3da`
-- 声线：**无**（真实项目没有 `voice:` 资产）→ `voicePlan=text-only`，交付清单记「跨集音色无保证」
+- 声线（**临时 canvas 引用，未入库**）：绛珠 `canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6`｜神瑛 `canvas:e22f2c25-7154-4922-bf66-768d46945a45`；`voicePlan=existing`（跨会话复用前需入库为 `voice:`）
 - TO-BUILD：**0**
 
 ## ⑥ 生产参数预填
@@ -703,6 +722,6 @@
 - 画面比例 9:16 ｜ 音频 dialogue-led ｜ 语言 中文 ｜ 字幕 none
 - 视频 balanced ｜ 图片 quality ｜ 角色卡 single ｜ 审查 batch ｜ 交付原生
 - 视觉风格 guofeng-xianxia
-- 声线方案 text-only（无 voice 资产；若阶段 C 补试镜则改 existing）
+- 声线方案 existing（canvas 音频节点临时引用；入库后替换为 `voice:<id>`）
 - 分镜模式 text ｜ 镜数 24 ｜ 对白 16 行 ｜ 成本估计 ≈80 min
 - 合规：无

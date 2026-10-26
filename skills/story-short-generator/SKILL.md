@@ -383,6 +383,10 @@ comfy_generate_image(prompt=<同一角色设定 + 正/侧/背三格 + 锁 A/B>, 
 
 **硬要求**：单镜、单人、一句台词、**无环境音、无音乐、无音效、无字幕**、口型清晰可见、背景中性。用 `canvas_write_prompt_bank(title="Mia 试镜 提示词（分档）", group="voice auditions", prompts={fast: p, balanced: p, quality: p})`，三档逐字一致。
 
+**试镜只用风格锁 A + B，不带 C**（实测 2026-10-26：带 C 的试镜中段人物消失、只剩云海/建筑——C 的环境词会把纯底试镜拉成场景镜头）。同时写死：`plain neutral seamless studio wall` / `static camera` / `no cut` / `framing stays identical from first to last frame` / `subject remains in frame the whole time`。
+
+**若 A+B 仍带明显环境声**（AV 模型可能自己补 room tone），改走 **v3 路径：只带锁 B + 棚拍后缀**，并在 `detailed_description` 里明确写 `AUDIO: close-mic dry studio recording; only the voice is audible; the rest of the track is digital silence; no room tone, no ambience, no air, no wind, no water, no birds, no reverb, no echo, no music, no sound effects`。
+
 模板（Ref2VA 六段式，H3 路径）：
 
 ```text
@@ -443,12 +447,12 @@ extract_audio(video_node=<试镜节点>, title='Mia 声线样本', group='voice 
 **两条路径共用**：
 
 - 用户点该音频卡「入库」→ 类型选「音频」→ 得到 `voice:<hex>`。
-- 写一份「声线清单」文本节点（group `voice auditions`）：`角色 | voice:<id> | 来源（audition/existing/仅文本）| 试镜节点 id | tier | seed | 时长`。**后续镜头表与 STEP 7 只认这份清单里的 id。**
+- 写一份「声线清单」文本节点（group `voice auditions`）：`角色 | voice:<id> 或 canvas:<音频节点 id> | 来源（audition/existing/仅文本）| 试镜节点 id | tier | seed | 时长`。**后续镜头表与 STEP 7 只认这份清单里的 id**；`canvas:` 是未入库的临时引用（仅同会话可用，跨会话前必须点「入库」换 `voice:`）。
 
 ### 3.5.5 后续使用（STEP 5 / STEP 7 引用）
 
-- 镜头表「音频与对白轨 → `声线参考`」填 `voice:<id>` 或 `none`；**同一角色全片（连续短剧为全季）必须同一个 id**。
-- 方案为 `audition` / `existing` 时，STEP 7 对白镜传 `audio_ref_nodes=['voice:<id>']`，prompt 里写 `<Audio 1> is the voice-timbre reference for <Subject 1> (S1).` + `<Audio 1>: reference - …`（写法委托 `h3-prompt-writing`）；`text-only` 时两者都不写（只保留文本音色描述）。
+- 镜头表「音频与对白轨 → `声线参考`」填 `voice:<id>`（入库后）、`canvas:<音频节点 id>`（未入库临时）或 `none`；**同一角色全片（连续短剧为全季）必须同一个引用**。
+- 方案为 `audition` / `existing` 时，STEP 7 对白镜传 `audio_ref_nodes=['voice:<id>']`（未入库时直接传画布音频节点 id），prompt 里写 `<Audio 1> is the voice-timbre reference for <Subject 1> (S1).` + `<Audio 1>: reference - …`（写法委托 `h3-prompt-writing`）；`text-only` 时两者都不写（只保留文本音色描述）。
 - 只有 `type='r2v'` 支持；`i2v` / 2K / hires 实现会报 `audio-ref-unsupported`；≤3 段、每段 2–15s、总 ≤15s。
 - 换 `voice:` 资产 = 该角色全部对白镜 + 续接下游重渲。
 
@@ -533,7 +537,7 @@ extract_audio(video_node=<试镜节点>, title='Mia 声线样本', group='voice 
   - `模式` — 本镜是 `dialogue` 还是 `silent`（可与项目全局模式不同，如对白片里的静默镜）。
   - `对白` — 台词、说话人、语气、时间范围。**一镜只允许一个说话人。**
   - `口型` — 逐秒记录嘴部开合；说话人 `mouth-open`，同镜其他角色 `mouth-closed`，`silent` 镜全员 `mouth-closed`。
-  - `声线参考` — 本镜说话人的 `voice:<id>`（来自 STEP 3.5 声线清单）；`silent` 镜或未做声线的角色写 `none`。同一角色全片必须同一个 id。
+  - `声线参考` — 本镜说话人的 `voice:<id>` 或 `canvas:<音频节点 id>`（来自 STEP 3.5 声线清单）；`silent` 镜或未做声线的角色写 `none`。同一角色全片必须同一个引用。
   - `音效` — 关键音效，按时间锚定。
   - `字幕` — 本镜要渲进画面的字幕文本（即台词本身，不加引号/书名号/括号）；`silent` 镜写 `none`；**项目字幕选 `none` 时全表写 `none`**（见 STEP 0）。
   - `表演备注` — 每条对白对应的眼神与身体动作变化。

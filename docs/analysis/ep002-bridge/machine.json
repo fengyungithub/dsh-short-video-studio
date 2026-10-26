@@ -77,7 +77,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.2,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -87,7 +87,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -97,7 +97,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 2.8,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -107,7 +107,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.8,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -117,7 +117,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.2,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -127,7 +127,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.0,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -137,7 +137,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -147,7 +147,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.8,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -157,7 +157,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.2,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -167,7 +167,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.8,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -177,7 +177,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.2,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -187,7 +187,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -197,7 +197,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -207,7 +207,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     },
     {
@@ -217,7 +217,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.0,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
       "sfx": []
     },
     {
@@ -227,7 +227,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.0,
       "subtitle": "none",
-      "voiceRef": "none",
+      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
       "sfx": []
     }
   ],
@@ -570,7 +570,26 @@
         "nodeId": "89294279-1081-4f68-b2d6-c27c4754d3da"
       }
     ],
-    "voices": [],
+    "voices": [
+      {
+        "character": "绛珠",
+        "voiceAssetId": "",
+        "canvasNodeId": "1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
+        "source": "audition",
+        "tier": "balanced",
+        "seed": 0,
+        "episodes": "1-60"
+      },
+      {
+        "character": "神瑛",
+        "voiceAssetId": "",
+        "canvasNodeId": "e22f2c25-7154-4922-bf66-768d46945a45",
+        "source": "audition",
+        "tier": "balanced",
+        "seed": 0,
+        "episodes": "1-60"
+      }
+    ],
     "toBuild": []
   },
   "params": {
@@ -584,7 +603,7 @@
     "characterCardVariant": "single",
     "deliveryQuality": "native",
     "reviewMode": "batch",
-    "voicePlan": "text-only",
+    "voicePlan": "existing",
     "storyboardMode": "text",
     "groupOrderVersion": [
       "story planning",
