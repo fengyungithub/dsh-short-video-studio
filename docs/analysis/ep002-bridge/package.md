@@ -78,7 +78,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.2,
       "subtitle": "none",
-      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
+      "voiceRef": "voice:6a4ff47b59671b7e",
       "sfx": []
     },
     {
@@ -88,7 +88,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
+      "voiceRef": "voice:c6fc197a2cf0f029",
       "sfx": []
     },
     {
@@ -98,7 +98,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 2.8,
       "subtitle": "none",
-      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
+      "voiceRef": "voice:6a4ff47b59671b7e",
       "sfx": []
     },
     {
@@ -108,7 +108,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.8,
       "subtitle": "none",
-      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
+      "voiceRef": "voice:c6fc197a2cf0f029",
       "sfx": []
     },
     {
@@ -118,7 +118,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.2,
       "subtitle": "none",
-      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
+      "voiceRef": "voice:6a4ff47b59671b7e",
       "sfx": []
     },
     {
@@ -128,7 +128,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.0,
       "subtitle": "none",
-      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
+      "voiceRef": "voice:c6fc197a2cf0f029",
       "sfx": []
     },
     {
@@ -138,7 +138,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
+      "voiceRef": "voice:6a4ff47b59671b7e",
       "sfx": []
     },
     {
@@ -148,7 +148,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.8,
       "subtitle": "none",
-      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
+      "voiceRef": "voice:c6fc197a2cf0f029",
       "sfx": []
     },
     {
@@ -158,7 +158,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.2,
       "subtitle": "none",
-      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
+      "voiceRef": "voice:6a4ff47b59671b7e",
       "sfx": []
     },
     {
@@ -168,7 +168,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.8,
       "subtitle": "none",
-      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
+      "voiceRef": "voice:c6fc197a2cf0f029",
       "sfx": []
     },
     {
@@ -178,7 +178,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.2,
       "subtitle": "none",
-      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
+      "voiceRef": "voice:6a4ff47b59671b7e",
       "sfx": []
     },
     {
@@ -188,7 +188,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
+      "voiceRef": "voice:c6fc197a2cf0f029",
       "sfx": []
     },
     {
@@ -198,7 +198,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
+      "voiceRef": "voice:6a4ff47b59671b7e",
       "sfx": []
     },
     {
@@ -208,7 +208,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 3.5,
       "subtitle": "none",
-      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
+      "voiceRef": "voice:c6fc197a2cf0f029",
       "sfx": []
     },
     {
@@ -218,7 +218,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.0,
       "subtitle": "none",
-      "voiceRef": "canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
+      "voiceRef": "voice:6a4ff47b59671b7e",
       "sfx": []
     },
     {
@@ -228,7 +228,7 @@
       "emotion": "按表演意图",
       "targetSeconds": 4.0,
       "subtitle": "none",
-      "voiceRef": "canvas:e22f2c25-7154-4922-bf66-768d46945a45",
+      "voiceRef": "voice:c6fc197a2cf0f029",
       "sfx": []
     }
   ],
@@ -527,24 +527,22 @@
       {
         "name": "绛珠",
         "state": "常服-白衣仙裙",
-        "singleNodeId": "03a631e8-4808-47c5-a94b-d71f51c3e250",
-        "threeNodeId": "c83c0a93-1813-4198-b778-215c4a21e040",
-        "assetId": "",
-        "episodes": "1-60"
+        "episodes": "1-60",
+        "assetIdSingle": "character:0c3728dd746e944b",
+        "assetIdThree": "character:7ac72cfe2cbdc53e"
       },
       {
         "name": "神瑛",
         "state": "常服-白衣仙侍",
-        "singleNodeId": "fbc7e9fb-d45d-4878-b44d-db6c00b29c29",
-        "threeNodeId": "2448af68-0ce1-40d0-b2be-296dbf1fa6ce",
-        "assetId": "",
-        "episodes": "1-60"
+        "episodes": "1-60",
+        "assetIdSingle": "character:546e89f81d8c8d3c",
+        "assetIdThree": "character:0a9324424a4c2dc8"
       }
     ],
     "scenes": [
       {
         "name": "灵河岸",
-        "assetId": "",
+        "assetId": "scene:90d53096e6a30af1",
         "landmarks": [
           {
             "name": "river",
@@ -566,7 +564,7 @@
     "props": [
       {
         "name": "露瓶",
-        "assetId": "",
+        "assetId": "scene:f62f2f5a26aea46d",
         "episodes": "1-15",
         "nodeId": "89294279-1081-4f68-b2d6-c27c4754d3da"
       }
@@ -574,8 +572,7 @@
     "voices": [
       {
         "character": "绛珠",
-        "voiceAssetId": "",
-        "canvasNodeId": "1c642566-26e0-4d5b-a8ba-f3706d79a2b6",
+        "voiceAssetId": "voice:6a4ff47b59671b7e",
         "source": "audition",
         "tier": "balanced",
         "seed": 0,
@@ -583,8 +580,7 @@
       },
       {
         "character": "神瑛",
-        "voiceAssetId": "",
-        "canvasNodeId": "e22f2c25-7154-4922-bf66-768d46945a45",
+        "voiceAssetId": "voice:c6fc197a2cf0f029",
         "source": "audition",
         "tier": "balanced",
         "seed": 0,
@@ -617,7 +613,8 @@
       "shot prompts",
       "shot clips",
       "final delivery"
-    ]
+    ],
+    "assetMode": "library"
   },
   "budget": {
     "estimatedMinutes": 80,
@@ -707,14 +704,14 @@
 
 ## ⑤ 本集资产清单（全部复用，无 TO-BUILD）
 
-- 角色（复用 EP01 卡片 node id；`assetId` 为空，未入库）
-  - 绛珠 · 常服-白衣仙裙 · single `03a631e8-4808-47c5-a94b-d71f51c3e250` / three `c83c0a93-1813-4198-b778-215c4a21e040`
-  - 神瑛 · 常服-白衣仙侍 · single `fbc7e9fb-d45d-4878-b44d-db6c00b29c29` / three `2448af68-0ce1-40d0-b2be-296dbf1fa6ce`
+- 角色（复用 EP01 卡片，**已入库为 asset id**）
+  - 绛珠 · 常服-白衣仙裙 · single `character:0c3728dd746e944b` / three `character:7ac72cfe2cbdc53e`
+  - 神瑛 · 常服-白衣仙侍 · single `character:546e89f81d8c8d3c` / three `character:0a9324424a4c2dc8`
 - 场景（复用 EP01）
-  - 灵河岸 · node `e5ad4eb1-e87b-4046-8deb-471e80562e7f` · 地标 `river:右1/3`、`bank:下1/3`、`grass:中下`、`three-life-stone:下1/3`（夜场）
+  - 灵河岸 · `scene:90d53096e6a30af1` · 地标 `river:右1/3`、`bank:下1/3`、`grass:中下`、`three-life-stone:下1/3`（夜场）
 - 道具（复用 EP01）
-  - 露瓶 · node `89294279-1081-4f68-b2d6-c27c4754d3da`
-- 声线（**临时 canvas 引用，未入库**）：绛珠 `canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6`｜神瑛 `canvas:e22f2c25-7154-4922-bf66-768d46945a45`；`voicePlan=existing`（跨会话复用前需入库为 `voice:`）
+  - 露瓶 · `scene:f62f2f5a26aea46d`
+- 声线：绛珠 `voice:6a4ff47b59671b7e`｜神瑛 `voice:c6fc197a2cf0f029`；`voicePlan=existing`，已入库
 - TO-BUILD：**0**
 
 ## ⑥ 生产参数预填
@@ -722,6 +719,6 @@
 - 画面比例 9:16 ｜ 音频 dialogue-led ｜ 语言 中文 ｜ 字幕 none
 - 视频 balanced ｜ 图片 quality ｜ 角色卡 single ｜ 审查 batch ｜ 交付原生
 - 视觉风格 guofeng-xianxia
-- 声线方案 existing（canvas 音频节点临时引用；入库后替换为 `voice:<id>`）
+- 声线方案 existing（`voice:` 资产）；资产模式 library（角色/场景/道具/声线均有 asset id）
 - 分镜模式 text ｜ 镜数 24 ｜ 对白 16 行 ｜ 成本估计 ≈80 min
 - 合规：无

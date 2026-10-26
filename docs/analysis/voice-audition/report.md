@@ -1,7 +1,7 @@
 # EP02 声线试镜记录（绛珠 / 神瑛）
 
 > 日期：2026-10-26 ｜ 画布会话：`session-002884e3-29ba-44ca-b79f-b739766b87ed`
-> 结论：**v2 通过用户听核**；当前用画布音频节点 id 作同会话 `existing` 引用，EP02 已切 `existing`。跨会话前仍需用户点「入库」换 `voice:<id>`。
+> 结论：**v2 通过用户听核**，两条声线已入库为 `voice:` 资产，EP02 已切 `existing` + `assetMode=library`，校验 0/0。
 
 ## 1. 三轮尝试
 
@@ -41,9 +41,9 @@
 
 ## 5. 下一步
 
-1. 已用画布音频节点 id 作临时引用，EP02 已切 `existing`：
-   - 绛珠 `canvas:1c642566-26e0-4d5b-a8ba-f3706d79a2b6`
-   - 神瑛 `canvas:e22f2c25-7154-4922-bf66-768d46945a45`
-2. `npm run validate:bridge`：EP002 0 error / 0 warning。
-3. **跨会话前**仍需用户在画布点这两张音频卡的「入库」，得到 `voice:<id>`，再把 `canvasNodeId` 替换成 `voiceAssetId`。
+1. 两条声线已入库：
+   - 绛珠 `voice:6a4ff47b59671b7e`
+   - 神瑛 `voice:c6fc197a2cf0f029`
+2. EP02 已切 `assetMode=library` + `voicePlan=existing`；对白 `voiceRef=voice:`；`npm run validate:bridge`：EP002 0 error / 0 warning。
+3. 角色/场景/道具也同步入库（见 [EP02 桥接报告](../ep002-bridge/report.md) §5）。
 4. 若之后要求“强制干声”，再跑 v3（只带锁 B + 数字静音声明）；否则 v2 即为当前声线基线。

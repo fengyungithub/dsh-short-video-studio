@@ -33,7 +33,8 @@
 
 - 下面是**字段骨架**（不可直接送校验；`shots`/`assets` 等需按实际集填满）；完整可校验样例见 `scripts/fixtures/episode-package.example.json`。
 - 字段与约束：`schemas/episode-package.schema.json`。
-- `assets.voices[].voiceAssetId` 可留空，用 `canvasNodeId` 记画布音频节点（未入库临时引用；**跨会话前必须点「入库」换 `voice:`**）；对白 `voiceRef` 支持 `voice:` / `canvas:` / `none`。
+- `params.assetMode`：`draft`（允许 node id / `canvas:` 声线，EP01/试产）或 `library`（量产：角色必须有 `assetIdSingle/assetIdThree`，场景/道具必须有 `assetId`，声线必须有 `voiceAssetId`）。`library` 下 `toBuild` 必须为空、对白 `voiceRef` 必须是 `voice:`。
+- `assets.voices[].voiceAssetId` 在 `draft` 下可留空，用 `canvasNodeId` 记画布音频节点（未入库临时引用；**跨会话前必须点「入库」换 `voice:`**）；对白 `voiceRef` 支持 `voice:` / `canvas:` / `none`。
 - 六节照旧必须齐全；机读块与六节不一致时，**以机读块为准并回写六节**。
 - 生成后跑 `node scripts/smoke-skill-contract.mjs`（校验集号 / 镜数 / 声线闭合 / groupOrder / 过期断言）。
 

@@ -1195,6 +1195,7 @@ whenToUse: 适用于……不适用于……
 | `canvas_get_state` / `canvas_set_state` | `aspectRatio` / `duration` / `audioMode` / `mode` / `reviewMode` / `groupOrder` | 读写项目设置 |
 | `asset_list` | `type`、`query` | 查资产库 |
 | `asset_to_canvas` | `id`、`title` / `group` / `nodeId` | 物化回画布 |
+| `asset_ingest` | `approvalNodeId`、`items[]`（nodeId/srcPath/type/name/state/character/cardVariant/source）、`allowOverwrite` | 系列模式下，用户批准清单后由 AI 入库；默认不覆盖同名 |
 
 **共用参数**：`sessionId`（缺省当前会话）、`workspaceId`（自动解析）、`title`、`group`（缺省 `ungrouped`）、`nodeId`（传了 = 就地更新而非新增）。
 

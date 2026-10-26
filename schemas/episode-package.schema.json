@@ -318,8 +318,6 @@
             "required": [
               "name",
               "state",
-              "singleNodeId",
-              "threeNodeId",
               "episodes"
             ],
             "properties": {
@@ -340,6 +338,14 @@
               },
               "episodes": {
                 "type": "string"
+              },
+              "assetIdSingle": {
+                "type": "string",
+                "description": "单视图资产 id（library 模式必填；空=TO-BUILD）"
+              },
+              "assetIdThree": {
+                "type": "string",
+                "description": "三视图资产 id（library 模式建议填；空=缺该版本）"
               }
             }
           }
@@ -501,7 +507,8 @@
         "reviewMode",
         "voicePlan",
         "storyboardMode",
-        "groupOrderVersion"
+        "groupOrderVersion",
+        "assetMode"
       ],
       "properties": {
         "styleId": {
@@ -599,6 +606,14 @@
           "items": {
             "type": "string"
           }
+        },
+        "assetMode": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "library"
+          ],
+          "description": "draft=允许画布节点/canvas 声线临时引用（EP01/试产）；library=量产，必须有资产 id"
         }
       }
     },

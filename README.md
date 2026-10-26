@@ -282,7 +282,7 @@ video_upscale({ video_node: '<长片节点 id>', target_width: 4032, chunk_frame
 | 生成 | `comfy_generate_image` · `comfy_generate_video` · `comfy_generate_music`（BGM）· `comfy_render`（通用入口，模型无关）· `comfy_list_workflows`（查能力/工作流） |
 | 后处理 | `extract_frame`（抽帧）· `extract_audio`（抽音轨，作声线参考）· `video_concat`（拼接成片）· `video_upscale`（超分：画布视频节点 → 像素空间 ×2/×4，可换模型与工作流） |
 | 画布 | `canvas_list_nodes` · `canvas_write_node` · `canvas_get_node` · `canvas_write_prompt_bank`（每镜分档提示词） · `canvas_get_prompt` · `canvas_group_nodes` · `canvas_reorder` · `canvas_get_state` · `canvas_set_state` |
-| 资产 | `asset_list`（列出跨会话资产，含 kind）· `asset_to_canvas`（物化回画布：图片/视频/音频→媒体节点，文本→text/table 节点） |
+| 资产 | `asset_list`（列出跨会话资产，含 kind）· `asset_to_canvas`（物化回画布：图片/视频/音频→媒体节点，文本→text/table 节点）· `asset_ingest`（系列模式：用户批准清单后，AI 把节点/文件登记进资产库；默认不覆盖同名） |
 
 > 全部工具**模型无关**：capability 由注册表 `preferred` 解析到具体工作流，prompt 与流程里不硬编码模型名。
 

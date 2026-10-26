@@ -11,7 +11,7 @@
 - **系列台账**（`series/production-state.json` 的 `assets`）是**系列层索引**：角色/状态/场景/道具/声线 → 资产 id → 适用集范围 → 版本/状态。
 - **每集画布**（`canvas/session-<id>/`）是**临时工作副本**：进入一集时用 `asset_to_canvas` 从资产 id 物化，渲染完可归档；节点 id 不跨集复用。
 - **集制作包**是「单集采购单」：只写资产 id 或 `TO-BUILD`，不把节点 id 当持久引用。
-- 人工入库不是 per-episode 负担：**全季资产一次集中入库（G-A）**，每集只物化。真正会变成负担的是「把节点 id 当资产」——这正是当前真实项目的问题。
+- 入库不是 per-episode 负担：**全季资产一次集中入库（G-A）**，每集只物化。系列模式允许**用户批准后 AI 调用入库工具**（见 §4.6），但批准仍是人工门。真正会变成负担的是「把节点 id 当资产」——这正是当前真实项目的问题。
 
 ---
 
@@ -56,7 +56,7 @@
 │  character:91bc…（绛珠·three）                │
 │  scene:77de…（灵河岸）                         │
 │  voice:3ac1…（绛珠声线）                       │
-│  唯一身份权威；id 永久；用户人工入库           │
+│  唯一身份权威；id 永久；用户批准 → 入库        │
 └───────────────▲──────────────────────────────┘
                 │ 入库（人工，一次）
 ┌───────────────┴──────────────────────────────┐
@@ -96,7 +96,7 @@
 - 修法：`assetIdSingle / assetIdThree` 必填（可为空 = `TO-BUILD`）；`nodeSingleId / nodeThreeId` 可选、仅本会话。
 - 加 `params.assetMode`：`draft` 允许 canvas 节点 id；`library` 必须有资产 id（量产集强制）。
 
-### P1 · 人工入库的粒度与时机
+### P1 · 入库的粒度与时机
 - 不是“每集入库”，而是**G-A 一次性集中入库**：角色双版 + 状态卡 + 场景 + 道具 + 声线。
 - 全季资产量约 30–60 个，点 30–60 次可接受；每集只 `asset_to_canvas`。
 - 需要一张「入库清单」：资产名 / 类型 / 是否已入库 / 资产 id；未齐不放进 G-A。
@@ -124,7 +124,7 @@
 
 ### 4.1 资产库（持久层）
 
-- 只放**已批准、跨集复用**的资产；由用户人工入库。
+- 只放**已批准、跨集复用**的资产；由用户批准，系列模式允许 AI 调用 `asset_ingest` 执行（§4.6）。
 - 建议元数据：`type`、`name`、`state`、`character`、`cardVariant`（single/three）、`assetVersion`、`sourceSession`、`sourceNode`、`seed`、`prompt`、`fileHash`。
 - 命名规范：`角色名-状态-版本`（如「绛珠-常服-v1」）；**同名 = 同一槽位**，改版优先新名字/新 id。
 
@@ -180,11 +180,51 @@
 | 资产库文件被外部替换 | 用 `fileHash` 检测；不匹配 → 停线，重新入库 |
 | 交付后 | 成片已渲染，不依赖库；交付清单记 asset id + version |
 
-### 4.6 人工入库的 UX
+### 4.6 入库：用户批准后由 AI 执行（系列模式新增）
 
-- **G-A 一张卡**：列出全部资产（角色双版/状态卡/场景/道具/声线）+ 入库状态 + 资产 id；全齐才通过。
-- 建议插件提供**批量入库**（多选节点 → 一次确认），仍由用户点击；AI 不代劳。
-- 声线：试镜听核通过 → 入库 → 台账写 `voice:`；`canvas:` 只允许在 `draft` 集。
+**决定（2026-10-26）**：系列模式下允许 AI 调用入库工具，**前提是资产已由用户审核确定**。这改变“AI 不能入库”的旧契约，但把人工门从“逐个点按钮”前移到“一次批准清单”。
+
+**流程**
+
+1. AI 准备「入库清单」画布文本节点：每项写 `类型 / 名称 / 状态 / 画布 node id / 预览 / 建议资产名`。
+2. **一张批准卡**（`ask_user_question`）：批准全部 / 逐项取舍 / 取消。
+3. 用户批准后，AI 对批准的项调用 `asset_ingest`：
+   ```
+   asset_ingest({
+     nodeId, type, name, state?, tags?,
+     approval: { approvedBy: "user", approvalNodeId, note? },
+     allowOverwrite?: false
+   })
+   ```
+4. 工具写资产库 + 审计字段，返回 `assetId`；AI 再 `asset_list` 校验，写系列台账。
+5. 未批准的项**不得入库**；失败项单独报告，不静默跳过。
+
+**工具安全约束（必须实现）**
+
+| 约束 | 说明 |
+|---|---|
+| 仅系列模式 | `assetIngestPolicy = "approved"`（项目/配置开关）；单项目默认仍是人工按钮 |
+| 必须有批准 | 缺 `approval.approvalNodeId` / `approvedBy` 直接拒绝 |
+| 只收 `ready` 节点 | 生成中 / 失败 / 被替换的节点拒绝 |
+| 类型/载体匹配 | image→character/scene/style；audio→voice；text→text；video→clip |
+| 不静默覆盖 | 同名已有资产默认**拒绝**；`allowOverwrite:true` 才覆盖并 `version+1` |
+| 审计 | 库记录写 `ingestedBy:"agent"`、`approvedAt`、`approvalNodeId`、`sourceSession`、`sourceNode`、`version` |
+| 幂等 | 同一 node+name 重复调用返回同一 assetId |
+
+**仍由用户做的事**：审核资产内容、点批准卡、决定命名/是否覆盖。AI 只做机械登记。
+
+### 4.7 `assetMode`：draft 与 library
+
+集制作包 `params.assetMode` 只有两个值：
+
+| 模式 | 允许什么 | 用在哪 | 校验 |
+|---|---|---|---|
+| `draft` | 画布 node id / `canvas:<音频节点>` 临时引用；允许 `toBuild` | EP01、样片、试产 | 只警告“跨会话不可复用” |
+| `library` | **必须**有 `assetIdSingle/assetIdThree/assetId/voiceAssetId`；node id 只能作 `lastNode*` | 量产集（EP02 起） | 缺 asset id / 只有 canvas 声线 → **直接报错**，方案卡不批准 |
+
+- `library` 不是“更严的标签”，是**跨会话可复用性的硬门槛**：新会话只有 asset id 能解析，node id 一定失效。
+- 切换时点：EP01 用 `draft` 建资产 → G-A 批准 + 入库 → EP02 起 `library`。
+- 当前 EP02 桥接是 `draft`（声线用 canvas 节点）；`asset_ingest` 工具落地后，入库两条声线 + 主角色卡，再把 EP02 切 `library`。
 
 ---
 
@@ -219,15 +259,24 @@
 
 ---
 
-## 7. 需要拍板的 3 件事
+## 7. 已定 / 待拍板
 
-| # | 问题 | 建议 |
+| # | 问题 | 状态 |
 |---|---|---|
-| 1 | 资产版本策略：同名覆盖同一 id，还是每次新 id？ | **同名覆盖 + 台账 version/fileHash**；重大改版用新名字/新 id。否则 80 集会积累大量 id。 |
-| 2 | 量产集是否强制 `assetMode=library`（禁止 canvas 节点引用）？ | **强制**。`draft` 只给 EP01/试产；否则跨会话必坏。 |
-| 3 | 入库时机：G-A 一次性，还是每集懒入库？ | **G-A 一次性**；每集只物化。每集懒入库会把 30–60 次操作变成 80 倍。 |
+| 1 | 入库时机 | ✅ **已定：G-A 一次性集中入库**；每集只物化。 |
+| 2 | 系列模式是否允许 AI 入库 | ✅ **已定：允许，但必须先由用户批准清单**；新增 `asset_ingest` 工具（§4.6）。 |
+| 3 | 资产版本策略 | ✅ **已定：混合**——修图/重抽同名覆盖同一 id + version/fileHash；换脸/换装/换声线新名字/新 id。 |
+| 4 | 量产集 `assetMode` | ✅ **已定：EP01 draft，EP02 起 library**；validator 已按此实现。 |
+| 5 | `asset_ingest` 是否本轮实现 | ✅ **已实现**（工具 + 审计/拒绝覆盖/幂等）；需重启 DSH 后出现在工具列表。 |
 
 ---
+
+## 7.1 本轮落地结果（2026-10-26）
+
+- `asset_ingest` 已写进 `lib/index.js`（批准清单 + 审计 + 默认拒绝覆盖 + 幂等）；`params.assetMode` 已写进 schema/validator。
+- 8 项 EP02 资产已入库（4 张角色卡 + 灵河岸 + 露瓶 + 2 条声线），真实台账 `production-state.json` 已从 `nodeSingle/nodeThree/node` 迁移到 `assetIdSingle/assetIdThree/assetId`，node id 移入 `lastNode*`。
+- EP02 已切 `assetMode=library`，`validate:bridge` 0/0；EP01 保持 `draft`（TO-BUILD）。
+- `asset_ingest` 工具需重启 DSH 后才出现在工具列表；本次迁移用等价脚本完成（`docs/analysis/ep002-bridge/ingest-script.mjs`）。
 
 ## 8. 附：当前实现的关键证据
 

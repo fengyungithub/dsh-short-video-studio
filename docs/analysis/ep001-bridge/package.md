@@ -699,7 +699,8 @@
       "shot prompts",
       "shot clips",
       "final delivery"
-    ]
+    ],
+    "assetMode": "draft"
   },
   "budget": {
     "estimatedMinutes": 97,

@@ -100,6 +100,27 @@ if (shots.length < 17 || shots.length > 26) warnings.push(`镜数 ${shots.length
 if ((data.assets?.toBuild || []).length > 8) errors.push('toBuild > 8，超出建卡集预算')
 else if ((data.assets?.toBuild || []).length > 2) warnings.push(`toBuild=${data.assets.toBuild.length}（量产期应 ≤2；建卡集需在方案卡列明）`)
 if (data.params && JSON.stringify(data.params.groupOrderVersion) !== JSON.stringify(canonicalGroups)) errors.push('groupOrderVersion 不等于 canonical 10 组')
+
+const mode = data.params?.assetMode
+if (mode === 'library') {
+  for (const c of data.assets?.characters || []) {
+    if (!c.assetIdSingle) errors.push(`角色 ${c.name}: library 模式缺 assetIdSingle`)
+    if (!c.assetIdThree) warnings.push(`角色 ${c.name}: 缺 assetIdThree（只有单视图资产；fast 可用，balanced/quality 三视图需补）`)
+  }
+  for (const s of data.assets?.scenes || []) if (!s.assetId) errors.push(`场景 ${s.name}: library 模式缺 assetId`)
+  for (const p of data.assets?.props || []) if (!p.assetId) errors.push(`道具 ${p.name}: library 模式缺 assetId`)
+  for (const v of data.assets?.voices || []) if (!v.voiceAssetId) errors.push(`声线 ${v.character}: library 模式缺 voiceAssetId（不能只用 canvasNodeId）`)
+  if ((data.assets?.toBuild || []).length) errors.push('library 模式仍有 TO-BUILD 资产')
+  if (data.params?.voicePlan === 'existing') {
+    for (const d of data.dialogue || []) if (!String(d.voiceRef).startsWith('voice:')) errors.push(`library 模式对白 ${d.no}: voiceRef 必须是 voice:（实际 ${d.voiceRef}）`)
+  }
+} else if (mode === 'draft') {
+  const canvasRefs = (data.dialogue || []).filter((d) => String(d.voiceRef).startsWith('canvas:')).length
+  const nodeOnly = (data.assets?.characters || []).filter((c) => !c.assetIdSingle && (c.singleNodeId || c.threeNodeId)).length
+  if (canvasRefs || nodeOnly) warnings.push(`draft 模式：${canvasRefs} 条 canvas 声线 / ${nodeOnly} 个仅 node id 的角色；跨会话前必须入库换 assetId`)
+} else {
+  errors.push('params.assetMode 必须是 draft 或 library')
+}
 for (const s of data.scenes || []) if (!s.lightBaseline) errors.push(`${s.id}: 缺 lightBaseline`)
 
 // ── markdown 一致性 ─────────────────────────────────

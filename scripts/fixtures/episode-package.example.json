@@ -141,7 +141,9 @@
         "singleNodeId": "node-lin-single",
         "threeNodeId": "node-lin-three",
         "assetId": "character:demo-lin",
-        "episodes": "1-60"
+        "episodes": "1-60",
+        "assetIdSingle": "character:demo-林晚",
+        "assetIdThree": "character:demo-林晚-three"
       },
       {
         "name": "顾言",
@@ -149,7 +151,9 @@
         "singleNodeId": "node-gu-single",
         "threeNodeId": "node-gu-three",
         "assetId": "character:demo-gu",
-        "episodes": "1-60"
+        "episodes": "1-60",
+        "assetIdSingle": "character:demo-顾言",
+        "assetIdThree": "character:demo-顾言-three"
       }
     ],
     "scenes": [
@@ -237,7 +241,8 @@
       "shot prompts",
       "shot clips",
       "final delivery"
-    ]
+    ],
+    "assetMode": "library"
   },
   "budget": {
     "estimatedMinutes": 70,
