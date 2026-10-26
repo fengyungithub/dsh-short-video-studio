@@ -3,6 +3,8 @@
 > **适用**：工作区已有 `series/bible.md` + `series/episodes/epNNN/package.md`，或从 `short-drama-series-production` 委托进入。
 > 进入本模式前必读本文件；本文件只定义**入口/交接/门**，拍摄规则仍走 SKILL 的 STEP 3–8。
 > 单片模式见 `single-film-mode.md`；声线见 `voice-audition.md`。
+>
+> **从 story 门 0 选「连续短剧」转入时**：story 必须**立即停止**，不再问 11 项规格、不写 state、不进入 STEP 1；production 接住后由它决定 A/B/C。
 
 ### 门 0 · 入口探测（上下文优先，提问兜底）
 

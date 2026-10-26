@@ -17,6 +17,8 @@
 | 品牌/产品宣传短片 | `brand-promo-video-generator` | `/brand-promo-video-generator` + 品牌素材 |
 | 单张图片（角色卡/场景图/改绘） | `image-generate` / 直接 `comfy_generate_image` | `/image-generate`（若可用）或「用 comfy_generate_image 生成…」 |
 
+> **硬规则**：用户选「连续短剧（多集）」后，`story-short-generator` **必须立即停止**，不再问视觉风格/画幅/时长/档位/角色卡/审查等任何规格，直接加载 `short-drama-series-production` 接住；只有用户明确改口「改做单片」才继续单片流程。
+>
 > **单片 vs 单集**：`story-short-generator` 现在**先探测系列上下文**。如果工作区有 `series/` 或集制作包，它会直接进「委托模式」；没有才问片型。所以「拍第 3 集」在有系列上下文时，从 story 进来也能工作；但**整部/多集**建议从 production 进。
 
 ---

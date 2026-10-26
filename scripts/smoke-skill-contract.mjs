@@ -153,6 +153,8 @@ ok('剧集参考含 assetMode=library 与 3 张卡', seriesMode.includes('assetM
 ok('声线参考含“不带风格锁 C”', voiceRef.includes('不带风格锁 C'))
 ok('剧集参考含 E-STEP 0 预检', seriesMode.includes('E-STEP 0') && seriesMode.includes('规格偏差卡'))
 ok('runbook 含本集规格卡', run.includes('本集规格'))
+ok('SSG 连续短剧硬停', ssg.includes('立即停止本 skill 流程') && ssg.includes('不要静默降级'))
+ok('系列参考含 story 立即停止', seriesMode.includes('立即停止'))
 
 console.log('')
 if (fail) {
