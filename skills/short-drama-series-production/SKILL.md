@@ -36,7 +36,11 @@ series-writer 剧本（文件）
 
 **路由规则**（开场第一条就判）：
 
-1. 没有已批准的分集剧本 → 先加载 `short-drama-series-writer` 跑 `/start` → `/plan` → `/characters` → `/outline`，再回到本 skill 的阶段 B。
+1. **没有已批准的分集剧本** → 加载 `short-drama-series-writer`，跑它的**完整剧本流水**，不是只让它出大纲：
+   - A 段（本 skill 阶段 A 内）：`/start` → `/plan` → `/characters` → `/outline`（先有分集目录）；
+   - B 段（本 skill 阶段 B 内）：`/episode 1-10` → `/review N`，前 10 集优先；
+   - 只有零散剧本、缺人物/目录 → 先让 writer 补齐 `/characters` / `/outline`，不要 production 自造设定；
+   - writer 未安装/加载失败 → **停线告知用户**；**本 skill 不代写剧本、不改台词**。
 2. 只有一句话创意、目标是一条片子 → 转 `story-short-generator`，不要用本 skill。
 3. 有分集剧本、目标是多集成片 → 本 skill。
 4. **由 `story-short-generator` 的门 0 转入**（它查到系列上下文，或用户选了「连续短剧」）时：story **必须立即停止提问**，本 skill 接住；**不再重复问片型**，直接接住剧本/集制作包（没有就按本 skill 阶段 A/B 产出），完成后交回它做单集生产。
@@ -204,7 +208,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 ## 4. 阶段 A：立项与系列圣经（门 G-S）
 
 1. 确认第 1 节的参数（不改默认就按推荐项走），`canvas_set_state` 落地。
-2. 没有剧本 → 加载 `short-drama-series-writer`，跑 `/start` → `/plan` → `/characters` → `/outline`（**它的 references 按阶段读，不要一次全读**）。
+2. 没有剧本 → 加载 `short-drama-series-writer`，跑 A 段 `/start` → `/plan` → `/characters` → `/outline`（**它的 references 按阶段读，不要一次全读**）；**writer 的 A 段只做剧本/目录；系列圣经仍由本 skill 第 3 步写，制作包在阶段 B 写**。
 3. 写 `series/bible.md`，同时落主会话文本节点（group `series bible`）。必须包含：
    - 一句话故事 + 三幕结构（集数范围）+ 全剧节奏波形（高潮/低谷/卡点位置）
    - 人物关系图 + 每个主要角色的**视觉锚点**（脸/发型/身材/服饰主色/签名道具/不可改特征）与**状态卡需求**（哪几段会有换装/受伤/年龄跨度）
@@ -224,7 +228,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 - **前 10 集优先**：投流与样片都在这一批；写满 10 集就停下来做样片，不要一口气写 80 集。
 - 之后按批写（每批 5–10 集），**剧本领先影像 5–10 集**，用生产反馈修正后续剧本（避免成片暴露的问题在全季重复）。
-- 批量入口：`/episode 1-10`（series-writer 支持区间）；每集完跑 `/review N`，不过关先改再进（它的 45/50 分线）。
+- B 段仍由 **writer** 写：批量入口 `/episode 1-10`（支持区间）；每集完跑 `/review N`，不过关先改再进（它的 45/50 分线）。**production 只接收场次/逐字台词/钩子，不代写。**
 - **每集只落到本 skill 需要的三件事**：场次（压缩到 1–2 个物理场景）、逐字台词、集尾钩子 + 下集回应。
 - **门 G-B**：每批剧本批准（沿用 series-writer 的输出，不再重复问创作取向）。
 

@@ -93,6 +93,9 @@ DSH 的技能选择是**模型读目录里的 `name + description` 前 500 字**
 ```
 
 ### 整部 / 单集
+
+> 如果还没有剧本：production 会调用 `short-drama-series-writer` 的**完整流水**（`/start` → `/plan` → `/characters` → `/outline` → `/episode` → `/review`），不是只让它出大纲；production 不代写台词/设定。writer 不可用则停线告知。
+
 ```
 /short-drama-series-production
 已有 80 集分集剧本，整部量产；先做 EP01 样片集，balanced/9:16/无字幕。
