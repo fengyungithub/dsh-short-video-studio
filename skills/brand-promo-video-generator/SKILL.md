@@ -30,9 +30,10 @@ whenToUse: |
 | 写简报 / 事实表 / 来源清单 / 镜头表 / 交付清单 | `canvas_write_node`（kind=text\|table） |
 | 读画布节点 | `canvas_get_node` / `canvas_list_nodes` |
 | 归组 / 排序 | `canvas_group_nodes` / `canvas_reorder` |
-| 读写项目设置 | `canvas_get_state` / `canvas_set_state` |
+| 读写项目设置（含逐镜自检门 `shotGate`） | `canvas_get_state` / `canvas_set_state` |
 | 查跨会话资产库 / 物化资产到画布 | `asset_list` / `asset_to_canvas` |
-| 抽帧（取末帧 / 首帧） | `extract_frame` |
+| 抽帧（取末帧 / 首帧 / 自检关键帧） | `extract_frame` |
+| **记录逐镜自检结论（自检门放行凭据）** | `canvas_record_check(nodeId, verdict="pass"\|"fail", frames?, notes?)` |
 | 拼接全片（含音轨） | `video_concat` |
 | 提分辨率 / 超分（可选，见 STEP 8） | `video_upscale`（对**单个片段**放大） |
 | 所有批准 / 选择关口 | `ask_user_question`（选项卡） |
@@ -365,6 +366,8 @@ whenToUse: |
 抽出的末帧 / 首帧图片节点也归 `shot clips` 组，它们是中间产物，终检时不计入镜头数。转场镜自带模型生成的音频，终检时必须逐条听过，有杂音或幻听人声就重出。
 
 ### 片段批准
+
+**逐镜自检必须先落画布（工具层硬门）**：每渲完一镜立即 `extract_frame` 抽首/中/末帧核对（身份素材是否逐字一致、文案是否漏烧/错烧、无分镜痕迹），然后 `canvas_record_check(nodeId=<本镜片段节点>, verdict="pass"|"fail", frames=[抽出的帧节点 id], notes=<判定摘要>)`。`pass` 必须有抽帧证据；未 pass 的镜头会被插件 pre-execute 门挡住下一镜，`video_concat` 也要求参与拼接的镜头全部 pass。`fail` 时按「逐镜失败回退阶梯」改完**复用同一 nodeId 重渲**（重渲把自检重置为 pending）。项目设置 `shotGate=verdict|frames|off` 控制强度（默认 verdict）。
 
 所有片段渲染完成后按镜头顺序放到画布（group `shot clips`），出选项卡：批准片段并进入交付（推荐）/ 重渲染选定片段 / 修复身份不一致 / 加强品牌锁一致性 / 修复跨片段色彩状态跳变。
 

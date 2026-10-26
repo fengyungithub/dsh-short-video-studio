@@ -724,6 +724,13 @@ import { markdownToHtml } from './markdown.js'
     const keys = ['model', 'tier', 'character', 'cardVariant', 'seed', 'width', 'height', 'length', 'steps', 'guidance']
     const parts = keys.filter((k) => node.params[k] !== undefined && node.params[k] !== null)
       .map((k) => k + '=' + node.params[k])
+    // 逐镜自检门：镜头卡上直接显示自检状态（⏳ 待自检 / ✅ 通过 / ❌ 未过），
+    // 与插件 pre-execute 门读同一份 params.selfCheck。
+    const check = node.params.selfCheck
+    if (check && typeof check === 'object') {
+      const label = check.status === 'pass' ? '✅ 自检通过' : check.status === 'fail' ? '❌ 自检未过' : '⏳ 待自检'
+      parts.unshift(label)
+    }
     return parts.join(' · ')
   }
 
