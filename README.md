@@ -300,6 +300,8 @@ video_upscale({ video_node: '<长片节点 id>', target_width: 4032, chunk_frame
 | 品牌故事 / 纪念短片 / Vlog 解说… | 素材与主题 | 按你的业务规范自定义 |
 
 > 另有**剧本层** `short-drama-series-writer`（自 `0xsline/short-drama` 收编，MIT）：负责选题、分集大纲与单集剧本，供 `short-drama-series-production` 调用；只写文本、不出视频；它的 `export/` 只做剧本汇编（不含分镜 / 镜头表），**生产交接物是由 series-production 生成的「集制作包」**。
+>
+> **怎么触发、触发词重叠、以及与外部 `shortdrama-*` 的区别**：[docs/USAGE-ROUTING.md](docs/USAGE-ROUTING.md)。
 
 每个场景 skill 就是一个 `SKILL.md`（纯文本编排规则），插件对它零认知——触发哪个 skill 就完全按它执行。三步即可定义一种新场景：
 
