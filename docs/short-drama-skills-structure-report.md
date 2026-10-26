@@ -389,6 +389,8 @@ PROD 与 SSG 都写 `canvas_set_state`、都声明 groupOrder（9 vs 10）；PRO
 
 ### P3（可选，1 周）
 
+> 前置设计：**资产管理层**（资产库 / 系列台账 / 每集画布三层）见 [连续短剧资产管理设计](analysis/series-asset-management.md)——量产前必须先定，否则 80 集会重复“节点 id 当资产”的坑。
+
 14. 拆出 `short-drama-episode`（方案 2）+ SSG 回到纯单片 + 改名。
 15. BGM 能力接入交付流程（可选点单）。
 
