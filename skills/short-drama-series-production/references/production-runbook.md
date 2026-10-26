@@ -30,19 +30,30 @@ canvas_set_state(aspectRatio="9:16", duration="90 秒（默认；按包 ① 80�
 
 ---
 
-## 2. 单集生产序列（3 张人工卡）
+## 2. 单集生产序列（3 张人工卡，编排权威）
+
+### 2.0 职责与 handback
+
+| 谁 | 做什么 | 不做什么 |
+|---|---|---|
+| production | 物化资产（asset id）、建集制作包、出 3 张人工卡、asset_ingest/台账、状态/成本/交付包 | 不调用图片/视频生成工具、不改拍摄规则 |
+| story | 生成卡片/镜头表/分镜/提示词库/逐镜/拼接、跑 AI 自检与异常门 | 不写系列台账/资产库/交付包 |
+
+**story → production handback**（每集收尾必须交回）：`finalNodeId` / `clipNodeIds` / `shots` / `rework` / `costMinutes` / `warnings` / `assetNodeIds`（本集新生成的卡，交 production 入库）。production 写 `production-state.json` 与 ledger；story 不写这两个文件。
 
 > 拍摄参数与失败梯度**一律照 `story-short-generator` 的 STEP 5 / 6 / 7**；本片型只固定：`tier=balanced`、`ref_variant=single`、字幕 `none`、声线从台账 `voices[]` 取。这里只列系列层动作，不复述调用参数。
 
-### 2.1 卡片（缺卡才建）
+### 2.1 资产物化 / 缺卡交 story
 
 ```text
-有 id → asset_to_canvas(id)                     # 复用
-缺卡   → 按 story STEP 3 生成 single + three（图片档位 balanced、两版配对）
+有 id → asset_to_canvas(id)                     # production 物化，节点写 params.assetId
+缺卡   → 交 story 生成 single + three（图片档位 balanced、两版配对）
+        → production 走 asset_ingest（用户批准清单）→ 台账 → §2.2 方案卡重批
 ```
 
 - 建卡后的逐卡锁定**不单独弹卡**，并入 §2.2 的方案卡。
 - 场景 / 道具 / 声线已在阶段 C 建好；本集只物化，不重画。
+- **story 不写资产库**；缺卡生成后只返回节点，由 production 入库/记账。
 
 ### 2.2 建包 → 镜头表 → 分镜 → 方案卡（G-P，1 张/集）
 
