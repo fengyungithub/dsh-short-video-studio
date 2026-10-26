@@ -671,7 +671,7 @@ comfy_generate_image(prompt=<同一角色设定 + 正/侧/背三格 + 锁 A/B>, 
 5. **音频与声线**：先查画布节点 `params.audio_ref_nodes` 是否等于镜头表 `声线参考`（对白镜必须传；`silent`/`none` 镜必须为空），以及 `params.audio_ref_declared === true`（prompt 里有 `<Audio N>`）。AI 不能听音——把「对白清晰 / 音色与声线样本是否同一人 / 音效与画面同步 / 无杂音幻听」列入确认卡，由人工听核；转场镜重点核对有无幻听人声。
 6. **风格一致**：本镜画面符合**所选风格锁**（`references/styles/<id>.md`），与已锁定的卡片及相邻镜无风格漂移；风格锁后缀与负向约束确已追加到本镜 prompt。
 
-**自检结论必须落画布（工具层硬门，不可跳过）**：每镜自检结束后立刻 `canvas_record_check(nodeId=<本镜片段节点>, verdict="pass"|"fail", frames=[本镜抽出的帧节点 id], notes=<判定摘要>)`。`pass` 必须有抽帧证据（`extract_frame` 产物，或用 `frames` 显式给出）；**未 pass 的镜头会被插件 pre-execute 门直接挡在下一镜之前**（`comfy_generate_video` 被 deny 并给出下一步），`video_concat` 也要求参与拼接的镜头全部 pass。`fail` 时改 prompt / 参数后**复用同一 nodeId 重渲**（重渲会把自检重置为 `pending`），不要新开节点。人工确认按 `reviewMode` 照旧——自检门只管 AI 自检留痕，不替代人工确认。项目设置 `shotGate` 控制强度：`verdict`（默认，必须 pass）/ `frames`（只要求抽过帧）/ `off`（关闭——此时不做本段留痕，也不被插件拦；人工确认照旧）。
+**自检结论必须落画布（工具层硬门，不可跳过）**：每镜自检结束后立刻 `canvas_record_check(nodeId=<本镜片段节点>, verdict="pass"|"fail", frames=[本镜抽出的帧节点 id], notes=<判定摘要>)`。`pass` 必须有抽帧证据（`extract_frame` 产物，或用 `frames` 显式给出）；**未 pass 的镜头会被插件 pre-execute 门直接挡在下一镜之前**（`comfy_generate_video` 被 deny 并给出下一步）；`video_concat` / `video_upscale` 是后处理，不受此门约束。`fail` 时改 prompt / 参数后**复用同一 nodeId 重渲**（重渲会把自检重置为 `pending`），不要新开节点。人工确认按 `reviewMode` 照旧——自检门只管 AI 自检留痕，不替代人工确认。项目设置 `shotGate` 控制强度：`verdict`（默认，必须 pass）/ `frames`（只要求抽过帧）/ `off`（关闭——此时不做本段留痕，也不被插件拦；人工确认照旧）。
 
 失败处置：任一不过 → 先 `canvas_record_check(verdict="fail")` 留痕，再走「逐镜失败回退阶梯」重渲本镜（参考图形态类问题先换单视图卡 / 强化 prompt / 缩时长 / 降档 / 简化动作）后重跑自检；**未过自检的片段不进任何审查卡**。若片段与已批准的 `参考锚点` 漂移（门框落到错边、人物从错边离屏、光位翻转），用直接引用 `参考锚点` 块的强化提示重渲。
 

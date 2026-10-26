@@ -148,14 +148,12 @@ try {
   writeProject({ shotGate: 'off' }, [shotNode('s1', 1, 'pending')])
   ok((await gate(genExec(), next)).kind === 'allow', 'off 档：完全关闭')
 
-  // ---------- 4. 拼接门 ----------
-  console.log('# video_concat')
+  // ---------- 4. 后处理 / 其他能力不受门控 ----------
+  console.log('# 后处理不受门控')
   writeProject({}, [shotNode('s1', 1, 'pass'), shotNode('s2', 2, 'pending')])
   const concatExec = { name: 'video_concat', arguments: { nodes: ['s1', 's2'], sessionId: sid }, agent }
-  r = await gate(concatExec, next)
-  ok(r.kind === 'deny' && String(r.reason).includes('参与拼接'), '拼接含未过门镜头：拒绝')
-  writeProject({}, [shotNode('s1', 1, 'pass'), shotNode('s2', 2, 'pass')])
-  ok((await gate(concatExec, next)).kind === 'allow', '拼接全部 pass：放行')
+  ok((await gate(concatExec, next)).kind === 'allow', 'video_concat 不受逐镜自检门约束（即使有 pending 镜）')
+  ok((await gate({ name: 'video_upscale', arguments: { video_node: 's2', sessionId: sid }, agent }, next)).kind === 'allow', 'video_upscale 不受门控')
   ok((await gate({ name: 'comfy_generate_image', arguments: { prompt: 'x', sessionId: sid }, agent }, next)).kind === 'allow', '图片生成不受门控影响')
 
   // ---------- 5. 防死循环 ----------

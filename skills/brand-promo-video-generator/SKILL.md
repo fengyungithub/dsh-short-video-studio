@@ -368,7 +368,7 @@ whenToUse: |
 
 ### 片段批准
 
-**逐镜自检必须先落画布（工具层硬门，`settings.shotGate` 开启时生效、默认开启）**：每渲完一镜立即 `extract_frame` 抽首/中/末帧核对（身份素材是否逐字一致、文案是否漏烧/错烧、无分镜痕迹），然后 `canvas_record_check(nodeId=<本镜片段节点>, verdict="pass"|"fail", frames=[抽出的帧节点 id], notes=<判定摘要>)`。`pass` 必须有抽帧证据；未 pass 的镜头会被插件 pre-execute 门挡住下一镜，`video_concat` 也要求参与拼接的镜头全部 pass。`fail` 时按「逐镜失败回退阶梯」改完**复用同一 nodeId 重渲**（重渲把自检重置为 pending）。项目设置 `shotGate=verdict|frames|off` 控制强度（默认 verdict）。
+**逐镜自检必须先落画布（工具层硬门，`settings.shotGate` 开启时生效、默认开启）**：每渲完一镜立即 `extract_frame` 抽首/中/末帧核对（身份素材是否逐字一致、文案是否漏烧/错烧、无分镜痕迹），然后 `canvas_record_check(nodeId=<本镜片段节点>, verdict="pass"|"fail", frames=[抽出的帧节点 id], notes=<判定摘要>)`。`pass` 必须有抽帧证据；未 pass 的镜头会被插件 pre-execute 门挡住下一镜；`video_concat` 是后处理，不受此门约束。`fail` 时按「逐镜失败回退阶梯」改完**复用同一 nodeId 重渲**（重渲把自检重置为 pending）。项目设置 `shotGate=verdict|frames|off` 控制强度（默认 verdict）。
 
 所有片段渲染完成后按镜头顺序放到画布（group `shot clips`），出选项卡：批准片段并进入交付（推荐）/ 重渲染选定片段 / 修复身份不一致 / 加强品牌锁一致性 / 修复跨片段色彩状态跳变。
 

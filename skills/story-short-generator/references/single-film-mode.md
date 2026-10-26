@@ -58,7 +58,7 @@
   - 选定后**写进项目简报**，并 `canvas_set_state(reviewMode='per-shot'|'batch')` 持久化。**中途可改**：改 state 即生效——`per-shot → batch` 从下一镜起不再逐镜弹卡；`batch → per-shot` 从下一镜起恢复逐镜确认（已渲片段不重做）。
 
 **逐镜自检门（`shotGate`，默认开启）**：是否强制每镜自检留痕。
-  - **开启（`verdict`，默认推荐）**：每渲完一镜，AI 必须 `extract_frame` 抽首/中/末帧核对，再 `canvas_record_check(nodeId, verdict="pass"|"fail", frames=…)`；**没 pass 的镜头，插件会直接拒绝下一镜生成**（`video_concat` 也要求参与拼接的镜头全部 pass），`fail` 复用同一 `nodeId` 重渲。
+  - **开启（`verdict`，默认推荐）**：每渲完一镜，AI 必须 `extract_frame` 抽首/中/末帧核对，再 `canvas_record_check(nodeId, verdict="pass"|"fail", frames=…)`；**没 pass 的镜头，插件会直接拒绝下一镜生成**；`video_concat` / `video_upscale` 是后处理，不受此门约束。`fail` 复用同一 `nodeId` 重渲。
   - **只要求抽帧（`frames`）**：每镜至少抽一帧（看片），不强制记录结论——插件只拦「没抽帧就开下一镜」。
   - **关闭（`off`）**：不做逐镜 AI 自检留痕（新手快速试片、或只是想先看全片节奏）。**人工确认与失败回退阶梯照旧**；`reviewMode=per-shot` 时变成「渲完 → 直接人工确认」。
   - 选定后 `canvas_set_state(shotGate='verdict'|'frames'|'off')` 持久化；**中途可改**，从下一镜起生效（新渲片段按新档打标/不打标，已渲片段不重做）。
