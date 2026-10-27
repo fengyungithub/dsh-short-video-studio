@@ -82,13 +82,15 @@ canvas_set_state(aspectRatio="9:16", duration="90 秒（默认；按包 ① 80�
 ### 2.4 拼接 + 终检 → 交付卡（G-E，1 张/集）
 
 ```text
+[可选，delivery=fps48] 逐镜补帧：video_interpolate(video_node=每镜片段, target_fps=48)
+  → 用补帧后的节点去拼接（整片同帧率；含硬切/拼接产物不补）
 video_concat(nodes=[按镜头表顺序，含转场镜], title="EP00X 拼接成片", group="final delivery")
 → 按 story 终检清单核对
 → ask_user_question（交付卡）：成片 + 终检结论 + 本集成本 + 台账
 → 批准后写 series/delivery/epNNN/、state=delivered、ledger 追加一行
 ```
 
-交付卡选项：**批准交付（推荐）** / 重渲某镜 / 重拼 / 逐镜超分 / 补做终检某项。
+交付卡选项：**批准交付（推荐）** / 重渲某镜 / 重拼 / 逐镜超分 / **逐镜补帧（48fps）** / 补做终检某项。
 
 ---
 

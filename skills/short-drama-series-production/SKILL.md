@@ -80,7 +80,7 @@ series-writer 剧本（文件）
 | 片段审查节奏 | `batch` | 量产默认全部渲完一次确认；口型/一致性不过关仍**当场**弹单镜处置卡 |
 | 声线方案 | **`existing`**（阶段 C 一次性建立） | 有对白角色在阶段 C 做一次试镜 / 复用 `voice:`，全季复用；`text-only` 仅作降级，交付清单必须记「跨集音色无保证」。无 state 字段，写进系列圣经与集制作包 ⑥ |
 | 每集场景数 | **1–2 个物理场景** | 上游「每集 3–5 场」必须压缩：同一物理场景的多次换景算 1 场；**跨场景每个边界要 1 个转场镜**（占 1 镜预算） |
-| 交付画质 | **先原生，样片后定** | 原生 768×1344；要 1080×1920 只能**逐镜超分**（9:16 不支持生成内放大），代价 +≈78 min/集，见 §9 |
+| 交付画质 | **先原生，样片后定** | 原生 768×1344；要 1080×1920 只能**逐镜超分**（9:16 不支持生成内放大），代价 +≈78 min/集；**要 48fps 只能逐镜补帧**（成片不补），代价 +≈3 min/集，见 §9 |
 | 视觉风格 | `cinematic-live-action` | 真人写实最适合国内竖屏短剧；由用户最终确认（7 选 1，见 story skill） |
 
 **开场必须用 `canvas_set_state` 一次写全**（主会话与每集会话各写一次；下面是**示例**，实际值按 S-STEP 0 结果填）：
@@ -116,14 +116,14 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 | 片段审查 `reviewMode` | `batch` / `per-shot` | per-shot 每镜一张卡，人力 ×N |
 | 逐镜自检门 `shotGate` | `verdict`（默认，每镜必须记录 pass）/ `frames`（只抽帧）/ `off`（关闭） | 关闭 = 坏镜头晚发现、返工成串；量产建议保持 `verdict` |
 | 声线方案 `voicePlan` | `existing`（复用/缺的补建，推荐）/ `audition`（全部重新试镜）/ `text-only` | text-only 无音色锚点，交付记风险；audition = 新季换声/重做声线 |
-| 交付画质 `delivery` | `native` / `upscale1080` / `upscale2k` / `upscale4k` | 超分 ≈+78 min/集（1080）；整季二选一 |
+| 交付画质 `delivery` | `native` / `upscale1080` / `upscale2k` / `upscale4k` / `fps48` | 超分 ≈+78 min/集（1080）；补帧 48fps ≈+3 min/集；整季二选一 |
 | 视觉风格 | `cinematic-live-action` / 其余 6 套 | 改 = 全部卡片与片段作废 |
 | 语言 / 出海 | 中文 / English（出海） | 英文台词+字幕未实测，先 1 镜验证 |
 
 **S-STEP 0 必须用 `ask_user_question` 的四组选项提交（不许静默按默认通过；用户说“按默认”也要回显规格卡确认）**：
 
 1. **画面 / 时长**：`9:16`（推荐）/ `16:9` / `1:1`；`90s`（推荐）/ `80s` / `100s` / `110s` / 自定义。
-2. **画质 / 成本**：视频 `tier` = `balanced`（推荐）/ `quality` / `fast`；图片 `imageTier` = `balanced`（推荐）/ `quality` / `fast`；交付 `delivery` = `native`（推荐）/ `upscale1080` / `upscale2k` / `upscale4k`；字幕 `subtitles` = `none`（推荐）/ `burned-in`；BGM `bgmMode` = `none`（默认）/ `in-model`（H3 逐镜自带，本期）。
+2. **画质 / 成本**：视频 `tier` = `balanced`（推荐）/ `quality` / `fast`；图片 `imageTier` = `balanced`（推荐）/ `quality` / `fast`；交付 `delivery` = `native`（推荐）/ `upscale1080` / `upscale2k` / `upscale4k` / `fps48`（逐镜补帧，+≈3 min/集）；字幕 `subtitles` = `none`（推荐）/ `burned-in`；BGM `bgmMode` = `none`（默认）/ `in-model`（H3 逐镜自带，本期）。
 3. **资产 / 声音**：角色卡 `characterCardVariant` = `single`（推荐）/ `three`（仅 balanced/quality）；声线 `voicePlan` = `existing`（推荐，阶段 C 复用/缺的补建）/ `audition`（强制每个说话角色重新试镜）/ `text-only`（降级）。
 4. **审查 / 自检 / 风格**：`reviewMode` = `batch`（推荐）/ `per-shot`；**逐镜自检门 `shotGate` = `verdict`（推荐，默认）/ `frames` / `off`**；视觉风格 7 选 1；语言中文 / English（出海，先 1 镜验证）。
 
@@ -199,7 +199,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
               "mode": "domestic",
               "aspectRatio": "9:16", "style": "cinematic-live-action",
               "audioMode": "dialogue-led", "tier": "balanced", "imageTier": "balanced",
-              "subtitles": "none", "delivery": "native|upscale1080",
+              "subtitles": "none", "delivery": "native|upscale1080|fps48",
               "characterCardVariant": "single", "reviewMode": "batch", "shotGate": "verdict",
               "voicePlan": "audition|existing|text-only", "bgmMode": "none|in-model", "packageContract": "episode-package/v1", "assetMode": "library" },
   "assets": {
@@ -319,9 +319,9 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 2. **一致性基线**：抽 5 帧（首/中/末 + 两个说话窗）对照角色卡与场景卡，记录漂移项。
 3. **声线基线**：每个说话角色抽 1 句对白，人工听核「是否同一人 / 有无环境音 / 有无幻听」；不通过回阶段 C 换 `voice:`（换声线要连锁重渲对白镜，宁可在样片集发现）。
 4. **字幕开关复核**：确认成片**画面内没有任何字幕 / 烧录文字**（负向尾句是兜底，主机制是「不写声明」）。
-5. **交付画质对照**：原生 768×1344 与「超分到 1080×1920」各做 1 镜，给用户看差别与代价。
+5. **交付画质对照**：原生 768×1344 与「超分到 1080×1920」各做 1 镜，给用户看差别与代价；`delivery=fps48` 时再加 1 镜 48fps 对照（补帧前后抽同时间点 1 帧，看双影 / 字幕边缘）。
 6. **可选三视图对照**：用户要试 `three` 时，只在本集挑 1–2 镜用 `ref_variant='three'` 对照（竖屏未实测，通过了再讨论整季切换；切换 = 已产集重渲）。
-7. **门 G-SAMPLE**：`ask_user_question` 列「成片 + 三档实测 + 漂移项 + 声线基线 + 超分对照」，选项：**按 balanced 原生量产（推荐）** / 整季升 quality / 整季逐镜超分到 1080 / 放开 three 视图（需重渲本集）/ 先修资产或剧本再量产。
+7. **门 G-SAMPLE**：`ask_user_question` 列「成片 + 三档实测 + 漂移项 + 声线基线 + 超分对照」，选项：**按 balanced 原生量产（推荐）** / 整季升 quality / 整季逐镜超分到 1080 / **整季逐镜补到 48fps** / 放开 three 视图（需重渲本集）/ 先修资产或剧本再量产。
 
 > 样片集未批准，不进第 2 集。
 
@@ -378,6 +378,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 | 转场镜（≤1 个，i2v） | ≈177s | ≈3 min |
 | 重渲（经验系数 1.3–1.5） | — | +15–25 min |
 | 逐镜超分到 1080×1920（可选） | ≈262s/镜 | +78 min |
+| 逐镜补帧到 48fps（可选，成片不补） | ≈10.5s/镜 | **+3 min** |
 | 抽帧自检 / 拼接 / 导出 | 秒–分钟级 | ≈2 min |
 | **单集合计** | | **≈70 min（原生）/ ≈150 min（超分）** |
 | 整季 80 集 | | **≈93 GPU 小时（原生）≈ 4 天满负荷；超分版 ≈8 天** |
@@ -388,7 +389,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 ### 9.2 三道闸门
 
 1. **样片闸**：EP01 未过 G-SAMPLE 不进第 2 集。
-2. **档位闸**：整季同一档（`balanced`）；**不要混档**（链内首遍尺寸必须一致，混档会打断续接链且拼接后清晰度跳变）。用户要「更好看」先分清：要更大尺寸 → 超分（不重画、不断链）；要更好画面 → 改档重渲（断链、连锁下游）。
+2. **档位闸**：整季同一档（`balanced`）；**不要混档**（链内首遍尺寸必须一致，混档会打断续接链且拼接后清晰度跳变）。用户要「更好看」先分清：要更大尺寸 → 超分（不重画、不断链）；要更顺 → **逐镜补 48fps**（后处理、不改尺寸、不断链）；要更好画面 → 改档重渲（断链、连锁下游）。**整季必须同一帧率**：混帧率拼接会被 `video_concat` 拒绝。
 3. **规模闸**：≥20 集的项目，先出「集数 × 档位 × 是否超分」预算表让用户确认；跑批期间每 5 集报一次成本偏差。
 
 ### 9.3 省钱顺序（不许跳）
@@ -444,7 +445,7 @@ T = 目标时长（80–110s，默认 90s）
 - 终检清单（沿用 story skill 的终检项）+ 本集成本（GPU 分钟 / 重渲镜数）
 - 人工听核项：对白清晰度、音效同步、有无幻听人声
 
-**交付卡（G-E）**：每集一张，列成片（节点 id / 时长 / 尺寸 / 档位）+ 终检结论 + 本集成本 + 台账；批准后才把 `stage` 写成 `delivered`。选项：**批准交付（推荐）** / 重渲某镜 / 重拼 / 逐镜超分 / 补做终检某项。
+**交付卡（G-E）**：每集一张，列成片（节点 id / 时长 / 尺寸 / 档位）+ 终检结论 + 本集成本 + 台账；批准后才把 `stage` 写成 `delivered`。选项：**批准交付（推荐）** / 重渲某镜 / 重拼 / 逐镜超分 / **逐镜补帧（48fps）** / 补做终检某项。
 
 **整季交付**（主会话 `series delivery` 组）：集清单（集号 → 成片路径 → 时长）、未落地项（BGM 贴轨 / `text-only` 音色风险 / 待重渲）、总成本、资产台账快照。
 
