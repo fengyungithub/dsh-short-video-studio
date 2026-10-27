@@ -440,6 +440,59 @@
         "source",
         "sampleExtra"
       ]
+    },
+    "interpolate": {
+      "type": "object",
+      "description": "视频补帧（capability=video.interpolate）的结构声明：倍率范围 / 帧数规则 / 音频策略。契约见 docs/video-interpolate.md。",
+      "properties": {
+        "mode": {
+          "enum": [
+            "param",
+            "fixed"
+          ],
+          "description": "倍率来源（缺省 param）：param=由 runner 按目标帧率反解；fixed=清单写死 multiplier。"
+        },
+        "multiplier": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 16,
+          "description": "mode=fixed 时唯一的合法倍率。"
+        },
+        "defaultMultiplier": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 16,
+          "description": "mode=param 且调用方未指定目标帧率时的默认倍率（如 2 ⇒ 24→48fps）。"
+        },
+        "minMultiplier": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 16,
+          "description": "模型支持的倍率下限（ComfyUI FrameInterpolate 为 2）。"
+        },
+        "maxMultiplier": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 16,
+          "description": "模型支持的倍率上限（ComfyUI FrameInterpolate 为 16）。"
+        },
+        "outRule": {
+          "enum": [
+            "n-minus-1-times-m-plus-1"
+          ],
+          "description": "模型输出帧数规则；决定 D2 尾部补几帧。"
+        },
+        "audio": {
+          "enum": [
+            "passthrough"
+          ],
+          "description": "音轨策略：直通（音频不经过模型，时长跟画面）。"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "definitions": {
