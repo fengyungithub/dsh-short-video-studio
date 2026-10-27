@@ -139,8 +139,9 @@ video_interpolate({ video_node: '<S01 节点 id>', multiplier: 5, target_fps: 12
 ## 7. 边界与已知限制
 
 - **只逐镜补，成片不补**：模型没有场景检测，硬切处会生成两场之间的形变帧。
-- **字幕 / 文字 / 硬边**：插帧可能拉丝或半透明叠字，上线前必须做 A/B（见
-  [`research/fps-interp/ab-48fps.md`](research/fps-interp/ab-48fps.md)）。
+- **字幕 / 文字 / 硬边**：插帧可能拉丝或半透明叠字，上线前必须做 A/B。实测（`research/fps-interp/ab-48fps.md`）：
+  慢镜/快动作都干净（中间帧 PSNR 32–41 dB），**含硬切的镜头会在切点生成交叉淡化鬼影帧（PSNR 13.9 dB）**，
+  烧录字幕的中间帧文字边缘变软（32.8–34.9 dB，仍可读）。⇒ 逐镜补；含切点/转场的镜头跳过；字幕镜先抽中间帧核对。
 - **未做分块**：长片（>300 帧 @1344×768）会把整段 IMAGE 张量放进内存；当前依赖
   `FrameInterpolate` 自身的 OOM 降 batch。需要长片时按 `overlap` 分块是下一步。
 - **只有 quality 一档**：补帧没有质量阶梯，`tier` 传 fast/balanced 会显式报错。
