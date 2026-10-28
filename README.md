@@ -228,6 +228,7 @@ video_upscale({ video_node: '<长片节点 id>', target_width: 4032, chunk_frame
 | `video-interpolate-rife` | `video.interpolate` | **视频补帧（VFI）**：输入是画布上**已有的视频节点**，RIFE 整数倍补帧（×2–×16，`FrameInterpolate` + `rife_v4.25`），**音轨直通**、分辨率不变。模型原生输出 `(N−1)m+1` 帧，runner 在 ComfyUI 图里**尾部补齐 m−1 帧** ⇒ 母版 `N×m` 帧、时长严格等于源（D2，避免逐镜拼接累积漂移）。目标帧率非整数倍时（24→60 / 24→30）先出 120fps 母版再由 **ffmpeg** 抽到目标帧率。实测（A800）：480×832 124 帧 ×2 **6.3s**；768×1344 124 帧 ×2 **10.5s**、×5 **21.0s**。**逐镜补、成片不补**；`video_concat` 会拒绝混帧率拼接。详见 [`docs/video-interpolate.md`](docs/video-interpolate.md) |
 | `minimax-music3` | `audio.music` | **MiniMax Music 3 文本生音乐（BGM）**：本地权重 + ComfyUI 原生节点（`MiniMaxMusic3TextEncode` → `KSampler` → `VAEDecodeAudio` → `SaveAudioAdvanced`）。输出 **44.1kHz 立体声**、时长由 `duration`（秒，1–360）控制；纯器乐把 `lyrics` 留空并在 prompt 写 instrumental。未分档（唯一实现）。实测 10s≈8–28s、30s≈122s |
 | `extract-frame` | `image.from_video` | 抽帧（末帧 / 首帧 → 图片节点） |
+| `image-crop` | `image.crop` | **图片裁切（纯像素）**：`LoadImage → ImageCrop → SaveImage`，无提示词、无采样器、**1:1 像素不缩放**。工具入口 `image_crop`：按 `panel`/`panels` 均分（三视图定妆图 ⇒ `panel=0, panels=3` 取正面格）或显式 `x/y/width/height`，矩形自动夹进源图边界。角色卡用它从三视图裁出单视图（两版同源像素、身份按构造一致）。未分档（唯一实现） |
 | `minimax-h3-ref2v-sol-stats` | `video.reference2video` | **内部诊断清单**（`internal: true`）：跑 Sol 时输出统计用于复核。**不参与档位解析、不进 UI 与技能选项**，只能由配置面 `pins` 钉选（工具面不接受 `workflow=`） |
 
 ### 档位（tier）与加速策略
@@ -282,7 +283,7 @@ video_upscale({ video_node: '<长片节点 id>', target_width: 4032, chunk_frame
 | 组 | 工具 |
 |---|---|
 | 生成 | `comfy_generate_image` · `comfy_generate_video` · `comfy_generate_music`（BGM）· `comfy_render`（通用入口，模型无关）· `comfy_list_workflows`（查能力/工作流） |
-| 后处理 | `extract_frame`（抽帧）· `extract_audio`（抽音轨，作声线参考）· `video_concat`（拼接成片）· `video_upscale`（超分：画布视频节点 → 像素空间 ×2/×4，可换模型与工作流）· `video_interpolate`（补帧：48/60fps，时长与音轨不变） |
+| 后处理 | `extract_frame`（抽帧）· `extract_audio`（抽音轨，作声线参考）· `image_crop`（图片裁切：画布图片节点 / 图片资产 → 指定矩形或按面板均分；角色卡「三视图 → 裁正面当单视图」用它）· `video_concat`（拼接成片）· `video_upscale`（超分：画布视频节点 → 像素空间 ×2/×4，可换模型与工作流）· `video_interpolate`（补帧：48/60fps，时长与音轨不变） |
 | 画布 | `canvas_list_nodes` · `canvas_write_node` · `canvas_get_node` · `canvas_write_prompt_bank`（每镜分档提示词） · `canvas_get_prompt` · `canvas_group_nodes` · `canvas_reorder` · `canvas_get_state` · `canvas_set_state` |
 | 资产 | `asset_list`（列出跨会话资产，含 kind）· `asset_to_canvas`（物化回画布：图片/视频/音频→媒体节点，文本→text/table 节点）· `asset_ingest`（系列模式：用户批准清单后，AI 把节点/文件登记进资产库；默认不覆盖同名） |
 
@@ -294,7 +295,7 @@ video_upscale({ video_node: '<长片节点 id>', target_width: 4032, chunk_frame
 
 | 场景 | 输入 | skill 定义的编排重点 |
 |---|---|---|
-| 故事短片（内置） | 一句话故事创意 | 角色一致、场景连续（**七列镜头表含「续接」列 + 链式续接**）、镜头表十一项自检门、H3 原生字幕 |
+| 故事短片（内置） | 一句话故事创意 | 角色一致、场景连续（**七列镜头表含「续接」列 + 链式续接**）、镜头表十四项自检门、H3 原生字幕 |
 | 品牌宣传短片（内置） | 品牌素材 / 推广目标 | 身份核验、来源清单、LOGO 首帧锁定、H3 原生画面文案 |
 | **短剧系列制片**（内置） | 分集剧本 / 一句话题材 | 系列圣经、集制作包（8 列镜头意图）、资产台账、逐集生产与成本闸门（组合 `short-drama-series-writer` + `story-short-generator`） |
 | **电商宣传视频** | 商品 / 卖点文案 | 产品展示分镜、口播逐字稿、卖点高光镜、BGM 与节奏 |
@@ -504,6 +505,28 @@ node scripts/import-comfy.mjs exported.json \
 ## 更新日志
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
+
+### 未发布（2026-10-27）— 分镜 / prompt 门控最小补丁（A/B 实测后收敛）
+
+- **两轮 A/B 结论**（画布 `AB 实验` 组，记录节点 `ea2c7380…`，对照图 `e2e-out/ab/`）：
+  - **卡里已有的内容，prompt 否定会换来镜头内形变**：S01 天刑台场景卡本来是玉柱 + 台座，prompt 写 `no pedestal / plain timber post` 后，前 1/3 仍是玉柱、后 2/3 被掰成木柱，台座只削弱未消失。
+  - **卡里没有的道具，形状 + 唯一特征 + 三条否定确实有效**：同 seed 下 `a small jade plaque` 出圆头指状玉条/小瓶；补 `flat rectangular + chipped corner + not a bottle/orb/cylinder` 后出带缺角的矩形玉牌（再加 `thin as a coin / face-on` 仅边际改善，且会把镜头推成特写）。
+- **落地（最小集，不加新门）**：`story-short-generator` STEP 5.5 扩到**十四项**（第 13 项对白容量、第 14 项**资产—设定一致性**：卡里有台座就按台座写，禁止用 prompt 否定卡内容）；STEP 5 新增**签名道具写法**与 `背景人物` / `画面文案` 两个数据字段（非门禁）；STEP 7 渲染前新增**分镜标记残留复查**；提示词库建议写 provenance（必须放 `note` 区，写进 `## quality` 会被当 prompt 发出）；`h3-prompt-writing` 映射表补三行并澄清 `<Picture N>` 只作来源引用。
+- **明确不做**：STEP 6.5 十一项门（与 STEP 6 章节结构重复）、7.0 映射表（与 studio-mapping 重复）、7.0.1 Prompt Lint（与门 3 / 失败阶梯 0.5 重复）、镜头表加两列（七列是契约名）、`≤3 refs` 写成硬限制（`refs.max` = 8，≤3 只是未验证的安全区）。
+- 细节见 [`docs/min-patch-prompt-gating.md`](docs/min-patch-prompt-gating.md)。
+
+### 未发布（2026-10-27）— 角色卡改「先三视图、裁正面当单视图」
+
+**🎯 两版身份一致性从"两次生成碰运气"变成"按构造成立"**
+
+- **新增能力 `image.crop` + 工具 `image_crop`**：ComfyUI `ImageCrop` 纯像素裁切（`LoadImage → ImageCrop → SaveImage`），**无提示词、无采样器、1:1 像素不缩放**。参数 `image_node`（画布图片节点 id 或图片资产 id）+ `panel`/`panels`（按竖条均分；三视图 ⇒ `panel=0, panels=3` 取正面）或显式 `x/y/width/height`，矩形自动夹进源图边界；可带 `character` / `card_variant` / `paired_node_id` 写角色卡双版本元数据。未分档（唯一实现），`comfy_render(capability='image.crop')` 同一条路径。
+- **`story-short-generator` STEP 3 顺序反转**：先出**三视图横排**（16:9、1×3 正/侧/背、全身含脚）→ 自检三视图本体 → `image_crop(panel=0, panels=3)` 裁**正面格当单视图** → 核裁切边界。旧的「两版各自文生图 + 同 seed + 文本锁 + 并排比对」废弃（同 seed 不保证跨画幅一致，实测会出现换发型 / 加配饰）。
+- **尺寸**：三视图 `fast` 1024×576 · `balanced` 1344×768 · `quality` 2048×1152；单视图 = 正面格（三视图宽的 1/3）`fast` 341×576 · `balanced` 448×768 · `quality` 682×1152（比例 ≈0.59）。代价：单视图分辨率约为整张 1/3（quality ≈0.79MP，低于旧 2:3 的 1344×2016）；收益：人物占画面比例更大，且**两版必然同源**。**不要再按旧 2:3 尺寸单独生成单视图**。
+- **自检口径**：三视图本体查「恰好三格 / 同一角色 / 正侧背可辨 / 全身含脚 / 无分隔线 / 零文字」；单视图查「正面 / 单主体 / 左右边缘无相邻格残留 / 零文字」；三视图不过 ⇒ 重出三视图再重裁，单视图不过 ⇒ 只调裁切矩形。
+- **改设定的纪律**：改角色设定只能改三视图，改完必须**重新裁一次单视图**（复用同一 nodeId）并保持 `pairedNodeId` 双向有效。
+- **旧资产兼容**：库里已有的 2:3 独立单视图卡继续合法可用（全档）；只有单视图不必回填三视图；只有三视图时先裁一版单视图即可。
+- **验证**：`scripts/smoke-crop.mjs`（39 项：矩形收敛 / 清单编译 / 工具面 / 尺寸口径）+ `scripts/e2e-crop.mjs` 真机（三视图 2048×1152 → 正面格 **682×1152**；配对双向、复用 nodeId 重裁不堆节点）。
+- **落点**：`lib/manifest.js`、`workflows/image-crop.json`、`lib/index.js`（`computeCropRect` / `runCrop` / `image_crop` / `comfy_render` 分支 / systemPrompt）、`skills/story-short-generator`（SKILL.md STEP 3 + §1.1 + 5.5 第 11 项 + 重生成纪律、`references/{asset-catalog,reference-image-contract,style-selection,single-film-mode}.md`、7 份 `styles/*.md`）、`short-drama-series-production`、`image-generate` / `video-generate` / `h3-prompt-writing` 口径同步。
 
 ### 未发布 — 图片档位默认 balanced · 系列资产台账（2026-10-26）
 

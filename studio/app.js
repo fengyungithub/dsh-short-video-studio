@@ -729,7 +729,12 @@ import { markdownToHtml } from './markdown.js'
     const check = node.params.selfCheck
     if (check && typeof check === 'object') {
       const label = check.status === 'pass' ? '✅ 自检通过' : check.status === 'fail' ? '❌ 自检未过' : '⏳ 待自检'
-      parts.unshift(label)
+      // 结构化 checks 里失败 / 待人工核的项直接显示在卡片上（与插件门读同一份 params.selfCheck）。
+      const failed = check.checks && typeof check.checks === 'object'
+        ? Object.entries(check.checks).filter(([, v]) => v === 'fail').map(([k]) => k)
+        : []
+      const suffix = failed.length ? `（${failed.join('/')}）` : ''
+      parts.unshift(label + suffix)
     }
     return parts.join(' · ')
   }

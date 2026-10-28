@@ -28,7 +28,7 @@
 
 - 选「连续短剧」但系列 skill 未安装、且用户同意 → 降级为单片，并在简报里注明「无系列上下文」。
 - **不重复问**：进入委托模式后，生产规格与分镜模式由集制作包 ⑥ 预填（13 项），不再逐项追问，只补问包里缺的项；与 `short-drama-series-production` 冲突时以它为准。
-- **委托模式的门合并**：每集人工确认由 production 合并为 **3 张卡**（方案卡 = 集制作包 + 镜头表 + 分镜 + 渲染参数；片段卡 = 门 3 batch；交付卡 = 终检 + 交付）。本 skill 的**门 1 / 门 2 / 分镜模式 / 分镜批准 / 渲染参数卡不再单独弹**，但 **STEP 5.5 十一项自检与门 3 的 AI 逐镜自检照做**——省的是人工确认次数，不是自检。遇到 G-ref / 同镜 3 次失败 / 口型字幕不过 / 意图冲突，仍按本 skill 的异常门当场打断。
+- **委托模式的门合并**：每集人工确认由 production 合并为 **3 张卡**（方案卡 = 集制作包 + 镜头表 + 分镜 + 渲染参数；片段卡 = 门 3 batch；交付卡 = 终检 + 交付）。本 skill 的**门 1 / 门 2 / 分镜模式 / 分镜批准 / 渲染参数卡不再单独弹**，但 **STEP 5.5 十四项自检与门 3 的 AI 逐镜自检照做**——省的是人工确认次数，不是自检。遇到 G-ref / 同镜 3 次失败 / 口型字幕不过 / 意图冲突，仍按本 skill 的异常门当场打断。**集制作包 8 列镜头意图的第 8 列「集内节拍」必须逐镜回填到镜头表 `镜头描述` 首行 `剧本依据: B0x`**（第 12 项据此核对剧本覆盖）。
 - **委托模式的资产/交付边界**：资产**物化、入库、台账**由 production 负责；本 skill 只校验物化节点 `params.assetId`，缺卡时生成后**交回 production 入库**，不自己写资产库。交付包 / 系列台账 / 成本由 production 汇总；本 skill 只写**本集终检结论与片段清单**，委托模式下**不弹交付卡、不写系列交付包**。
 - **委托模式的 handback**：每集收尾向 production 交回 `finalNodeId` / `clipNodeIds` / `shots` / `rework` / `costMinutes` / `warnings` / `assetNodeIds`（本集新生成的卡）；production 写 `production-state.json` 与 ledger。
 - **剧本冲突**：台词/事件与剧本不一致、或镜头装不下时，**停线退回 production/writer**；本 skill 只拆镜/改时长/改表演，**不许自行改写台词或事件**。
@@ -69,7 +69,7 @@
 
 ## 委托模式的硬边界
 
-- **门**：production 出 3 张人工卡（方案 / 片段 / 交付）；SKILL 的 门 1 / 门 2 / 分镜模式 / 分镜批准 / 渲染参数卡不再单独弹，但 STEP 5.5 十一项自检与门 3 AI 逐镜自检照做。
+- **门**：production 出 3 张人工卡（方案 / 片段 / 交付）；SKILL 的 门 1 / 门 2 / 分镜模式 / 分镜批准 / 渲染参数卡不再单独弹，但 STEP 5.5 十四项自检与门 3 AI 逐镜自检照做。
 - **资产**：物化/入库/台账归 production；SKILL 只校验物化节点 `params.assetId`，缺卡生成后交回 production 入库，不写资产库。
 - **交付**：交付包/系列台账/成本归 production；SKILL 只写本集终检与片段清单，不弹交付卡、不写系列交付包。
 - **handback**：`finalNodeId` / `clipNodeIds` / `shots` / `rework` / `costMinutes` / `warnings` / `assetNodeIds` / `changedShots` / `scriptVersion`。

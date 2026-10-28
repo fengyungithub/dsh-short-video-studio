@@ -26,9 +26,13 @@
       "enum": [
         "image.text2image",
         "image.image2image",
+        "image.crop",
         "video.text2video",
         "video.image2video",
         "video.reference2video",
+        "video.upscale",
+        "video.interpolate",
+        "image.from_video",
         "audio.tts",
         "audio.music"
       ]

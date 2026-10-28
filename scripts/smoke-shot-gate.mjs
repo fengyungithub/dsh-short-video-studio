@@ -197,6 +197,28 @@ try {
   rec = await record({ nodeId: 's1', verdict: 'pass' })
   ok(rec.ok === true && rec.frames.length === 1, 'extract_frame 记账的帧可作 pass 凭据')
 
+  // ---------- 6b. 结构化 checks（门 3 六项） ----------
+  console.log('# canvas_record_check checks（结构化六项）')
+  writeProject({}, [shotNode('s1', 1, 'pending'), imageNode('f1', 2)])
+  rec = await record({
+    nodeId: 's1', verdict: 'pass', frames: ['f1'],
+    checks: { plan: 'pass', character: 'pass', lipsync: 'pass', subtitle: 'pass', contamination: 'pass', audio: 'na', style: 'pass' },
+  })
+  ok(rec.ok === true && rec.checks.audio === 'na', '合法 checks 接受（audio=na）')
+  ok(readProject().nodes.find((n) => n.id === 's1').params.selfCheck.checks.subtitle === 'pass', 'checks 持久化')
+
+  rec = await record({ nodeId: 's1', verdict: 'pass', frames: ['f1'], checks: { subtitle: 'fail' } })
+  ok(rec.ok === false && /冲突/.test(rec.error), 'verdict=pass + fail check：拒绝')
+
+  rec = await record({ nodeId: 's1', verdict: 'fail', frames: ['f1'], checks: { subtitle: 'fail' } })
+  ok(rec.ok === true && rec.status === 'fail', 'verdict=fail 可带 fail check')
+
+  rec = await record({ nodeId: 's1', verdict: 'pass', frames: ['f1'], checks: { bogus: 'pass' } })
+  ok(rec.ok === false && /未知项/.test(rec.error), '未知 check 键：拒绝')
+
+  rec = await record({ nodeId: 's1', verdict: 'pass', frames: ['f1'], checks: { plan: 'ok' } })
+  ok(rec.ok === false && /值非法/.test(rec.error), '非法 check 值：拒绝')
+
   // ---------- 7. 默认开启：缺省 / 非法值读回 verdict ----------
   console.log('# shotGate 默认值（默认开启）')
   writeProject({ shotGate: undefined }, [])
