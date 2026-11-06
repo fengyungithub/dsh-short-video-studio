@@ -1212,6 +1212,7 @@ whenToUse: 适用于……不适用于……
 | `story-short-generator` | 最完整的片型流程：9 项开场、七列镜头表、14 项自检门、门 3、续接规划、转场镜、重渲连锁 |
 | `brand-promo-video-generator` | 「真素材先行」与身份素材保护、能力降级声明、六列镜头表 |
 | `h3-prompt-writing` | 结构化 prompt 的写法权威（Ref2VA 六段式 / I2VA·FL2VA 三段式）与字幕写法 |
+| `qwen-image-prompt-writing` | 图片提示词的写法权威（官方 PE-T2I 八步骨架 / PE-I2I 属性解耦）+ 机械规则检查器 `check_prompt.mjs` |
 | `image-generate` / `video-generate` | 最轻量的单次生成链路，适合照抄输入契约 |
 
 ---
@@ -1429,9 +1430,12 @@ A：看节点 `params.width` / `params.height`（真实交付像素），或看�
 | `flux-text2image-balanced` | image.text2image | balanced | 1344 | 6s |
 | `flux-text2image-quality` | image.text2image | quality | 2048 | 45s |
 | `qwen-image-21-t2i-fast/balanced/quality` | image.text2image | fast / balanced / quality | 1024 / 1344 / 2048 | 3s / 5s / 45s |
+| `qwen-image-21-t2i-pe-balanced/quality` | image.text2image | balanced / quality | 1344 / 2048 | 30s / 80s |
 | `flux2-img2img-fast/balanced/quality` | image.image2image | fast / balanced / quality | 参考图预算 0.5 / 1 / 2 MP（输出跟随参考图） | 3s / 8s / 30s |
 | `qwen-image-21-i2i-fast/balanced/quality` | image.image2image | fast / balanced / quality | 768 / 1056 / 2048 | 4s / 8s / 60s |
 | `extract-frame` | image.from_video | （未分档） | — | — |
+
+> `-pe-` 变体在出图图里串了 Qwen 官方 **PE 改写器**（改写结果经 `JsonExtractString` 抽 `rewritten_prompt` 再喂采样器，JSON 键不进 conditioning）：可以直接写一句短需求，不必自己先按八步骨架改写。**只有 `balanced` / `quality` 两档**——把图片档位指到这个家族后，`fast` 会缺实现（家族内没有 PE 的 fast 变体）。要自己写 / 核对提示词时用 `qwen-image-prompt-writing` skill 的 `check_prompt.mjs`。
 
 ### 视频 · 参考绑定（ref2v）
 

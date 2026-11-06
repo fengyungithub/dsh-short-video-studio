@@ -472,6 +472,17 @@ node scripts/import-comfy.mjs exported.json \
 
 > ✅ 字幕兼容已实测定稿（A/B 六变体，见画布「A/B 实验结论」，**配方唯一权威版在 `skills/h3-prompt-writing/SKILL.md` 的 §字幕**）：六段式下字幕以英文双引号 on-screen text 声明内嵌 `detailed_description` 对白处（中文措辞指令任何位置不生效），四条限定词缺一不可——**声明紧贴对白句 + `reading exactly "原文"` + 强调描边对比 + 只给结束点（不给起止时间窗）**；失败写法：给时间窗、台词 1.0s 才起。**每档都能出字幕、没有档位硬规则**（由用户/脚本需求决定）；实测 `quality` 20 步逐字一致、`balanced` 8 步整段未烧、`fast` 4 步有错字，故成片字幕建议 `quality`，其余档走自检门逐镜核对后再按需升档。口型安全 / 一致性 / 音频与旧格式同级，动作执行略优。
 
+## Qwen-Image 提示词增强（`qwen-image-prompt-writing` skill）
+
+Qwen 官方对出图的建议是「用提示词改写器」：一句短需求 → 一段**像在描述已完成的画面**的长英文段落 + 推荐画幅。本 skill 把官方 PE-T2I / PE-I2I 的 system prompt 落成可复用流程（图片侧的 `prompt_rewrite` 对应物）：
+
+- **八步骨架**：拆题 → 定画幅 → 开篇句 → 盘点元素与文字 → 走画面 → 逐条定文字 → 光照单独一句 → 单一收尾句。目标篇幅 **400–500 词 / 约 20 句**。
+- **改图走属性解耦**：只动点名的那一个属性并推到明确强度，其余用**毯式保留条款**锁住（越具体地描写"要保住的东西"，模型越容易把它重画）；多图必须用 `<image1>` 标注；扩图 / 全景 / 三视图各有画幅决策表（三视图 = `(单格宽×列):(单格高×行)`，本插件 16:9 + 1×3 与之自洽）。
+- **五条硬事实**（决定怎么写，不是建议）：本链路 `cfg=1` ⇒ **没有负向提示词**，约束必须正向陈述；**比例绝不进 prompt**（走 `width`/`height` 或画布比例）；**禁质量词**（masterpiece / 8K / highly detailed）；**RGBA 套固定句柄**；**图内文字保持原语种、双引号逐字给**。
+- **机械规则检查器** `scripts/check_prompt.mjs`：抓比例泄漏 / 质量词 / 指令语气 / 篇幅 / 位置覆盖 / 光照句 / 收尾句 / 卡类误带文字；`--self-test` 用 `references/examples.md` 里的完整长度示例回归。**不接 `tools/pre-execute`、不做门禁**，纯离线自查。
+- **只产 prompt 文本与画幅判定**，不跑片型流程；卡片规则与 `story-short-generator` 的参考图契约一致（零文字、单主体、纯底；单视图由三视图裁正面格，不重新生成）。
+- **规范来源**：[QwenLM/Qwen-Image-2.1 `prompt_rewrite/`](https://github.com/QwenLM/Qwen-Image-2.1/tree/main/prompt_rewrite)（Qwen Research License），规则未改，只做本地化与工具映射。
+
 ## 示例：《一只想当宇航员的小狐狸》
 
 一个完整走完流水线的 30 秒风格化短片（6 镜、quality 档、H3 原生字幕；示例用皮克斯感 3D 风格），展示画布各步骤的**真实产物**。
@@ -505,6 +516,25 @@ node scripts/import-comfy.mjs exported.json \
 ## 更新日志
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
+
+### 未发布（2026-11-06）— 短剧制片门 + 集制作包 beat 契约 + 两处渲染修复
+
+- **新增「短剧制片门」**（`lib/index.js` 的 `makeProductionGateListener`，`tools/pre-execute`，**只在工作区有 `series/production-state.json` 时激活**，单片项目零影响）：每镜生成前校验本集 `stage` 已到 `shotlist` 及以后、方案卡（G-P）批准留痕、集制作包与 state 的 `packageVersion`/`scriptVersion` 一致、`assetMode=library` 时资产全部 `locked` 且参考图都带 `params.assetId`。它验的是**留痕**，真实性由新增的 `npm run audit:session` 从会话记录核对；`DSH_SVS_PRODUCTION_GATE=off` 可关。冒烟 `scripts/smoke-production-gate.mjs`（12 项）。
+- **集制作包新增 `beats[]` + 每镜 `beatId`**（schema + `validate-episode-package.mjs`）：这是「每个 beat 至少被 1 镜覆盖」的**唯一机械证据**——剧集模式原本没有编号可回指，只能自创 B01…，漏拍一个反转节拍不会被任何检查发现。校验器把「镜缺 `beatId` / `beatId` 不在清单 / 某 beat 无镜覆盖」判错（旧包无 `beats[]` 只告警）。同时 `targetSeconds` 下限 60→30（低于 60 必须在圣经 + state 显式声明例外）。
+- **修复「拼接永远走不到 ComfyUI 兜底」**：`runConcat` 用带 `roots` 的探测能选中 ffmpeg 后端，而 `ffmpegConcat` 内部又做了一次**只看 PATH**的无参探测 ⇒ 抛 `concat-no-ffmpeg`，兜底不可达。改为由调用方把探测到的 bin 传进去（回归 `scripts/smoke-concat-ffmpeg.mjs`）。
+- **参考音频接受 `canvas:` 前缀**：镜头表按规范写 `canvas:<音频节点 id>`，而工具以前只认裸节点 id ⇒ 门永远比对不上、只能手改两边。
+- **镜头表 `画面文案` 升为独立子字段**：它此前会被并进 `字幕`，字幕门把「门牌 / 招牌文字」当成要逐字核的字幕。
+- **skill 修订**：`story-short-generator` **3.8.0**（`length` 是请求帧不是交付帧、续接头只在采样期存在且交付已裁掉、`段名:` 行格式、字幕核验留痕 `<N> 帧 / <M> 例`、抽帧不可判读写 `na`、转场镜 ≥73 帧、场景卡按物理场景一张）；`short-drama-series-production` **0.2.0**（S-STEP 0 改为 A/B/C 三套餐 + 微调、样片集删掉「三档成本实测」换成声线听核矩阵、阶段 C 的委托边界与防死循环声明、时长回写改双向、集间硬切写进交付清单）。
+- **新增 `qwen-image-21-t2i-pe-{balanced,quality}` 两个清单**：出图图里串了官方 PE 改写器，可以直接用一句短需求生成（skill 与规则见下一条 11-03 条目）。
+- **实验与调研**（`docs/experiments/`）：L1 干跑 3 臂（抓到 15 个真问题、12 个已修）、L2 真机 8 镜 + 拼接零重编码、L3 6/6 故障注入全部被拦；装置在 `experiment/` + `scripts/experiment/`（`npm run experiment:selftest`）。另加阿里云 FC GPU 价格 / 运行时可行性调研与 `scripts/fc-cost-model.mjs` 成本模型。
+
+### 未发布（2026-11-03）— 新增 `qwen-image-prompt-writing` skill
+
+- **来源**：Qwen 官方 `Qwen-Image-2.1/prompt_rewrite` 的 PE-T2I / PE-I2I `system_prompt.txt`（Qwen Research License）。规则原文未改，只做本地化、工具映射与示例化。
+- **内容**：八步骨架（拆题/定画幅/开篇/盘点/走画面/定文字/光照句/单一收尾）、改图属性解耦、画幅决策表（扩图 / 全景 / 三视图 / 多图画布）、五条硬事实（`cfg=1` 无负向提示词、比例不进 prompt、禁质量词、RGBA 固定句柄、图内文字原语种）。
+- **检查器**：`skills/qwen-image-prompt-writing/scripts/check_prompt.mjs`（`t2i` / `edit` / `card` 三模式，`--json` / `--strict`，`--self-test` 回归 `references/examples.md` 的完整长度示例）；契约冒烟 `scripts/smoke-image-prompt-skill.mjs` 已并入 `npm run smoke`。
+- **与 10-27 决定的关系**：当时「明确不做 7.0.1 Prompt Lint」指的是**视频侧的 hook 门禁**（与门 3 / 失败阶梯重复）；本次是**图片侧 skill 内的离线自查**，不接 `tools/pre-execute`、不 deny、不进片型流程。
+- **明确不做**：不加 hook 门禁、不改 `lib/index.js`、不给 prompt 加新字段。
 
 ### 未发布（2026-10-27）— 分镜 / prompt 门控最小补丁（A/B 实测后收敛）
 

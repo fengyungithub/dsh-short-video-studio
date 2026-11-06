@@ -1,0 +1,16 @@
+display-name-zh: Qwen-Image 提示词增强
+version: 1.0.0
+tag-en: Prompt
+tag-cn: 提示词
+complete-tags-en:
+  - Image / Prompt Engineering
+  - Image / Pre-processing
+complete-tags-cn:
+  - 图片 / 提示词工程
+  - 图片 / 预处理
+summary-en: Turn a short image request into a full-length observer description (official PE-T2I eight-step skeleton) or a precise edit instruction (official PE-I2I attribute disentanglement), with aspect-ratio verdict, RGBA handle, in-image text rules, and positive rewrites of negative constraints.
+summary-cn: 把一句简短或含糊的出图需求重写为长描述（官方 PE-T2I 八步骨架）或精确改图指令（官方 PE-I2I 属性解耦），并裁定画幅、RGBA 透明句柄、图内文字写法与「负向约束的正向改写」。
+desc-en: Local stand-in for Qwen-Image 2.1's official prompt rewriters, adapted to dsh-short-video-studio. Covers text-to-image long descriptions (eight-step skeleton: brief split, frame, opening sentence, inventory, walk the frame, set every piece of text, lighting sentence, single closing sentence), image-editing directives (attribute disentanglement, blanket preservation clauses, imageN tags, ratio_follow tables for outpainting/panorama/three-view), plus the Qwen-specific hard facts — cfg=1 means no negative prompt, ratios never enter the prompt, RGBA needs a fixed handle sentence, quality boosters are banned. Ships references and a mechanical linter (scripts/check_prompt.mjs) with a self-test over the bundled examples. Produces prompt text only; does not run the pipeline.
+desc-cn: Qwen-Image 2.1 官方提示词改写器（PE-T2I / PE-I2I）的本地替代，适配 dsh-short-video-studio。覆盖文生图长描述（八步：拆题/定画幅/开篇/盘点/走画面/定文字/光照句/单一收尾句）与改图指令（属性解耦、毯式保留条款、imageN 标签、扩图·全景·三视图的画幅决策表），并固化 Qwen 特有的硬事实：cfg=1 没有负向提示词、比例绝不进 prompt、RGBA 必须套固定句柄、质量词一律禁。自带 references 与机械规则检查器（scripts/check_prompt.mjs，含示例自检）。只产出 prompt 文本，不跑片型流程。
+source: official-adapted
+source-original: https://github.com/QwenLM/Qwen-Image-2.1/tree/main/prompt_rewrite

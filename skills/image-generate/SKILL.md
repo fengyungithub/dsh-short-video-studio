@@ -71,6 +71,7 @@ Keep the flying pig exactly as it is, only change the sky from daytime blue to a
 - 多张（count>1）用于挑图：prompt 不变，种子由工作流内部随机。
 - 画布/资产库已有角色卡、场景卡想照着出图时：选 i2i 路径，参考图用资产 id 或画布节点 id，**单张整图传入**——三视图卡就喂那张三视图卡本身，不要再另拼一张。
 - **手动建角色卡走「先三视图、再裁正面」**：先出三视图横排（16:9，`card_variant=three`），再 `image_crop(image_node=<三视图节点>, panel=0, panels=3, card_variant=single, paired_node_id=<三视图节点>)` 裁正面格当单视图——**裁切不重绘，两版同源像素、身份按构造一致**。尺寸：三视图 `fast` 1024×576 / `balanced` 1344×768 / `quality` 2048×1152；单视图 = 正面格 341×576 / 448×768 / 682×1152。后续视频引用版本由 STEP 0 用户选择（`fast` 只能单视图；后者可选单视图或三视图，见 `story-short-generator` 的参考图契约）。别再按旧 2:3 尺寸单独生成单视图。
+- **系统化增强 prompt**：要把一句需求写成官方风格的八步长描述（或把含糊改图需求写成属性解耦指令）时，加载 `qwen-image-prompt-writing` skill；它带机械规则检查器 `scripts/check_prompt.mjs`（比例泄漏 / 质量词 / 指令语气 / 篇幅 / 卡类误带文字）。
 
 ## 参考图硬规则（i2i 同样遵守）
 
