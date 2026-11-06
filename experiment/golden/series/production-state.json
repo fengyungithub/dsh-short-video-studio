@@ -1,0 +1,84 @@
+{
+  "series": {
+    "title": "三十天",
+    "episodes": 1,
+    "episodeSeconds": 45,
+    "episodeSecondsRange": [
+      40,
+      50
+    ],
+    "episodeSecondsException": {
+      "ep001": 45
+    },
+    "mode": "domestic",
+    "aspectRatio": "9:16",
+    "style": "cinematic-live-action",
+    "audioMode": "dialogue-led",
+    "tier": "balanced",
+    "imageTier": "balanced",
+    "subtitles": "none",
+    "delivery": "native",
+    "characterCardVariant": "single",
+    "reviewMode": "batch",
+    "shotGate": "verdict",
+    "voicePlan": "existing",
+    "bgmMode": "none",
+    "packageContract": "episode-package/v1",
+    "assetMode": "draft"
+  },
+  "assets": {
+    "characters": [],
+    "scenes": [],
+    "props": [],
+    "voices": []
+  },
+  "episodes": {
+    "ep001": {
+      "stage": "delivered",
+      "package": "series/episodes/ep001/package.md",
+      "shots": 8,
+      "scriptVersion": 1,
+      "packageVersion": 1,
+      "episodeVersion": 1,
+      "changeRequest": null,
+      "doneShots": [
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08"
+      ],
+      "clipNodeIds": [
+        "vid-017",
+        "vid-019",
+        "vid-021",
+        "vid-023",
+        "vid-025",
+        "vid-027",
+        "vid-029",
+        "vid-031"
+      ],
+      "finalNodeId": "vid-032",
+      "costMinutes": 31,
+      "gate": {
+        "package": {
+          "status": "approved",
+          "at": ""
+        },
+        "clips": {
+          "status": "approved",
+          "at": ""
+        },
+        "delivery": {
+          "status": "approved",
+          "at": ""
+        }
+      },
+      "delivery": "series/delivery/ep001/"
+    }
+  },
+  "next": "ep002/package"
+}
