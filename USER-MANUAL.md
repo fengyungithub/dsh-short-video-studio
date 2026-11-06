@@ -897,7 +897,7 @@ STEP 8 会：**拼接全片**（`video_concat`，含音轨）→（按开场选�
 
 **代价与体积**（A800 实测）：768×1344 / 124 帧 ≈ **10.5s/镜**；48fps 产物体积与 24fps 源基本持平（2.00 MB vs 2.00 MB）。
 
-**30/60fps**：非整数倍目标（24→60、24→30）先出整数倍母版（120fps），再由 **ffmpeg** 抽到目标帧率——插件会自动向上层目录找 ffmpeg（本机装在 `…/short-video/tools/ffmpeg/`），也可以用 `ffmpegPath` 配置或 `DSH_SVS_FFMPEG` 指定。60fps 的体积与平台兼容性另算，**默认只提供 48fps**。
+**30/60fps**：非整数倍目标（24→60、24→30）先出整数倍母版（120fps），再由 **ffmpeg** 抽到目标帧率——ffmpeg 的解析顺序是 `DSH_SVS_FFMPEG` → 配置 `ffmpegPath` → **PATH（全局安装）** → 从工作区 / 插件包根逐级向上找 `tools/ffmpeg/ffmpeg`；全局装了就直接用，想钉某个版本（例如仓库自带的 `…/short-video/tools/ffmpeg/`）用 `ffmpegPath` 或环境变量显式指定。60fps 的体积与平台兼容性另算，**默认只提供 48fps**。
 
 ---
 

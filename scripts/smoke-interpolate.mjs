@@ -95,23 +95,52 @@ console.log('# concatFpsGuard')
   ok(unknown.fps === null && unknown.warnings.length === 1, '全读不出 fps：不误杀，只告警')
 }
 
-// ---------- 4. ffmpeg 探测（向上层目录搜索） ----------
+// ---------- 4. ffmpeg 探测（env > ffmpegPath > PATH > 向上层目录搜索） ----------
+// 注意：不隔离 PATH 就断言「向上找到 tools/ffmpeg」是假测试——本机一旦把 ffmpeg 装进 PATH
+// （/usr/local/bin/ffmpeg），PATH 候选就先命中了，这条断言必然失败（实测就是这么挂的）。
+// 这里两个分支各用一个假 ffmpeg 定点验证，不依赖本机是否装了 ffmpeg。
 console.log('# detectFfmpeg')
 {
   const root = mkdtempSync(join(tmpdir(), 'dsh-svs-ffprobe-'))
+  const park = mkdtempSync(join(tmpdir(), 'dsh-svs-ffpath-'))
+  const savedPath = process.env.PATH
+  const savedEnv = process.env.DSH_SVS_FFMPEG
+  const fakeScript = (tag) => `#!/bin/sh\necho "ffmpeg version fake-${tag}"\nexit 0\n`
   try {
-    // tools/ffmpeg/ffmpeg 的假实现：-version 返回 0
+    // 落点 A：项目上层目录里的 tools/ffmpeg/ffmpeg（没进 PATH 的旧场景）
     mkdirSync(join(root, 'tools', 'ffmpeg'), { recursive: true })
     const fake = join(root, 'tools', 'ffmpeg', 'ffmpeg')
-    writeFileSync(fake, '#!/bin/sh\necho "ffmpeg version fake"\nexit 0\n', 'utf8')
+    writeFileSync(fake, fakeScript('root'), 'utf8')
     chmodSync(fake, 0o755)
-    const found = await detectFfmpeg({ roots: [join(root, 'canvas', 'sid')], force: true })
-    ok(found === fake, '从工作区逐级向上找到 tools/ffmpeg/ffmpeg')
-    // extraPaths 优先
-    const found2 = await detectFfmpeg({ roots: [], extraPaths: [fake], force: true })
-    ok(found2 === fake, '显式 extraPaths（配置 ffmpegPath）生效')
+    // 落点 B：全局安装进 PATH 的 ffmpeg（PATH 指向这个临时目录）
+    const pathFfmpeg = join(park, 'ffmpeg')
+    writeFileSync(pathFfmpeg, fakeScript('path'), 'utf8')
+    chmodSync(pathFfmpeg, 0o755)
+
+    delete process.env.DSH_SVS_FFMPEG // env 优先级最高，测试期间必须清掉
+    const roots = [join(root, 'canvas', 'sid')]
+
+    // ① PATH 里有 ffmpeg → PATH 胜出（全局安装场景）
+    process.env.PATH = park
+    const fromPath = await detectFfmpeg({ roots, force: true })
+    ok(fromPath === 'ffmpeg', 'PATH 里的 ffmpeg 优先于上层目录（全局安装）')
+
+    // ② PATH 里没有 ffmpeg → 从工作区逐级向上找到 tools/ffmpeg/ffmpeg
+    process.env.PATH = join(root, 'no-such-path')
+    const fromRoots = await detectFfmpeg({ roots, force: true })
+    ok(fromRoots === fake, 'PATH 无 ffmpeg 时，从工作区逐级向上找到 tools/ffmpeg/ffmpeg')
+
+    // ③ 显式 extraPaths（配置 ffmpegPath）优先于 PATH
+    process.env.PATH = park
+    const fromExtra = await detectFfmpeg({ roots: [], extraPaths: [fake], force: true })
+    ok(fromExtra === fake, '显式 extraPaths（配置 ffmpegPath）优先于 PATH')
   } finally {
+    if (savedPath === undefined) delete process.env.PATH
+    else process.env.PATH = savedPath
+    if (savedEnv === undefined) delete process.env.DSH_SVS_FFMPEG
+    else process.env.DSH_SVS_FFMPEG = savedEnv
     rmSync(root, { recursive: true, force: true })
+    rmSync(park, { recursive: true, force: true })
     await detectFfmpeg({ roots: [], extraPaths: [], force: true }) // 复原缓存
   }
 }

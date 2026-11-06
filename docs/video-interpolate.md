@@ -79,8 +79,10 @@ CreateVideo(fps = 源fps × m, audio 直通) → SaveVideo
 
 **非整数倍目标需要本机 ffmpeg**（抽取这一步没有 ComfyUI 兜底）：
 `ffmpeg -i 母版.mp4 -vf fps=60 -c:v libx264 -c:a copy out.mp4`。
-ffmpeg 解析顺序：`DSH_SVS_FFMPEG` → 配置 `ffmpegPath` → PATH → **从工作区/插件包根逐级向上找
-`tools/ffmpeg[/ffmpeg]`、`bin/ffmpeg`、`ffmpeg`**（本机 ffmpeg 就装在仓库上层，不进 PATH 也能找到）。
+ffmpeg 解析顺序：`DSH_SVS_FFMPEG` → 配置 `ffmpegPath` → **PATH（全局安装）** → 从工作区/插件包根
+逐级向上找 `tools/ffmpeg[/ffmpeg]`、`bin/ffmpeg`、`ffmpeg`。全局装了 ffmpeg（如 `/usr/local/bin/ffmpeg`）
+就直接用它；仓库上层目录里的那份只是「没进 PATH 时」的兜底——要钉住某个版本用 `ffmpegPath` 或
+`DSH_SVS_FFMPEG` 显式指定。
 
 ---
 
