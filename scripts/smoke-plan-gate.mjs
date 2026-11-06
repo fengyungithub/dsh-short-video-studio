@@ -49,6 +49,16 @@ const SHOT_TABLE = [
   ok(shotIdFromText('Mia 试镜') === '', '无镜头号标题返回空')
   ok(parseAspectRatio('9:16') === 9 / 16 && parseAspectRatio('16:9') === 16 / 9, '画幅比解析')
   ok(parseShotTableContent('| 镜号 | 内容 |\n|---|---|\n| S01 | x |') === null, '非七列表格返回 null')
+
+  // 回归：`画面文案` 是独立子字段，不能并进 `字幕`（否则字幕门会把「门牌文字」当成要核的字幕）
+  const withCopy = [
+    '| 镜头编号 & 时长 | 连续性衔接 | 续接 | 参考锚点（空间+身份） | Hook 类型 | 镜头描述（每秒指令） | 音频与对白轨 |',
+    '|---|---|---|---|---|---|---|',
+    '| S01 / 5s | 开场 | 起链 | door-frame: 右 1/3 | setup | 剧本依据: B01 — 0–5s 推门 | 模式: dialogue；对白: Mia（0–2s）：“我不去。”；口型: mouth-open；声线参考: canvas:abc123；音效: 门轴；BGM: N/A；画面文案: 门牌 “第 3 层”；字幕: none |',
+  ].join('\n')
+  const pc = parseShotTableContent(withCopy)
+  ok(pc && pc.shots[0].subtitle === 'none', '画面文案 不污染字幕')
+  ok(pc && pc.shots[0].voiceRef === 'canvas:abc123', '声线参考 保留 canvas: 写法')
 }
 
 // ---------- 1. 准备临时工作区 ----------
