@@ -517,7 +517,11 @@ Qwen 官方对出图的建议是「用提示词改写器」：一句短需求 �
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
 
-### 未发布（2026-11-06）— 短剧制片门 + 集制作包 beat 契约 + 两处渲染修复
+### v1.15.0 — 短剧制片门 · 集制作包 beat 契约 · Qwen 提示词 skill（2026-11-06）
+
+> 自 `1.14.1` 起的五个批次合并发布。**升级须知**：① 系列模式新增**制片门**（默认开启，`DSH_SVS_PRODUCTION_GATE=off` 可关；只验留痕）；② 新建集制作包必须有 `beats[]` 且每镜 `beatId`（旧包只告警），`targetSeconds` 下限 60 → **30**；③ 新增 `qwen-image-prompt-writing` skill 与两个 `qwen-image-21-t2i-pe-*` 清单；④ `story-short-generator` 升到 **3.8.0**、`short-drama-series-production` 升到 **0.2.0**，自带 skill 会在插件加载时自动刷新到 `~/.dsh/skills/`。
+
+#### 短剧制片门 + 集制作包 beat 契约 + 两处渲染修复（2026-11-06）
 
 - **新增「短剧制片门」**（`lib/index.js` 的 `makeProductionGateListener`，`tools/pre-execute`，**只在工作区有 `series/production-state.json` 时激活**，单片项目零影响）：每镜生成前校验本集 `stage` 已到 `shotlist` 及以后、方案卡（G-P）批准留痕、集制作包与 state 的 `packageVersion`/`scriptVersion` 一致、`assetMode=library` 时资产全部 `locked` 且参考图都带 `params.assetId`。它验的是**留痕**，真实性由新增的 `npm run audit:session` 从会话记录核对；`DSH_SVS_PRODUCTION_GATE=off` 可关。冒烟 `scripts/smoke-production-gate.mjs`（12 项）。
 - **集制作包新增 `beats[]` + 每镜 `beatId`**（schema + `validate-episode-package.mjs`）：这是「每个 beat 至少被 1 镜覆盖」的**唯一机械证据**——剧集模式原本没有编号可回指，只能自创 B01…，漏拍一个反转节拍不会被任何检查发现。校验器把「镜缺 `beatId` / `beatId` 不在清单 / 某 beat 无镜覆盖」判错（旧包无 `beats[]` 只告警）。同时 `targetSeconds` 下限 60→30（低于 60 必须在圣经 + state 显式声明例外）。
@@ -528,7 +532,7 @@ Qwen 官方对出图的建议是「用提示词改写器」：一句短需求 �
 - **新增 `qwen-image-21-t2i-pe-{balanced,quality}` 两个清单**：出图图里串了官方 PE 改写器，可以直接用一句短需求生成（skill 与规则见下一条 11-03 条目）。
 - **实验与调研**（`docs/experiments/`）：L1 干跑 3 臂（抓到 15 个真问题、12 个已修）、L2 真机 8 镜 + 拼接零重编码、L3 6/6 故障注入全部被拦；装置在 `experiment/` + `scripts/experiment/`（`npm run experiment:selftest`）。另加阿里云 FC GPU 价格 / 运行时可行性调研与 `scripts/fc-cost-model.mjs` 成本模型。
 
-### 未发布（2026-11-03）— 新增 `qwen-image-prompt-writing` skill
+#### 新增 `qwen-image-prompt-writing` skill（2026-11-03）
 
 - **来源**：Qwen 官方 `Qwen-Image-2.1/prompt_rewrite` 的 PE-T2I / PE-I2I `system_prompt.txt`（Qwen Research License）。规则原文未改，只做本地化、工具映射与示例化。
 - **内容**：八步骨架（拆题/定画幅/开篇/盘点/走画面/定文字/光照句/单一收尾）、改图属性解耦、画幅决策表（扩图 / 全景 / 三视图 / 多图画布）、五条硬事实（`cfg=1` 无负向提示词、比例不进 prompt、禁质量词、RGBA 固定句柄、图内文字原语种）。
@@ -536,7 +540,7 @@ Qwen 官方对出图的建议是「用提示词改写器」：一句短需求 �
 - **与 10-27 决定的关系**：当时「明确不做 7.0.1 Prompt Lint」指的是**视频侧的 hook 门禁**（与门 3 / 失败阶梯重复）；本次是**图片侧 skill 内的离线自查**，不接 `tools/pre-execute`、不 deny、不进片型流程。
 - **明确不做**：不加 hook 门禁、不改 `lib/index.js`、不给 prompt 加新字段。
 
-### 未发布（2026-10-27）— 分镜 / prompt 门控最小补丁（A/B 实测后收敛）
+#### 分镜 / prompt 门控最小补丁（A/B 实测后收敛）（2026-10-27）
 
 - **两轮 A/B 结论**（画布 `AB 实验` 组，记录节点 `ea2c7380…`，对照图 `e2e-out/ab/`）：
   - **卡里已有的内容，prompt 否定会换来镜头内形变**：S01 天刑台场景卡本来是玉柱 + 台座，prompt 写 `no pedestal / plain timber post` 后，前 1/3 仍是玉柱、后 2/3 被掰成木柱，台座只削弱未消失。
@@ -545,7 +549,7 @@ Qwen 官方对出图的建议是「用提示词改写器」：一句短需求 �
 - **明确不做**：STEP 6.5 十一项门（与 STEP 6 章节结构重复）、7.0 映射表（与 studio-mapping 重复）、7.0.1 Prompt Lint（与门 3 / 失败阶梯 0.5 重复）、镜头表加两列（七列是契约名）、`≤3 refs` 写成硬限制（`refs.max` = 8，≤3 只是未验证的安全区）。
 - 细节见 [`docs/min-patch-prompt-gating.md`](docs/min-patch-prompt-gating.md)。
 
-### 未发布（2026-10-27）— 角色卡改「先三视图、裁正面当单视图」
+#### 角色卡改「先三视图、裁正面当单视图」（2026-10-27）
 
 **🎯 两版身份一致性从"两次生成碰运气"变成"按构造成立"**
 
@@ -558,7 +562,7 @@ Qwen 官方对出图的建议是「用提示词改写器」：一句短需求 �
 - **验证**：`scripts/smoke-crop.mjs`（39 项：矩形收敛 / 清单编译 / 工具面 / 尺寸口径）+ `scripts/e2e-crop.mjs` 真机（三视图 2048×1152 → 正面格 **682×1152**；配对双向、复用 nodeId 重裁不堆节点）。
 - **落点**：`lib/manifest.js`、`workflows/image-crop.json`、`lib/index.js`（`computeCropRect` / `runCrop` / `image_crop` / `comfy_render` 分支 / systemPrompt）、`skills/story-short-generator`（SKILL.md STEP 3 + §1.1 + 5.5 第 11 项 + 重生成纪律、`references/{asset-catalog,reference-image-contract,style-selection,single-film-mode}.md`、7 份 `styles/*.md`）、`short-drama-series-production`、`image-generate` / `video-generate` / `h3-prompt-writing` 口径同步。
 
-### 未发布 — 图片档位默认 balanced · 系列资产台账（2026-10-26）
+#### 图片档位默认 balanced · 系列资产台账（2026-10-26）
 
 - **图片档位默认从 `quality` 改为 `balanced`**（单片与连续短剧一致）：文生图长边 1344，≈6s/张；`quality`（2048，≈45s/张）改为按需选择，不再默认。`fast` 仍只用于抽卡。
 - **系列资产三层**：资产库（唯一身份权威）/ 系列台账（asset id 索引）/ 每集画布（临时副本）；集制作包加 `params.assetMode=draft|library`，EP01 draft、EP02 起 library。
