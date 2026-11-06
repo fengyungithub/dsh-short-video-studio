@@ -34,10 +34,11 @@ const ref2v = all.filter((m) => m.capability === 'video.reference2video')
 const i2v = all.filter((m) => m.capability === 'video.image2video')
 const withAudio = ref2v.filter((m) => m.params && m.params.ref_audios)
 const withoutAudio = ref2v.filter((m) => !(m.params && m.params.ref_audios))
-ok(ref2v.length === 20, `ref2v 清单 20 份（实际 ${ref2v.length}）`)
-ok(withAudio.length === 14, `14 份 ref2v 声明了 ref_audios（实际 ${withAudio.length}）`)
-ok(withoutAudio.length === 6, `6 份未声明（2K×5 + hires×1，实际 ${withoutAudio.length}: ${withoutAudio.map((m) => m.id).join(',')}）`)
-ok(withoutAudio.every((m) => /-2k$|-hires$/.test(m.id)), '未声明集恰好是 2K / hires 家族')
+// 断言按**结构**而不是精确份数：新增实现（Pika / Sol-VAE 变体等）不该让这条冒烟变红；
+// 真正要守住的是「要么完整声明 ref_audios，要么属于本来就没有音频槽的 2K / hires 家族」。
+ok(ref2v.length >= 20, `ref2v 清单 ≥20 份（实际 ${ref2v.length}）`)
+console.log(`  · 声明 ref_audios：${withAudio.length} 份；未声明：${withoutAudio.length} 份`)
+ok(withoutAudio.every((m) => /-2k$|-hires$/.test(m.id)), `未声明集恰好是 2K / hires 家族（实际 ${withoutAudio.map((m) => m.id).join(',') || '无'}）`)
 ok(i2v.every((m) => !(m.params && m.params.ref_audios)), 'i2v 19 份全部没有 ref_audios（节点没有音频输入槽）')
 for (const m of withAudio) {
   const p = m.params.ref_audios

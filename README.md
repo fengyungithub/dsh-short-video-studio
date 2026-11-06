@@ -518,6 +518,39 @@ Qwen 官方对出图的建议是「用提示词改写器」：一句短需求 �
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
 
+### v1.16.0 — Pika H3 Flex 6 步 · Sol-H3-VAE 解码变体（2026-11-06）
+
+> **升级须知**：本版只**新增**实现，不动既有任何默认。新清单全部 `priority < 0`（不做隐式默认，必须在设置页「＋ 新增策略」里显式挑），所以不下载权重也不会影响你现在的流程。
+> 要用需自备两个 Pika 适配器（各 1.82 GB）放 `ComfyUI/models/loras/`；Sol-H3-VAE 变体另需 `sol_h3_vae.safetensors`（6.1 GB）放 `models/vae/`，且 **ComfyUI ≥ 0.44.0**（低版本 `VAELoader` 不认识该权重）。
+
+#### Pika H3 Flex 6 步（ref2v / i2v 的 balanced 并列实现）
+
+- **是什么**：Pika 在 MiniMax H3 上后训练的 **6 步蒸馏**版本，两个 LoRA 适配器（`fl2va` / `ref2va`）跑在同一批 base 上，不是新架构。采样配方固定为 `lcm` + `ManualSigmas`（7 个 sigma = 6 步）+ `BasicGuider`、LoRA `strength_model = 1.0`；**不能接 `MiniMaxH3SigmaShift`、不能叠 turbo / Lightning LoRA**（官方明确会破坏输出）⇒ 与现有 8 步 balanced 是**互斥选择**。
+- **新增 12 份清单 + 6 份模板**：ref2v 9 份（`-balanced-pika`、`-ctx-balanced-pika`、`-ctx-balanced-pika-solattn`、`-ctx-balanced-pika-solattn-solvae`、`-fast-pika`、`-fast-pika-solvae`、`-ctx-fast-solvae`、`-ctx-fast-pika-solattn`、`-ctx-fast-pika-solattn-solvae`）、i2v 3 份（`-balanced-pika`、`-ctx-balanced-pika`、`-ctx-balanced-pika-solattn`）。模板在 `scripts/h3-templates/minimax-h3-pika-*.json`，由 `make-h3-variants.mjs` 生成清单。
+- **实测（A800 80GB · 1344×768 · 124 帧 · 同 prompt 同 seed）**：ref2v **178.8s → 135.9s**、i2v **173.6s → 132.2s**，即 **1.30–1.32×**，四次重复稳定（8 步 173.4–178.8s / Pika 133.4–136.1s）。叠**原生块稀疏**再快 1.5×（84.4s），但 ref2v 上帧锐度 −11%（i2v 未掉）。
+- **中文内嵌字幕：逐字烧出**（2 张角色卡 × 5/14/15 字台词共 3 例，含中文标点），与 PDD 同级；现有 lightx2v 8 步是整段不烧。**但出镜窗由模型决定且随台词长度变化**：短句 2–3s 退场、长句挂到片尾，不跟 prompt 声明的结束点走。
+- **链式续接可用**：起链 126.6s / 续接 163.1s，接缝 PSNR **31.0 dB**。
+- **fast 档 Pika 4 步**（`-fast-pika`）是**实验实现**：官方只发 6 步 schedule，4 步 sigma（`1.0, 0.948025, 0.8, 0.452381, 0.0`）由 6 步曲线线性插值得来，整镜 ~20s。
+- **配置键**：`models.h3PikaLora` / `models.h3PikaFlLora`（env `DSH_SVS_H3_LORA_PIKA` / `DSH_SVS_H3_LORA_FL_PIKA`）；在设置页把某档选成 `…-balanced-pika` 即可。
+
+#### Sol-H3-VAE 解码器变体（`-solvae`）
+
+- **是什么**：NVIDIA 蒸馏的 H3 **纯解码器**（24 层非因果，1.62B），替换原 36 层 decoder。**只能解码**——直接改 `assets.vae` 会在 encode 处报 `'MiniMaxH3VideoVAE' object has no attribute 'quant_conv'`；变体的做法是**另加一个 VAELoader 只喂 `VAEDecode`**（节点 `4b` + 资产槽 `vae_decode`），编码链路仍用 `int8_convrot`。
+- **实测**：`VAEDecode` **9.90s → 5.37s（1.84×）**，整镜 −5.7%（balanced 1344）/ −10.5%（标准 fast 832）——**收益由采样占比决定**，短镜与 fast 档更划算。画质 PSNR 41.9 dB(Y)、SSIM 0.985，音轨逐字节相同，无时间偏移。
+- **代价**：+6.1 GB 常驻、不能 tile（整片解码，显存随片长/分辨率涨）。配置键 `models.h3SolVae`（env `DSH_SVS_H3_SOL_VAE`）。
+- **A/B 两个坑**（写进文档了）：① ComfyUI 按节点输入哈希缓存，同 seed 重跑会**跳过采样**，端到端对比必须换新 seed；② 两臂**编码 VAE 必须一致**，否则采样缓存失效、整镜对比失真。
+
+#### 为什么不做成默认
+
+注册表的可用性预检只查**节点**、不查**权重文件**。把 Pika 设成 balanced 默认，会让没下那两个 1.8 GB LoRA 的环境直接渲染失败；所以它定位为「装了就能在策略里选」的可选实现，默认仍是 8 步。
+
+#### 其它
+
+- `lib/index.js`：两个族的资产表登记 `lora_pika` / `vae_decode`；新增 id 进 `H3_REF2V_IDS` / `H3_I2V_IDS`（否则 `smoke-tier-resolution` 的「每份清单都有 assetOverrides 继承入口」会红）。
+- `scripts/smoke-voice-ref.mjs` 的清单计数断言改为**结构断言**（「要么完整声明 `ref_audios`，要么属于 2K / hires 家族」），新增实现不再让它变红。
+- `scripts/bench-h3.mjs` 支持打印 `ManualSigmas` / 无 `SigmaShift` 的配方。
+- 新增文档：[`docs/research/pika-h3-flex-assessment.md`](docs/research/pika-h3-flex-assessment.md)（落地评估 · A/B · 字幕 · OOM 复现）、[`docs/research/sol-h3-vae-ab.md`](docs/research/sol-h3-vae-ab.md)（节点级计时与三档对比）；`docs/h3-prompt-integration.md` §5.4 补实现级字幕矩阵与新窗口结论。
+
 ### v1.15.0 — 短剧制片门 · 集制作包 beat 契约 · Qwen 提示词 skill（2026-11-06）
 
 > 自 `1.14.1` 起的五个批次合并发布。**升级须知**：① 系列模式新增**制片门**（默认开启，`DSH_SVS_PRODUCTION_GATE=off` 可关；只验留痕）；② 新建集制作包必须有 `beats[]` 且每镜 `beatId`（旧包只告警），`targetSeconds` 下限 60 → **30**；③ 新增 `qwen-image-prompt-writing` skill 与两个 `qwen-image-21-t2i-pe-*` 清单；④ `story-short-generator` 升到 **3.8.0**、`short-drama-series-production` 升到 **0.2.0**，自带 skill 会在插件加载时自动刷新到 `~/.dsh/skills/`。
