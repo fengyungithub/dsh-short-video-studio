@@ -603,7 +603,9 @@ Skill 会**先用选项卡问清规格**，然后才动第一张图。每一项�
 | 转场镜 | `type=i2v` + `first_frame_node=S0x 末帧` + `last_frame_node=S0y 首帧`；若该档 i2v 实现支持续接，**同一次调用再加 `continuity_from=S0x`**（此形态下**首帧锚点会被丢弃**、末帧锚点保留——这是转场镜的当前最优解） |
 | 锚点式重渲 | `type=i2v` + 上游末帧 + 下游首帧（只改中段、保住已批准的下游首帧） |
 
-**生成前还有一道镜头表一致性门（插件代码强制）**：每镜生成前，插件按 `title` 里的 `Sxx` 在画布镜头表里找到该行，校验：prompt 里台词 / 字幕与表**逐字一致**、`length/24` 与表时长一致（±1s）、`audio_ref_nodes` 与 `声线参考` 一致、显式 `width`/`height` 与画布比例一致、`fast` 档不得用三视图卡（`ref_variant=three` / 直接传 three 卡）。不一致直接拒绝并列出差异（同一 agent 连续 deny 2 次后降级放行）。⇒ **每镜标题必须带镜头号**（如「S03 片段」）；转场镜（「S03→S04 转场」）、锚点式重渲（标题含「锚点」）、试镜片段不参与；**新镜 / 拆镜必须先写进镜头表再渲**，否则会被判「镜头表没有该镜」。
+**生成前还有一道镜头表一致性门（插件代码强制）**：每镜生成前，插件按 `title` 里的 `Sxx` 在画布镜头表里找到该行，校验：prompt 里台词 / 字幕与表**逐字一致**、`length/24` 与表时长一致（±1s）、`audio_ref_nodes` 与 `声线参考` 一致、显式 `width`/`height` 与画布比例一致、`fast` 档不得用三视图卡（`ref_variant=three` / 直接传 three 卡）。不一致直接拒绝并列出差异（同一 agent 连续 deny 2 次后降级放行）。⇒ **每镜标题必须带镜头号**（如「S03 片段」）；转场镜（「S03→S04 转场」）、锚点式重渲（标题含「锚点」）、试镜片段不参与；**新镜 / 拆镜必须先写进镜头表再渲**，否则会被判「镜头表没有该镜」。表里的 `画面文案` 是**独立子字段**（门牌 / 招牌 / 屏幕字等画面内文字只进 prompt），**不参与字幕核对**——字幕列仍按「要不要字幕」开关逐字单独核。
+
+**系列模式还有一道制片门（插件代码强制；单片项目不触发）**：工作区里存在 `series/production-state.json` 时，每镜生成前还会校验——本集 `stage` 已到 `shotlist` 及以后、**方案卡（G-P）已批准**（`gate.package.status='approved'`）、集制作包的 `packageVersion` / `scriptVersion` 与 state 一致（改台词必须重建包）、`assetMode=library` 时三类资产全部 `locked` 且 `ref_nodes` 都来自资产库（节点带 `params.assetId`）。它验的是**留痕**而不是「人真的点过头」，真实性由 `npm run audit:session` 从会话记录核对；不满足会直接拒绝并列出缺项（连续 2 次后降级放行，`DSH_SVS_PRODUCTION_GATE=off` 可整体关闭）。
 
 **渲完每一镜，AI 立即自检（不许推迟；`shotGate` 开启时，默认开启）**，六项：与计划一致（抽首 / 中 / 末帧，动作密集镜按 1.5–2s 加抽）、人物一致性（对照角色卡逐项核对）、**口型与字幕**（只有说话人动嘴；开场选「要字幕」时字幕与镜头表 `字幕` 字段逐字一致、无整段缺失，选「不要字幕」时改为核对画面里**没有任何字幕**）、无污染（无分镜痕迹 / 无水印文字 / 无角色副本；fast 档须留 G-ref 已过的痕迹）、音频（**AI 不能听音**，由你在确认卡里听核）、风格一致。
 
@@ -1053,6 +1055,7 @@ STEP 8 会：**拼接全片**（`video_concat`，含音轨）→（按开场选�
 | `DSH_SVS_POLL_MS` / `DSH_SVS_TIMEOUT_MS` | 轮询间隔 / 超时 |
 | `DSH_SVS_USER_WORKFLOWS` | 用户清单目录 |
 | `DSH_SVS_SKILL_REFRESH` | `off` 关闭自带 skill 刷新；`force` 连你改过的也覆盖 / 回收 |
+| `DSH_SVS_PRODUCTION_GATE` | `off` 关闭系列模式的制片门（默认开启；验的是留痕，见「生成前还有一道…」段） |
 | `DSH_SVS_FLUX_MODEL` / `_CLIP` / `_VAE` | FLUX 资产覆盖 |
 | `DSH_SVS_H3_MODEL` / `_MODEL_REF` / `_MODEL_FL` / `_CLIP` / `_VAE` / `_AUDIO_VAE` / `_FPS` | H3 资产覆盖 |
 | `DSH_SVS_H3_LORA_FAST` / `_LORA_FL_FAST` / `_LORA_BALANCED` / `_LORA_FL_BALANCED` | H3 LoRA 覆盖 |
