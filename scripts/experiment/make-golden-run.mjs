@@ -139,10 +139,13 @@ const state = {
 writeFileSync(join(out, 'series/production-state.json'), JSON.stringify(state, null, 2))
 
 // ── trace：8 次生成 + 8 次上传 ──────────────────────────────
+// 时间戳固定：golden 是判分基线，重跑必须逐字节一致，否则每次 `npm run experiment:selftest`
+// 都会弄脏工作树（实测：只差 `t` 字段）。需要真实时间时用 GOLDEN_TRACE_T 覆盖。
+const TRACE_T = process.env.GOLDEN_TRACE_T || '2026-01-01T00:00:00.000Z'
 const lines = []
 for (const s of pkg.shots) {
-  lines.push({ t: new Date().toISOString(), kind: 'upload', bytes: 1024, n: lines.length })
-  lines.push({ t: new Date().toISOString(), kind: 'prompt', id: `golden-${s.shotId}`, mediaKind: 'videos', nodes: 12, media: 'mock.mp4', graph: { '5': { class_type: 'KSampler', inputs: { seed: 1, steps: 4, width: 832, height: 480, positive: ['4', 0] } }, '4': { class_type: 'TextEncodeQwenImage21', inputs: { prompt: promptFor(s) } } } })
+  lines.push({ t: TRACE_T, kind: 'upload', bytes: 1024, n: lines.length })
+  lines.push({ t: TRACE_T, kind: 'prompt', id: `golden-${s.shotId}`, mediaKind: 'videos', nodes: 12, media: 'mock.mp4', graph: { '5': { class_type: 'KSampler', inputs: { seed: 1, steps: 4, width: 832, height: 480, positive: ['4', 0] } }, '4': { class_type: 'TextEncodeQwenImage21', inputs: { prompt: promptFor(s) } } } })
 }
 mkdirSync(out, { recursive: true })
 writeFileSync(join(out, 'comfy-trace.jsonl'), lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
