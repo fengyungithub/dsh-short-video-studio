@@ -41,6 +41,13 @@ const MAP = {
   // PDD：模板由 scripts/make-pdd-template.mjs 从同族 base 生成
   'minimax-h3-ref2v-balanced-pdd': ['minimax-h3-pdd-ref2v.json', 'balanced'],
   'minimax-h3-i2v-balanced-pdd': ['minimax-h3-pdd-i2v.json', 'balanced'],
+  // Pika H3 Flex：模板直接落盘（6 步 lcm + 固定 sigma，无 SigmaShift）
+  'minimax-h3-ref2v-balanced-pika': ['minimax-h3-pika-ref2v.json', 'balanced'],
+  'minimax-h3-ref2v-ctx-balanced-pika': ['minimax-h3-pika-ref2v-ctx.json', 'balanced'],
+  'minimax-h3-ref2v-ctx-balanced-pika-solattn': ['minimax-h3-pika-ref2v-ctx-solattn.json', 'balanced'],
+  'minimax-h3-i2v-balanced-pika': ['minimax-h3-pika-i2v.json', 'balanced'],
+  'minimax-h3-i2v-ctx-balanced-pika': ['minimax-h3-pika-i2v-ctx.json', 'balanced'],
+  'minimax-h3-i2v-ctx-balanced-pika-solattn': ['minimax-h3-pika-i2v-ctx-solattn.json', 'balanced'],
 }
 const ALLOW_DIFF = new Set(['id', 'version', 'description', 'group', 'tier', 'accel', 'displayName', 'estSeconds', 'note', 'priority', 'requiresNodes', 'modes', 'internal'])
 

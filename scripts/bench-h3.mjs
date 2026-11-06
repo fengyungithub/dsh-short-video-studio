@@ -102,8 +102,16 @@ const node = (cls) => g.find((n) => n.class_type === cls)
 const pdd = node('MiniMaxH3PDDAccApply')
 console.log(`[${TAG}] 配方：`)
 console.log('  模板/档位 :', TEMPLATE, '/', mode, '| 尺寸:', size ? `${size.w}x${size.h}` : (node('MiniMaxH3ReferenceToVideo') || node('MiniMaxH3ImageToVideo')).inputs.width + 'x' + (node('MiniMaxH3ReferenceToVideo') || node('MiniMaxH3ImageToVideo')).inputs.height)
-console.log('  步数/采样 :', node('BasicScheduler') ? node('BasicScheduler').inputs.steps + ' 步(BasicScheduler)' : `PDD nfe=${pdd?.inputs.nfe}`, '/', node('KSamplerSelect').inputs.sampler_name)
-console.log('  shift     :', node('MiniMaxH3SigmaShift').inputs.shift_video + '/' + node('MiniMaxH3SigmaShift').inputs.shift_audio)
+const manualSigmas = node('ManualSigmas')
+const sigmaCount = manualSigmas ? manualSigmas.inputs.sigmas.split(',').filter((x) => x.trim() !== '').length - 1 : null
+console.log('  步数/采样 :',
+  node('BasicScheduler') ? node('BasicScheduler').inputs.steps + ' 步(BasicScheduler)'
+    : manualSigmas ? `${sigmaCount} 步(ManualSigmas: ${manualSigmas.inputs.sigmas})`
+      : pdd ? `PDD nfe=${pdd.inputs.nfe}` : '?',
+  '/', node('KSamplerSelect').inputs.sampler_name)
+console.log('  shift     :', node('MiniMaxH3SigmaShift')
+  ? node('MiniMaxH3SigmaShift').inputs.shift_video + '/' + node('MiniMaxH3SigmaShift').inputs.shift_audio
+  : 'n/a（无 SigmaShift，shift 已含在 ManualSigmas 里）')
 console.log('  unet      :', node('UNETLoader').inputs.unet_name)
 const loras = g.filter((n) => n.class_type === 'LoraLoaderModelOnly').map((n) => n.inputs.lora_name)
 console.log('  蒸馏 LoRA :', loras.join(' + ') || '无', pdd ? `| PDD: ${pdd.inputs.pdd_file}` : '',
