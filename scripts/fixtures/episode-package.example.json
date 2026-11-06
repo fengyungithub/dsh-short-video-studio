@@ -86,6 +86,12 @@
       "sfx": []
     }
   ],
+  "beats": [
+    { "id": "B01", "label": "协议被推到桌心，指节发白（开场钩子）", "sceneId": "SC01" },
+    { "id": "B02", "label": "顾言羞辱林晚净身出户", "sceneId": "SC01" },
+    { "id": "B03", "label": "林晚平静反击，把笔推回去", "sceneId": "SC01" },
+    { "id": "B04", "label": "走廊灯下收尾，悬念留到下一集", "sceneId": "SC02" }
+  ],
   "shots": [
     {
       "shotId": "S01",
@@ -97,7 +103,8 @@
       "shotSizeCamera": "特写 / 锁定",
       "screenPositions": "协议：桌中；手：画面下缘",
       "chainIntent": "起链",
-      "beat": "钩子"
+      "beat": "钩子",
+      "beatId": "B01"
     },
     {
       "shotId": "S02",
@@ -109,7 +116,8 @@
       "shotSizeCamera": "中景 / 轻微下压",
       "screenPositions": "顾言：右中景；门框：右1/3",
       "chainIntent": "接 S01",
-      "beat": "爽点-打脸"
+      "beat": "爽点-打脸",
+      "beatId": "B02"
     },
     {
       "shotId": "S03",
@@ -121,7 +129,8 @@
       "shotSizeCamera": "近景 / 缓推",
       "screenPositions": "林晚：左前景",
       "chainIntent": "接 S02",
-      "beat": "反转"
+      "beat": "反转",
+      "beatId": "B03"
     },
     {
       "shotId": "S04",
@@ -133,7 +142,8 @@
       "shotSizeCamera": "近景 / 侧跟",
       "screenPositions": "林晚：右中景；窗光：左",
       "chainIntent": "转场",
-      "beat": "情绪点"
+      "beat": "情绪点",
+      "beatId": "B04"
     }
   ],
   "assets": {

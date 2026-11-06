@@ -79,6 +79,26 @@ for (const d of data.dialogue || []) {
 }
 if (data.params?.voicePlan === 'text-only' && (data.assets?.voices || []).length) warnings.push('voicePlan=text-only 但 voices 台账非空，确认是否应改 existing')
 
+// ── beat 清单与镜头覆盖（剧本覆盖的唯一机械证据）──────────
+const beats = data.beats || []
+if (beats.length) {
+  const beatIds = new Set()
+  for (const b of beats) {
+    if (beatIds.has(b.id)) errors.push(`beats: beatId ${b.id} 重复`)
+    beatIds.add(b.id)
+  }
+  const covered = new Map()
+  for (const s of data.shots || []) {
+    if (!s.beatId) errors.push(`${s.shotId}: 有 beats 清单但该镜缺 beatId（委托模式下「剧本依据」必须回指 beatId）`)
+    else if (!beatIds.has(s.beatId)) errors.push(`${s.shotId}: beatId ${s.beatId} 不在 beats 清单`)
+    else covered.set(s.beatId, (covered.get(s.beatId) || 0) + 1)
+  }
+  for (const b of beats) if (!covered.has(b.id)) errors.push(`beat ${b.id}（${b.label}）没有任何镜头覆盖（漏拍）`)
+  if (beats.length < 6 || beats.length > 16) warnings.push(`beats ${beats.length} 项，本片型建议 8–14（1 集 90s）`)
+} else {
+  warnings.push('缺 beats 清单：beat 覆盖不可机械校验（v1 旧包；新建包应写 §2.1）')
+}
+
 const shots = data.shots || []
 if (shots[0] && shots[0].chainIntent !== '起链') errors.push('首镜必须是起链')
 let transitions = 0

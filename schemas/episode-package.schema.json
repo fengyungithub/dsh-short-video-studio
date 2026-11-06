@@ -72,8 +72,9 @@
     },
     "targetSeconds": {
       "type": "number",
-      "minimum": 60,
-      "maximum": 180
+      "minimum": 30,
+      "maximum": 180,
+      "description": "本片型目标 80–110s（默认 90s）；低于 60s 必须是显式例外（圣经 §1 + production-state.series.episodeSecondsException），validator 会给 warning。"
     },
     "shotBudget": {
       "type": "integer",
@@ -243,6 +244,35 @@
         }
       }
     },
+    "beats": {
+      "type": "array",
+      "description": "本集 beat 清单（v1 可选；建议 8–14 项，来源 = ② 场次的冲突升级点）。有 beats 时每镜必须回指 beatId，validator 核对覆盖。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^B[0-9]{2}$",
+            "description": "beat 编号 B01…Bxx（集内唯一）"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "description": "beat 内容（事件 / 冲突升级点，一句话）"
+          },
+          "sceneId": {
+            "type": "string",
+            "pattern": "^(SC[0-9]{2}|TRANSITION)$",
+            "description": "所属场次（可选）"
+          }
+        }
+      }
+    },
     "shots": {
       "type": "array",
       "minItems": 4,
@@ -309,7 +339,12 @@
           "beat": {
             "type": "string",
             "minLength": 1,
-            "description": "集内节拍（建议：钩子/爽点-打脸/爽点-护/反转/揭露/情绪点/甜/危机/💰卡点/转场）"
+            "description": "集内节拍类型（建议：钩子/爽点-打脸/爽点-护/反转/揭露/情绪点/甜/危机/💰卡点/转场）"
+          },
+          "beatId": {
+            "type": "string",
+            "pattern": "^B[0-9]{2}$",
+            "description": "回指顶层 beats[].id（有 beats 清单时必填；一 beat 可被多镜引用）"
           }
         }
       }
