@@ -724,6 +724,18 @@ import { markdownToHtml } from './markdown.js'
     const keys = ['model', 'tier', 'character', 'cardVariant', 'seed', 'width', 'height', 'length', 'steps', 'guidance']
     const parts = keys.filter((k) => node.params[k] !== undefined && node.params[k] !== null)
       .map((k) => k + '=' + node.params[k])
+    // 逐镜自检门：镜头卡上直接显示自检状态（⏳ 待自检 / ✅ 通过 / ❌ 未过），
+    // 与插件 pre-execute 门读同一份 params.selfCheck。
+    const check = node.params.selfCheck
+    if (check && typeof check === 'object') {
+      const label = check.status === 'pass' ? '✅ 自检通过' : check.status === 'fail' ? '❌ 自检未过' : '⏳ 待自检'
+      // 结构化 checks 里失败 / 待人工核的项直接显示在卡片上（与插件门读同一份 params.selfCheck）。
+      const failed = check.checks && typeof check.checks === 'object'
+        ? Object.entries(check.checks).filter(([, v]) => v === 'fail').map(([k]) => k)
+        : []
+      const suffix = failed.length ? `（${failed.join('/')}）` : ''
+      parts.unshift(label + suffix)
+    }
     return parts.join(' · ')
   }
 
@@ -1015,6 +1027,7 @@ import { markdownToHtml } from './markdown.js'
       + ' · 档位 ' + (project.settings?.mode || 'quality')
       + (project.settings?.characterCardVariant ? ' · 角色卡 ' + (project.settings.characterCardVariant === 'three' ? '三视图' : '单视图') : '')
       + ' · 审查 ' + (project.settings?.reviewMode === 'batch' ? '批量' : '逐镜')
+      + ' · 自检 ' + (project.settings?.shotGate === 'off' ? '关闭' : project.settings?.shotGate === 'frames' ? '抽帧' : '开启')
       + ' · 节点 ' + nodes.length
       + (nodes.length ? '（主线 ' + main.length + (frames.length ? ' · 抽帧 ' + frames.length : '') + (discards.length ? ' · 作废 ' + discards.length : '') + '）' : '')
 

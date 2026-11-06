@@ -1,0 +1,183 @@
+{
+  "id": "video-interpolate-rife",
+  "displayName": "视频补帧 · RIFE（整数倍，可收敛到目标帧率）",
+  "capability": "video.interpolate",
+  "tier": "quality",
+  "group": "video-interpolate",
+  "priority": 0,
+  "estSeconds": 22,
+  "note": "输入是画布上已存在的视频；输出同一时长、更高帧率。模型只支持整数倍 2–16（ComfyUI FrameInterpolate 契约）：24→48 用 ×2；24→60 / 24→30 这类非整数倍先用 ×5 出 120fps 母版，再交给 runner 用 ffmpeg 按目标帧率抽取（不抽就会 2.5× 快放）。实测（A800，124 帧 768×1344）：×2 端到端 10.5s，×5 21.0s。模型输出帧数 = (N−1)×m+1，比 N×m 少 m−1 帧 ⇒ runner 会尾部补 m−1 帧（末帧重复，1/(m·f) 秒）把时长钉回源时长，避免逐镜拼接累积漂移。",
+  "description": "视频补帧（VFI）：把画布上一个已生成的视频节点提升帧率并写回画布（音轨直通——音频从不经过模型）。整数倍补帧（24→48/72/96）由 ComfyUI 原生 FrameInterpolate 完成；非整数倍目标（24→60、24→30）先出整数倍母版，再由 runner 用 ffmpeg 抽取到目标帧率（需要本机 ffmpeg）。产物帧数 = 源帧数 × 倍率（含 D2 尾部补齐），时长与源严格一致。逐镜补、不要对成片补（硬切处会生成两场之间的形变帧）。",
+  "interpolate": {
+    "mode": "param",
+    "defaultMultiplier": 2,
+    "minMultiplier": 2,
+    "maxMultiplier": 16,
+    "outRule": "n-minus-1-times-m-plus-1",
+    "audio": "passthrough",
+    "note": "倍率由 runner 按目标帧率反解（见 lib/index.js planInterpolate）：目标 = 源帧率 × 整数倍 → 纯模型补帧；目标 < 母版帧率且能整除 → 模型补帧 + ffmpeg 抽取。模型输出 (N−1)m+1 帧，runner 尾部补 m−1 帧凑成 N×m，时长 = N/源fps。`audio=passthrough`：音轨由 CreateVideo 直通，时长跟画面（补齐后与源一致）。"
+  },
+  "assets": {
+    "vfi_weights": {
+      "kind": "other",
+      "default": "rife_v4.25.safetensors",
+      "env": "DSH_SVS_VFI_WEIGHTS",
+      "label": "帧插值权重（放 ComfyUI models/frame_interpolation/）"
+    }
+  },
+  "params": {
+    "source_video": {
+      "inject": "scalar",
+      "to": {
+        "node": "1",
+        "field": "file"
+      }
+    },
+    "multiplier": {
+      "inject": "scalar",
+      "to": {
+        "node": "4",
+        "field": "multiplier"
+      }
+    },
+    "pad_from": {
+      "inject": "scalar",
+      "to": {
+        "node": "5",
+        "field": "batch_index"
+      }
+    },
+    "pad_amount": {
+      "inject": "scalar",
+      "to": {
+        "node": "6",
+        "field": "amount"
+      }
+    },
+    "out_fps": {
+      "inject": "scalar",
+      "to": {
+        "node": "8",
+        "field": "fps"
+      }
+    },
+    "prefix": {
+      "inject": "scalar",
+      "to": {
+        "node": "9",
+        "field": "filename_prefix"
+      }
+    }
+  },
+  "requiresNodes": [
+    "LoadVideo",
+    "GetVideoComponents",
+    "FrameInterpolationModelLoader",
+    "FrameInterpolate",
+    "ImageFromBatch",
+    "RepeatImageBatch",
+    "ImageBatch",
+    "CreateVideo",
+    "SaveVideo"
+  ],
+  "output": {
+    "mediaType": "video"
+  },
+  "graph": {
+    "1": {
+      "class_type": "LoadVideo",
+      "inputs": {
+        "file": "${source_video}"
+      }
+    },
+    "2": {
+      "class_type": "GetVideoComponents",
+      "inputs": {
+        "video": [
+          "1",
+          0
+        ]
+      }
+    },
+    "3": {
+      "class_type": "FrameInterpolationModelLoader",
+      "inputs": {
+        "model_name": "$assets.vfi_weights"
+      }
+    },
+    "4": {
+      "class_type": "FrameInterpolate",
+      "inputs": {
+        "interp_model": [
+          "3",
+          0
+        ],
+        "images": [
+          "2",
+          0
+        ],
+        "multiplier": "${multiplier}"
+      }
+    },
+    "5": {
+      "class_type": "ImageFromBatch",
+      "inputs": {
+        "image": [
+          "4",
+          0
+        ],
+        "batch_index": "${pad_from}",
+        "length": 1
+      }
+    },
+    "6": {
+      "class_type": "RepeatImageBatch",
+      "inputs": {
+        "image": [
+          "5",
+          0
+        ],
+        "amount": "${pad_amount}"
+      }
+    },
+    "7": {
+      "class_type": "ImageBatch",
+      "inputs": {
+        "image1": [
+          "4",
+          0
+        ],
+        "image2": [
+          "6",
+          0
+        ]
+      }
+    },
+    "8": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": [
+          "7",
+          0
+        ],
+        "fps": "${out_fps}",
+        "audio": [
+          "2",
+          1
+        ]
+      }
+    },
+    "9": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": [
+          "8",
+          0
+        ],
+        "filename_prefix": "${prefix}",
+        "format": "mp4",
+        "codec": "h264"
+      }
+    }
+  }
+}

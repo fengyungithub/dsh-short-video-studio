@@ -6,9 +6,15 @@ node_modules/
 e2e-out/
 .tmp-workspace/
 canvas/
+# 会话中的临时提示词草稿（不入库）
+.tmp-prompt/
 
 # 包管理器本地缓存（pnpm 在本仓库默认把 store 建在项目根，内容寻址、可再生）
 .pnpm-store/
 
 # 插件运行时资产库（asset_list / 入库存储，非源码）
 .dsh-assets/
+
+# 实验运行产物（工作区/假 ComfyUI trace）
+experiment/runs/
+experiment-out/

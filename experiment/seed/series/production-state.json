@@ -1,0 +1,52 @@
+{
+  "series": {
+    "title": "三十天",
+    "episodes": 1,
+    "episodeSeconds": 45,
+    "episodeSecondsRange": [40, 50],
+    "episodeSecondsException": { "ep001": 45 },
+    "mode": "domestic",
+    "aspectRatio": "9:16",
+    "style": "cinematic-live-action",
+    "audioMode": "dialogue-led",
+    "tier": "balanced",
+    "imageTier": "balanced",
+    "subtitles": "none",
+    "delivery": "native",
+    "characterCardVariant": "single",
+    "reviewMode": "batch",
+    "shotGate": "verdict",
+    "voicePlan": "existing",
+    "bgmMode": "none",
+    "packageContract": "episode-package/v1",
+    "assetMode": "draft"
+  },
+  "assets": {
+    "characters": [],
+    "scenes": [],
+    "props": [],
+    "voices": []
+  },
+  "episodes": {
+    "ep001": {
+      "stage": "package",
+      "package": "series/episodes/ep001/package.md",
+      "shots": 8,
+      "scriptVersion": 1,
+      "packageVersion": 1,
+      "episodeVersion": 1,
+      "changeRequest": null,
+      "doneShots": [],
+      "clipNodeIds": [],
+      "finalNodeId": "",
+      "costMinutes": 0,
+      "gate": {
+        "package": { "status": "pending", "at": "" },
+        "clips": { "status": "pending", "at": "" },
+        "delivery": { "status": "pending", "at": "" }
+      },
+      "delivery": ""
+    }
+  },
+  "next": "ep001/assets"
+}

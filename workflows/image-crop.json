@@ -1,0 +1,44 @@
+{
+  "id": "image-crop",
+  "version": 1,
+  "capability": "image.crop",
+  "runner": "comfyui",
+  "displayName": "裁切（图片 → 图片）",
+  "description": "ComfyUI ImageCrop 纯像素裁切：从一张已存在的图片上切出矩形区域。不重绘、不采样、无提示词，产物与源图落在同一像素网格上（1:1 像素，不缩放）。",
+  "note": "无档位：同一张图任何档位裁出来的都是同一张产物。轴对齐矩形（x/y/width/height 都是整数像素），不支持旋转/倾斜裁切。",
+  "output": { "mediaType": "image", "hasAudio": false },
+  "graph": {
+    "1": { "class_type": "LoadImage", "inputs": { "image": null } },
+    "2": { "class_type": "ImageCrop", "inputs": { "image": ["1", 0], "width": 512, "height": 512, "x": 0, "y": 0 } },
+    "3": { "class_type": "SaveImage", "inputs": { "images": ["2", 0], "filename_prefix": null } }
+  },
+  "params": {
+    "source_image": {
+      "inject": "image",
+      "via": "field",
+      "to": { "node": "1", "field": "image" }
+    },
+    "crop_width": {
+      "inject": "scalar",
+      "to": { "node": "2", "field": "width" }
+    },
+    "crop_height": {
+      "inject": "scalar",
+      "to": { "node": "2", "field": "height" }
+    },
+    "crop_x": {
+      "inject": "scalar",
+      "to": { "node": "2", "field": "x" },
+      "default": 0
+    },
+    "crop_y": {
+      "inject": "scalar",
+      "to": { "node": "2", "field": "y" },
+      "default": 0
+    },
+    "prefix": {
+      "inject": "scalar",
+      "to": { "node": "3", "field": "filename_prefix" }
+    }
+  }
+}

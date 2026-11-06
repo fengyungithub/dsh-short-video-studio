@@ -1,0 +1,272 @@
+{
+  "contract": "episode-package/v1",
+  "episode": {
+    "number": 3,
+    "id": "EP003",
+    "title": "离婚协议",
+    "sourceScript": "episodes/ep003.md",
+    "sourceDialogueCount": 2,
+    "scriptVersion": 1,
+    "packageVersion": 1,
+    "episodeVersion": 1
+  },
+  "targetSeconds": 90,
+  "shotBudget": 4,
+  "paywall": false,
+  "hookType": "suspense",
+  "prevRecap": "顾言当众否认婚约，林晚被赶出股东大会。",
+  "nextTeaser": "林晚拿出股权代持协议，顾言第一次失控。",
+  "scenes": [
+    {
+      "id": "SC01",
+      "intExt": "内",
+      "location": "总裁办公室",
+      "dayNight": "日",
+      "cast": [
+        "林晚",
+        "顾言"
+      ],
+      "event": "林晚递上离婚协议，顾言羞辱她净身出户",
+      "escalation": "从冷嘲到当众扔协议",
+      "landmarks": [
+        {
+          "name": "door-frame",
+          "position": "右侧 1/3"
+        },
+        {
+          "name": "desk",
+          "position": "画面中"
+        }
+      ],
+      "lightBaseline": "冷白顶光主光 + 右侧窗光补光"
+    },
+    {
+      "id": "SC02",
+      "intExt": "内",
+      "location": "办公室外走廊",
+      "dayNight": "日",
+      "cast": [
+        "林晚",
+        "助理"
+      ],
+      "event": "助理追上递回股权代持文件",
+      "escalation": "反转揭示：她才是控股方",
+      "landmarks": [
+        {
+          "name": "window-light",
+          "position": "左侧"
+        },
+        {
+          "name": "elevator",
+          "position": "画面中"
+        }
+      ],
+      "lightBaseline": "走廊顶部暖光 + 左侧窗光"
+    }
+  ],
+  "dialogue": [
+    {
+      "no": 1,
+      "speaker": "顾言",
+      "text": "签了它，你一分钱都别想从这个家带走。",
+      "emotion": "居高临下",
+      "targetSeconds": 3.5,
+      "subtitle": "none",
+      "voiceRef": "voice:demo-gu",
+      "sfx": []
+    },
+    {
+      "no": 2,
+      "speaker": "林晚",
+      "text": "我只要我该得的那一份，不多不少。",
+      "emotion": "平静",
+      "targetSeconds": 3.0,
+      "subtitle": "none",
+      "voiceRef": "voice:demo-lin",
+      "sfx": []
+    }
+  ],
+  "beats": [
+    { "id": "B01", "label": "协议被推到桌心，指节发白（开场钩子）", "sceneId": "SC01" },
+    { "id": "B02", "label": "顾言羞辱林晚净身出户", "sceneId": "SC01" },
+    { "id": "B03", "label": "林晚平静反击，把笔推回去", "sceneId": "SC01" },
+    { "id": "B04", "label": "走廊灯下收尾，悬念留到下一集", "sceneId": "SC02" }
+  ],
+  "shots": [
+    {
+      "shotId": "S01",
+      "seconds": 5.2,
+      "sceneId": "SC01",
+      "speaker": null,
+      "line": null,
+      "performance": "协议被推到桌心，指节发白",
+      "shotSizeCamera": "特写 / 锁定",
+      "screenPositions": "协议：桌中；手：画面下缘",
+      "chainIntent": "起链",
+      "beat": "钩子",
+      "beatId": "B01"
+    },
+    {
+      "shotId": "S02",
+      "seconds": 5.2,
+      "sceneId": "SC01",
+      "speaker": "顾言",
+      "line": "签了它，你一分钱都别想从这个家带走。",
+      "performance": "靠椅背，眼皮都不抬",
+      "shotSizeCamera": "中景 / 轻微下压",
+      "screenPositions": "顾言：右中景；门框：右1/3",
+      "chainIntent": "接 S01",
+      "beat": "爽点-打脸",
+      "beatId": "B02"
+    },
+    {
+      "shotId": "S03",
+      "seconds": 4.6,
+      "sceneId": "SC01",
+      "speaker": "林晚",
+      "line": "我只要我该得的那一份，不多不少。",
+      "performance": "平静，把笔推回去",
+      "shotSizeCamera": "近景 / 缓推",
+      "screenPositions": "林晚：左前景",
+      "chainIntent": "接 S02",
+      "beat": "反转",
+      "beatId": "B03"
+    },
+    {
+      "shotId": "S04",
+      "seconds": 4.0,
+      "sceneId": "SC02",
+      "speaker": null,
+      "line": null,
+      "performance": "走廊灯下停步，轻声说完最后一句",
+      "shotSizeCamera": "近景 / 侧跟",
+      "screenPositions": "林晚：右中景；窗光：左",
+      "chainIntent": "转场",
+      "beat": "情绪点",
+      "beatId": "B04"
+    }
+  ],
+  "assets": {
+    "characters": [
+      {
+        "name": "林晚",
+        "state": "常服-白衬衫",
+        "singleNodeId": "node-lin-single",
+        "threeNodeId": "node-lin-three",
+        "assetId": "character:demo-lin",
+        "episodes": "1-60",
+        "assetIdSingle": "character:demo-林晚",
+        "assetIdThree": "character:demo-林晚-three"
+      },
+      {
+        "name": "顾言",
+        "state": "深灰西装",
+        "singleNodeId": "node-gu-single",
+        "threeNodeId": "node-gu-three",
+        "assetId": "character:demo-gu",
+        "episodes": "1-60",
+        "assetIdSingle": "character:demo-顾言",
+        "assetIdThree": "character:demo-顾言-three"
+      }
+    ],
+    "scenes": [
+      {
+        "name": "总裁办公室",
+        "assetId": "scene:demo-office",
+        "landmarks": [
+          {
+            "name": "door-frame",
+            "position": "右1/3"
+          },
+          {
+            "name": "desk",
+            "position": "画面中"
+          }
+        ],
+        "lightBaseline": "冷白顶光主光 + 右侧窗光补光"
+      },
+      {
+        "name": "办公室外走廊",
+        "assetId": "scene:demo-corridor",
+        "landmarks": [
+          {
+            "name": "window-light",
+            "position": "左侧"
+          },
+          {
+            "name": "elevator",
+            "position": "画面中"
+          }
+        ],
+        "lightBaseline": "走廊顶部暖光 + 左侧窗光"
+      }
+    ],
+    "props": [
+      {
+        "name": "离婚协议",
+        "assetId": "scene:prop-divorce-paper",
+        "episodes": "3-12"
+      }
+    ],
+    "voices": [
+      {
+        "character": "林晚",
+        "voiceAssetId": "voice:demo-lin",
+        "source": "audition",
+        "auditionNodeId": "node-lin-audition",
+        "tier": "balanced",
+        "seed": 1001,
+        "episodes": "1-60"
+      },
+      {
+        "character": "顾言",
+        "voiceAssetId": "voice:demo-gu",
+        "source": "audition",
+        "auditionNodeId": "node-gu-audition",
+        "tier": "balanced",
+        "seed": 1002,
+        "episodes": "1-60"
+      }
+    ],
+    "toBuild": []
+  },
+  "params": {
+    "styleId": "cinematic-live-action",
+    "aspectRatio": "9:16",
+    "duration": "90 秒（默认；按包 ① 80–110s 调整）",
+    "audioMode": "dialogue-led",
+    "subtitleMode": "none",
+    "videoTier": "balanced",
+    "imageTier": "balanced",
+    "characterCardVariant": "single",
+    "deliveryQuality": "native",
+    "reviewMode": "batch",
+    "voicePlan": "existing",
+    "storyboardMode": "text",
+    "groupOrderVersion": [
+      "story planning",
+      "character cards",
+      "voice auditions",
+      "scene cards",
+      "prop cards",
+      "shot table",
+      "text storyboards",
+      "shot prompts",
+      "shot clips",
+      "final delivery"
+    ],
+    "assetMode": "library",
+    "bgmMode": "none"
+  },
+  "budget": {
+    "estimatedMinutes": 70,
+    "shotCount": 4,
+    "dialogueCount": 2
+  },
+  "gates": {
+    "packageApprovedAt": null,
+    "approvedBy": null,
+    "changeApprovedAt": null,
+    "changeRequestId": ""
+  }
+}

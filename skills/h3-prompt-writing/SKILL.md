@@ -77,7 +77,7 @@ Read `references/ref-en.txt` for label rules, retention analysis, and complete e
 | 对白（说话人/语气/时间） | `(Sx)` + `<d>[语言] 台词</d>`（ID 按发声顺序分配、跨镜复用） |
 | 口型纪律 | 显式 mouth-open / mouth-closed（旁白用官方 off-screen voiceover 句式） |
 | 音效 / 环境音 | `overall_soundscape` |
-| BGM 意图 | `non_diegetic_music`（无则 `N/A`） |
+| BGM 意图 / 镜头表 `BGM` | `non_diegetic_music`（`bgmMode=in-model` 按镜写；`none`/`separate` 写 `N/A`） |
 | 参考锚点 / 角色卡（`fast` 单视图或 `balanced`·`quality` 三视图横排）/ 场景卡 | `subject_definitions` + `retention_analysis` + `detailed_description` 空间描述 |
 
 详细映射、对齐指令模板与项目级后缀边界见 `references/studio-mapping.md`。

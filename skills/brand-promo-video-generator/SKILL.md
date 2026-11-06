@@ -30,11 +30,13 @@ whenToUse: |
 | 写简报 / 事实表 / 来源清单 / 镜头表 / 交付清单 | `canvas_write_node`（kind=text\|table） |
 | 读画布节点 | `canvas_get_node` / `canvas_list_nodes` |
 | 归组 / 排序 | `canvas_group_nodes` / `canvas_reorder` |
-| 读写项目设置 | `canvas_get_state` / `canvas_set_state` |
+| 读写项目设置（含逐镜自检门 `shotGate`） | `canvas_get_state` / `canvas_set_state` |
 | 查跨会话资产库 / 物化资产到画布 | `asset_list` / `asset_to_canvas` |
-| 抽帧（取末帧 / 首帧） | `extract_frame` |
+| 抽帧（取末帧 / 首帧 / 自检关键帧） | `extract_frame` |
+| **记录逐镜自检结论（自检门放行凭据）** | `canvas_record_check(nodeId, verdict="pass"\|"fail", frames?, notes?)` |
 | 拼接全片（含音轨） | `video_concat` |
 | 提分辨率 / 超分（可选，见 STEP 8） | `video_upscale`（对**单个片段**放大） |
+| 提帧率 / 补帧（可选，见 STEP 8） | `video_interpolate`（对**单个片段**补到 48fps；**成片不补**） |
 | 所有批准 / 选择关口 | `ask_user_question`（选项卡） |
 
 不要写死模型名或工作流：**实现由配置决定**（设置页的「档位选择 / 家族偏好 / 钉实现」），技能只表达能力 + 档位 + 分辨率/画幅 + 创作参数。要换实现请引导用户在设置页改，**不要在对话或流程里出现工作流 id**。
@@ -92,8 +94,9 @@ whenToUse: |
 3. **总时长**：15 秒（推荐，快速发布片）/ 30 秒 / 45–60 秒 / 自定义。镜头数：15s → 2–3 镜，30s → 3–6 镜，45–60s → 5–10 镜（单镜 5–15 秒，见镜头表规则）。
 4. **音频模式**：`silent` 纯音乐音效（BGM + SFX，无口播，零口型风险，产品宣传片推荐）/ `narration-led` 旁白主导（原生旁白 + BGM，讲解式宣传）。`dialogue-led` 不在本 Skill 范围。
 5. **生成档位**：`fast`（调试 / 调构图，长边 832）/ `balanced`（日常，画质与耗时平衡，长边 1344）/ `quality`（成片，长边 1344）。允许先 fast 走通全片再升档重出（`fast`→`balanced`、`fast`→`quality`、`balanced`→`quality` 都允许）。
+6. **逐镜自检门**（`shotGate`，**默认开启**）：开启（`verdict`，每镜抽帧核对 + `canvas_record_check(pass)` 才放行下一镜）/ 只要求抽帧（`frames`）/ 关闭（`off`，不做逐镜 AI 自检留痕，片段批准前仍可人工看）。
 
-确认后用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode），**同一次调用一并传 `groupOrder=["brand intake","creative plan","asset plates","shot prompts","shot clips","final delivery"]`**，并写入生产简报。
+确认后用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode / shotGate），**同一次调用一并传 `groupOrder=["brand intake","creative plan","asset plates","shot prompts","shot clips","final delivery"]**，并写入生产简报。
 
 > **每镜必须显式传 `type` 与 `tier`**：`type=r2v`（参考绑定）/ `type=i2v`（首末帧串联）——**工具面 `type` 必填**，且与参数冲突会报错；`tier=fast|balanced|quality` 同样逐镜显式写，**不要依赖缺省**——缺省是 `quality`（成本最高档）。
 
@@ -366,6 +369,8 @@ whenToUse: |
 
 ### 片段批准
 
+**逐镜自检必须先落画布（工具层硬门，`settings.shotGate` 开启时生效、默认开启）**：每渲完一镜立即 `extract_frame` 抽首/中/末帧核对（身份素材是否逐字一致、文案是否漏烧/错烧、无分镜痕迹），然后 `canvas_record_check(nodeId=<本镜片段节点>, verdict="pass"|"fail", frames=[抽出的帧节点 id], notes=<判定摘要>)`。`pass` 必须有抽帧证据；未 pass 的镜头会被插件 pre-execute 门挡住下一镜；`video_concat` 是后处理，不受此门约束。`fail` 时按「逐镜失败回退阶梯」改完**复用同一 nodeId 重渲**（重渲把自检重置为 pending）。项目设置 `shotGate=verdict|frames|off` 控制强度（默认 verdict）。
+
 所有片段渲染完成后按镜头顺序放到画布（group `shot clips`），出选项卡：批准片段并进入交付（推荐）/ 重渲染选定片段 / 修复身份不一致 / 加强品牌锁一致性 / 修复跨片段色彩状态跳变。
 
 若片段与已批准的镜头表漂移（产品位置、色彩状态、文案时机），用直接引用该镜头表行的强化提示重渲；不要在交付时静默混合修正版与未修正版。
@@ -388,6 +393,7 @@ whenToUse: |
 
 - **逐镜超分（推荐优先试）**：`video_upscale(video_node=某片段节点, tier='quality', target_width=…)` 对**单个片段**放大。逐帧 CNN，**不经过 H3、不重绘内容**（品牌身份素材的像素不会被模型"重新想象"，这一点对品牌片尤其重要），音轨原样带回；代价线性（≈2.2–2.6 s/帧）。**比例永远跟源片**：H3 是 1.75:1，所以「4032 宽」= 4032×2304，不是 16:9 的 3840×2160。
 - **生成时就出高分辨率**：让该档解析到**放大类实现**（在配置页把该档指到它；用 `comfy_list_workflows` 查该档有没有、交付多大）。这类实现**锁定自己的采样尺寸**：显式 `width`/`height` 与画布比例**都不生效**（工具会回一条 warnings 说明），交付尺寸由该实现决定；**比例与单镜帧数可能受限**；耗时远高于同档普通实现。全片要固定同一档。
+- **逐镜补帧（48fps，可选）**：`video_interpolate(video_node=某片段节点, target_fps=48)` 对**单个片段**补帧（RIFE ×2，只加时间信息、不重绘内容；**品牌 LOGO / 产品界面像素不会被模型重新想象**，但快速运动边缘仍可能轻微重影——先抽中间帧核对再批量）。代价 ≈10.5s/镜（768×1344），体积基本不变。**只逐镜补、成片不补**（硬切处出鬼影）；**全片同一帧率**（混帧率拼接被 `video_concat` 拒绝）；含烧录文案的镜头先核对中间帧文字清晰度。
 
 三条纪律：① **对单个分镜放大，不要对拼好的成片放大**（成片先拼后放会把失败代价与显存峰值放大到全片）；② **放大后要重跑拼接**（用放大后的节点、同样顺序）；③ **超分不改变内容**，构图/动作/文案错误要先重出那一镜，放大只会把错误放大。
 

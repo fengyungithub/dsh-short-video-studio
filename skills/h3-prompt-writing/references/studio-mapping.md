@@ -26,7 +26,11 @@
 | 镜头表 `音频与对白轨.口型` | `detailed_description` 显式写明「mouth-open: 说话人 / mouth-closed: 其余角色」；旁白用官方句式「says in an off-screen voiceover … while his lips remain completely closed」 |
 | 镜头表 `音频与对白轨.音效` | `overall_soundscape`（环境音、物理音、非语言人声，1–4 句） |
 | 项目简报 BGM 意图 / 情绪音乐 | `non_diegetic_music`（乐器、速度、节奏、动态；无则 `N/A`） |
+| 镜头表 `音频与对白轨.BGM` + 项目 `bgmMode` | `bgmMode=in-model` → 逐镜写入 `non_diegetic_music`（本镜 in/out/乐器/速度/对白下压低）；`none` → `N/A`；`separate`（下一期）→ `N/A` |
 | 镜头表 `字幕` 字段 | 对白进 `<d>`；**字幕在 `detailed_description` 的 `<d>` 对白附近以英文双引号 on-screen text 声明**（`a Chinese subtitle "字幕原文" is displayed centered at the bottom of the frame`），**不用末尾中文指令**（实测：六段式下末尾/内嵌中文指令均不烧录；英文 on-screen 声明 + quality 档正确烧录） |
+| 镜头表 `参考锚点.背景人物` | `detailed_description`：`exactly N` + 坐/站 + 衣色 + 虚化；无则写 `none/empty`（**不要写 `completely empty` 后又写有人**，自相矛盾）。未单独实测 |
+| 镜头表 `音频与对白轨.画面文案` | 与字幕同源同法的「画面内文案」写法：英文双引号 + `reading exactly "原文"` + 描边/对比 + 只给结束点；**与 `<d>` 字幕分开**，字幕选 `none` 时仍可单独声明 |
+| 签名道具（**无道具卡时**） | `detailed_description`：`<材质> <平面形状> with <唯一识别特征>，not a bottle, not an orb, not a cylinder`。A/B 实测：同一 seed 下从「圆头指状玉条/小瓶」变成「带缺角的矩形玉牌」；极端形状可加 `as thin as a coin` / `held face-on`。**只对无生命道具用否定**；道具已建卡时**不要**用否定去改卡里的形状（会把卡内容掰弯） |
 
 ### 1.1 续接镜（r2v + `continuity_from`）的额外要求
 
@@ -57,8 +61,9 @@
 - 段落用英文书写；**对白 / 歌词 / 画面可见文字保留原语言**，对白放 `<d>[语言] …</d>` 内。
 - 对白逐字保留（含标点），不翻译不改写；`<d>` 内只放语言标签与原文。
 - 参考标签（`<Subject N>` / `<Picture N>` / `<Video N>` / `<Audio N>`）跨节保持一致，不重复定义。
+- **r2v 里被参考的「内容」一律用 `<Subject N>`**；`<Picture N>` 只用于**引用来源图**（可以挂在 `<Subject N>` 的定义句中说明「来自 <Picture 1>」，见 ref-en §2），**不要**把 `<Picture N>` 当成被参考内容的标签。
 - 景别、镜头运动（类型 + 幅度 + 速度）、口型纪律全部写进 `detailed_description` / `integrated_multimodal_description`，不留到字段外。
-- 参考图硬规则：**角色卡双版本**（每个角色出单视图 + 三视图横排；视频引用哪一版由 STEP 0 用户选择——项目档位 `fast` 只能单视图，`balanced` / `quality` 可选单视图或三视图；每镜显式 `ref_variant`）、图内零文字、不把多张图临时拼成一张；需要更多角度时分别占不同 `ref_nodes` 槽位。非 fast 档若命中参考图形态类污染，片型 skill 先传 `ref_variant=single` 重渲，再改 prompt。
+- 参考图硬规则：**角色卡双版本**（每个角色先出三视图横排、再裁正面格当单视图；视频引用哪一版由 STEP 0 用户选择——项目档位 `fast` 只能单视图，`balanced` / `quality` 可选单视图或三视图；每镜显式 `ref_variant`）、图内零文字、不把多张图临时拼成一张；需要更多角度时分别占不同 `ref_nodes` 槽位。非 fast 档若命中参考图形态类污染，片型 skill 先传 `ref_variant=single` 重渲，再改 prompt。
 
 ### 3.1 提示词库（三档同文，共用 quality）
 
