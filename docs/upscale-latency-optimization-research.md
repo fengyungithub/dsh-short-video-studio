@@ -222,6 +222,12 @@ PDD 把二遍从 6 次评估压到 2 次（`nfe=8, denoise=0.3 → round(8×0.3)
 | **VDN-H3 线性注意力**（[OpenVDN](https://github.com/OpenVDN/vdn-minimax-h3)） | 用常数代价的线性注意力分支替换二次长程注意力 ⇒ **成本随长度线性**（α→1） | 无本机实测 | α=1.85→1 会让「分块」的收益消失（分块只在 α>1 时赚），但**整体**可能更快；属换模型，分布风险大 |
 | **官方 2K Regenerate**（[API](https://platform.minimax.io/docs/api-reference/video-generation-v2-regeneration)） | 不开源的 `H3-Regenerate-2K` 模块 | 不在本地 | 只接受符合 H3-768P 规格的源片（**必须有音轨**、24fps、两边 /32、面积 589,824–1,032,192、107–362 帧且步进 17），且**必须重发当时真正送进模型的输入**（含 H3-Context-IR 之后的最终 prompt）；resolution 仅支持 `2K` |
 
+> **2026-11 更新（本文写于 9 月）**：官方 `H3-Regenerate-2K` 仍未开源，但 **NVIDIA 已开源开放替代品
+> Open-H3-Regenerate-2K**（FL2VA + 合并 LoRA，σ₀0.909 起 3 步重生成，768P/1080P/2K/4K，ComfyUI 侧已有适配包）。
+> 按本仓库 2K 二遍实测外推，A800 上约 **15–16 min / 5 s 镜**（推算），比现有 U1-2K（≈35 min）快约 2.2×。
+> 详见 [`research/open-h3-regenerate-2k.md`](research/open-h3-regenerate-2k.md)。
+> 下文「官方 2K 只能走 API」对**官方模块**仍然成立，但「本地没有 2K 重生成」这条已过时。
+
 **降级方案**：如果本地 2K 始终太贵，`fast-2k`（1664×960，`estSeconds=620`）是现成的中间档；
 再往上的 4K 直接走 U3（原生→×4→4032，**241.3s**）。
 
@@ -304,6 +310,7 @@ PDD 把二遍从 6 次评估压到 2 次（`nfe=8, denoise=0.3 → round(8×0.3)
 | **SeedVR2 3B**（[ComfyUI 原生支持](https://docs.comfy.org/zh/tutorials/utility/seedvr2)，无需任何自定义节点） | 一步扩散恢复 | ✅ | **已实测**：同源同交付（124 帧 · 1344×768 → 2688×1536）**483.4s**，同格 U3 x2 只要 **69.0s ⇒ 7.0×**；官方仓库侧另有「细节重塑更强但慢」的一致说法 | 我们图里**直接把交付尺寸喂模型**（`ImageScale`）⇒ `target_width` 真驱动 | 低（节点与权重本机都已就位） | **已接入**：`video-upscale-seedvr2-3b`（`priority=-20` 不做隐式默认，`chunking="internal"`） |
 | **RTX VSR (nvvfx)** | 驱动级 | ❌ | 12GB 卡上多帧 **OOM/CUDA 崩溃** | — | 低 | ❌ 弃用（同页实测） |
 | **官方 H3-Regenerate-2K** | 闭源重生成 | ✅ | 云端 | **2K** | 需 API key + 重发原始输入 | 本地算力不够时的兜底；不是「放大器」 |
+| **Open-H3-Regenerate-2K**（2026-10 开源替代） | H3 latent 放大 + 3 步重生成 | ✅（FL2VA + 合并 LoRA + Sharp 曲线） | **本地** | 768P / 1080P / **2K** / 4K | 13.7 GB 新权重 + ComfyUI 节点包；已有放大器/快解码器可复用 | **新增候选**：A800 ≈15–16 min/5 s（推算）；比 U1-2K 快 ~2.2×，但重画幅度大（身份/口型风险）— 见 [`research/open-h3-regenerate-2k.md`](research/open-h3-regenerate-2k.md) |
 | **其它 H3 latent upscaler 实现** | latent 空间学习式 | ✅ | 未测 | — | 低（**资产槽可换**） | LBH 上游 / xmarre Plus / Tr1dae / Mamad8 至少四家；2D 档比 3D 档轻 |
 
 **注意最后一行的杠杆**：本仓库的放大器走 `$assets.latent_upscaler` 资产槽（`DSH_SVS_H3_LATENT_UPSCALER` 可覆盖），
@@ -567,4 +574,5 @@ SeedVR2 的 `sizing` 因此仍声明 `factor: 2`——它的含义退化为「�
 - FlashVSR / SeedVR2 / RTX VSR 的 H3 侧对比实测 — <https://github.com/juemin4-source/minimax-h3-guide/blob/main/docs/upscale.md>
 - Chaosyn：H3 高分辨率放大（joint AV latent 的坑、5090 实测）— <https://blog.chaosyn.com/en/posts/minimax-h3-high-resolution-upscaling/>
 - 官方 2K Regenerate API（`H3-Regenerate-2K`，未开源）— <https://platform.minimax.io/docs/api-reference/video-generation-v2-regeneration>
+- **Open-H3-Regenerate-2K**（NVIDIA / NVlabs 的开源替代，2026-10 发布）— <https://huggingface.co/Efficient-Large-Model/Open-H3-Regenerate-2K> · <https://nvlabs.github.io/Sana/Open-H3-Regenerate-2K/> · 调研见 [`research/open-h3-regenerate-2k.md`](research/open-h3-regenerate-2k.md)
 - ComfyUI 官方视频放大教程 — <https://docs.comfy.org/tutorials/utility/video-upscale>

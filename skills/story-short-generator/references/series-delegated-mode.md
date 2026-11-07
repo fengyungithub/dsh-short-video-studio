@@ -49,7 +49,7 @@
 | 审查节奏 `batch` | 圣经 + `canvas_set_state.reviewMode` | 读回校验 |
 | 逐镜自检门 `verdict`（默认开启） | 圣经 + `canvas_set_state.shotGate` | 读回校验；缺省按 `verdict` |
 | 字幕 `none` | 圣经 + 集制作包 ⑥ | 校验（无 state 字段） |
-| 交付画质 `delivery` | 圣经 + 集制作包 ⑥（native / upscale1080 / 2k / 4k） | 校验；整季二选一 |
+| 交付画质 `delivery` | 圣经 + 集制作包 ⑥（native / upscale1080 / upscale2k / upscale4k / **regen2k**） | 校验；整季同一路线（`regen2k` = 逐镜重生成 1440×2560，会重画内容；本集镜头表每镜须 ≥124 帧 24fps） |
 | 风格 / 声线方案 / assetMode | 圣经 + ⑥ | 校验 |
 | BGM 模式 `bgmMode` | 圣经 + ⑥（none / in-model） | 校验；`in-model` 要求镜头表 `BGM` 子字段逐镜写清 |
 | 节点数（主线/总） | `canvas_list_nodes()` | **只展示、不是参数**；动态 |

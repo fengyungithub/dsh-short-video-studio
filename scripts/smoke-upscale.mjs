@@ -418,7 +418,7 @@ console.log('\n[8] 容器解析：自造最小 mp4 读出宽高/帧数/时长/�
 console.log('\n[9] 注册表集成：能力可见、隐式默认仍是 x2、贵的实现必须显式选')
 {
   const cands = reg.byCapability['video.upscale'] || []
-  eq('能力下有 3 份实现（x2 / x4 / SeedVR2）', cands.length, 3)
+  eq('能力下有 5 份实现（x2 / x4 / SeedVR2 / RelayVSR ×2 / ×4）', cands.length, 5)
   const quality = cands.filter((m) => m.tier === 'quality' && !m.internal)
   const first = I.sortTierCandidates(quality)[0]
   eq('quality 隐式首选 x2（priority 最高）', first.id, X2)
@@ -465,6 +465,51 @@ console.log('\n[9] 注册表集成：能力可见、隐式默认仍是 x2、贵�
     const cs = sliceUpscaleGraph(cg, { start: 0, frames: 56, fps: 24 })
     eq('种 SeedVR2 图也能被切片（帧入口是 ImageScale）',
       JSON.stringify(cs['3'].inputs.image), JSON.stringify(['900', 0]))
+  }
+
+  // RelayVSR（Comfy-Org 重打包，ComfyUI PR #17511）：每 15 帧过参考分支 + 逐帧 Flash 解码。
+  // x2 / x4 是**两套权重**（factor 由 checkpoint 决定），所以是两份平级清单。
+  for (const [id, f, dit, vae] of [
+    ['video-upscale-relayvsr-x2', 2, 'relayvsr_x2_lightx2v_int8_convrot.safetensors', 'relayvsr_flash_vae_x2_fp32.safetensors'],
+    ['video-upscale-relayvsr-x4', 4, 'relayvsr_x4_int8_convrot.safetensors', 'relayvsr_flash_vae_x4_fp32.safetensors'],
+  ]) {
+    const rv = reg.byId[id]
+    ok(`${id} 已注册`, Boolean(rv))
+    if (!rv) continue
+    eq(`${id} capability=video.upscale（同一个工具）`, rv.capability, 'video.upscale')
+    eq(`${id} tier=quality`, rv.tier, 'quality')
+    eq(`${id} 尺寸来源 = factor`, rv.upscale.sizing, 'factor')
+    eq(`${id} 倍率 = ${f}（由 checkpoint 决定）`, rv.upscale.factor, f)
+    eq(`${id} 分块归属 = internal（自带因果窗口 + KV cache）`, rv.upscale.chunking, 'internal')
+    ok(`${id} priority<0（不做隐式默认）`, rv.priority < 0, String(rv.priority))
+    ok(`${id} 不声明 resolutionLock`, rv.resolutionLock === undefined)
+    const g = rv.graph
+    ok(`${id} 图里有原生 RelayVSR 节点链`,
+      ['RelayVSRConditioning', 'VSRDecode', 'KSampler'].every((c) => Object.values(g).some((n) => n.class_type === c)),
+      JSON.stringify(rv.requiresNodes))
+    eq(`${id} 一步推理（steps=1 / cfg=1 / denoise=1）`,
+      `${g['6'].inputs.steps}/${g['6'].inputs.cfg}/${g['6'].inputs.denoise}`, '1/1/1')
+    eq(`${id} 参考分支只吃低清源帧（不是交付尺寸重采样）`,
+      JSON.stringify(g['5'].inputs.images), JSON.stringify(['2', 0]))
+    eq(`${id} VSRDecode 也吃同一份低清源帧`,
+      JSON.stringify(g['7'].inputs.images), JSON.stringify(['2', 0]))
+    eq(`${id} 音轨不进模型（源 → CreateVideo 直连）`,
+      JSON.stringify(g['9'].inputs.audio), JSON.stringify(['2', 1]))
+    eq(`${id} 两个资产槽（DiT + VAE）`, Object.keys(rv.assets).sort().join(','), 'relayvsr_dit,relayvsr_vae')
+    eq(`${id} 默认 DiT 权重`, rv.assets.relayvsr_dit.default, dit)
+    eq(`${id} 默认 Flash 解码器`, rv.assets.relayvsr_vae.default, vae)
+    ok(`${id} requiresNodes 覆盖原生链路`,
+      ['UNETLoader', 'VAELoader', 'RelayVSRConditioning', 'KSampler', 'VSRDecode', 'ImageScale']
+        .every((n) => rv.requiresNodes.includes(n)), JSON.stringify(rv.requiresNodes))
+    // chunking=internal 的真实效果：像素-帧超线也不自动切（只告警）
+    const big = planUpscaleChunks({ frames: 900, deliveryW: 1344 * f, deliveryH: 768 * f, chunking: rv.upscale.chunking })
+    eq(`${id} 超像素-帧线也不自动分块`, big.frameLimit, 0)
+    ok(`${id} …但会如实告警`, big.warnings.length > 0, JSON.stringify(big.warnings))
+    // 编译出来的图：交付尺寸注入到 ImageScale（节点 8），16 号节点前的图 10 节点
+    const cg = buildGraphFromManifest(rv, { mode: null, source_video: 'in.mp4', out_width: 2688, out_height: 1536, prefix: 'x/y' })
+    eq(`${id} 编译图 10 节点`, Object.keys(cg).length, 10)
+    eq(`${id} 交付尺寸注入节点 8`, `${cg['8'].inputs.width}×${cg['8'].inputs.height}`, '2688×1536')
+    eq(`${id} ImageScale 收敛 VSRDecode 的输出`, JSON.stringify(cg['8'].inputs.image), JSON.stringify(['7', 0]))
   }
 }
 

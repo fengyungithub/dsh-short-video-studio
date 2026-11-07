@@ -184,6 +184,21 @@
         "sigmas": "1.0, 0.972973, 0.923077, 0.8, 0.571429, 0.333333, 0.0"
       }
     },
+    "24": {
+      "class_type": "OpenH3SaveRefinedLatent",
+      "inputs": {
+        "samples": [
+          "10",
+          0
+        ],
+        "frame_count": null,
+        "filename_prefix": null,
+        "audio": [
+          "11a",
+          0
+        ]
+      }
+    },
     "4a": {
       "class_type": "VAELoader",
       "inputs": {
@@ -275,6 +290,22 @@
         "node": "13",
         "field": "filename_prefix"
       }
+    },
+    "latent_prefix": {
+      "inject": "scalar",
+      "to": {
+        "node": "24",
+        "field": "filename_prefix"
+      },
+      "default": "h3_handoff"
+    },
+    "latent_frame_count": {
+      "inject": "scalar",
+      "to": {
+        "node": "24",
+        "field": "frame_count"
+      },
+      "default": 0
     }
   },
   "modes": {

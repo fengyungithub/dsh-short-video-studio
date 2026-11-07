@@ -1,0 +1,371 @@
+{
+  "id": "open-h3-regenerate-2k-latent",
+  "version": 1,
+  "capability": "video.regenerate",
+  "tier": "quality",
+  "group": "minimax-h3-regenerate",
+  "internal": true,
+  "displayName": "MiniMax H3 重生成（latent 交接版 · 2K/1080p）",
+  "description": "B 方案：直接从上游存下的 H3 原生 latent 重生成到目标网格——没有 mp4 解码、没有 VAE 重编码。第二段作业专用（上游清单需用 OpenH3SaveRefinedLatent 存 latent）。",
+  "output": {
+    "mediaType": "video",
+    "hasAudio": true
+  },
+  "assets": {
+    "unet": {
+      "kind": "checkpoint",
+      "default": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "env": "DSH_SVS_H3_MODEL_FL",
+      "label": "H3 FL2VA UNet（精修 base，必须 fl2va）"
+    },
+    "clip": {
+      "kind": "clip",
+      "default": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "env": "DSH_SVS_H3_CLIP",
+      "label": "H3 CLIP"
+    },
+    "vae_decode": {
+      "kind": "vae",
+      "default": "sol_h3_vae.safetensors",
+      "env": "DSH_SVS_H3_SOL_VAE",
+      "label": "Sol-H3-VAE / StreamRender-H3 快解码器（解码）"
+    },
+    "latent_upscaler": {
+      "kind": "other",
+      "default": "minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors",
+      "env": "DSH_SVS_H3_LATENT_UPSCALER",
+      "label": "H3 学习式 latent 放大器（3D）"
+    },
+    "regenerate_lora": {
+      "kind": "lora",
+      "default": "open_h3_regenerate_2k_lora.safetensors",
+      "env": "DSH_SVS_OPEN_H3_LORA",
+      "label": "Open-H3 合并 LoRA（refiner + LightX2V FL2VA Turbo + LMS Sharp）"
+    },
+    "sharp_curves": {
+      "kind": "lora",
+      "default": "sharp_curve_branches.safetensors",
+      "env": "DSH_SVS_OPEN_H3_CURVES",
+      "label": "LMS Sharp 50 条 AdaLN 曲线分支"
+    },
+    "curve_table": {
+      "kind": "checkpoint",
+      "default": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "env": "DSH_SVS_H3_MODEL_REF",
+      "label": "提供 adaln_t_table 的 pruned checkpoint（只读 32KB 曲线表）"
+    }
+  },
+  "graph": {
+    "1": {
+      "class_type": "OpenH3LoadRefinedLatent",
+      "inputs": {
+        "latent_file": null
+      }
+    },
+    "2": {
+      "class_type": "LatentUpscaleModelLoader",
+      "inputs": {
+        "model_name": "$assets.latent_upscaler"
+      }
+    },
+    "3": {
+      "class_type": "MiniMaxH3LatentUpscaleWithModel",
+      "inputs": {
+        "model": [
+          "2",
+          0
+        ],
+        "samples": [
+          "1",
+          0
+        ],
+        "width": null,
+        "height": null
+      }
+    },
+    "4": {
+      "class_type": "OpenH3RegenRefineLatent",
+      "inputs": {
+        "latent": [
+          "3",
+          0
+        ],
+        "audio_mode": "keep latent audio"
+      }
+    },
+    "5": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "$assets.unet",
+        "weight_dtype": "default"
+      }
+    },
+    "6": {
+      "class_type": "OpenH3RegenLora",
+      "inputs": {
+        "model": [
+          "5",
+          0
+        ],
+        "lora_name": "$assets.regenerate_lora",
+        "curve_name": "$assets.sharp_curves",
+        "curve_table": "$assets.curve_table",
+        "strength": 1.0,
+        "curve_strength": 1.0,
+        "lora_dtype": "bf16"
+      }
+    },
+    "7": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "$assets.clip",
+        "type": "minimax",
+        "device": "default"
+      }
+    },
+    "8": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "clip": [
+          "7",
+          0
+        ],
+        "text": null
+      }
+    },
+    "9": {
+      "class_type": "OpenH3RegenSigmas",
+      "inputs": {
+        "steps": 3,
+        "start_sigma": 0.0
+      }
+    },
+    "10": {
+      "class_type": "RandomNoise",
+      "inputs": {
+        "noise_seed": null
+      }
+    },
+    "11": {
+      "class_type": "KSamplerSelect",
+      "inputs": {
+        "sampler_name": "euler"
+      }
+    },
+    "12": {
+      "class_type": "BasicGuider",
+      "inputs": {
+        "model": [
+          "6",
+          0
+        ],
+        "conditioning": [
+          "8",
+          0
+        ]
+      }
+    },
+    "13": {
+      "class_type": "SamplerCustomAdvanced",
+      "inputs": {
+        "noise": [
+          "10",
+          0
+        ],
+        "guider": [
+          "12",
+          0
+        ],
+        "sampler": [
+          "11",
+          0
+        ],
+        "sigmas": [
+          "9",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ]
+      }
+    },
+    "14": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "$assets.vae_decode"
+      }
+    },
+    "15": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "13",
+          0
+        ],
+        "vae": [
+          "14",
+          0
+        ]
+      }
+    },
+    "16": {
+      "class_type": "OpenH3RegenFinish",
+      "inputs": {
+        "images": [
+          "15",
+          0
+        ],
+        "frame_count": [
+          "1",
+          1
+        ],
+        "crop": "auto (1088 -> 1080, 2176 -> 2160)",
+        "audio": [
+          "1",
+          2
+        ]
+      }
+    },
+    "17": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": [
+          "16",
+          0
+        ],
+        "audio": [
+          "16",
+          1
+        ],
+        "fps": 24.0
+      }
+    },
+    "18": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": [
+          "17",
+          0
+        ],
+        "filename_prefix": null,
+        "format": "mp4",
+        "codec": "h264"
+      }
+    }
+  },
+  "params": {
+    "latent_file": {
+      "inject": "scalar",
+      "to": {
+        "node": "1",
+        "field": "latent_file"
+      }
+    },
+    "prompt": {
+      "inject": "scalar",
+      "to": {
+        "node": "8",
+        "field": "text"
+      }
+    },
+    "width": {
+      "inject": "scalar",
+      "to": {
+        "node": "3",
+        "field": "width"
+      }
+    },
+    "height": {
+      "inject": "scalar",
+      "to": {
+        "node": "3",
+        "field": "height"
+      }
+    },
+    "seed": {
+      "inject": "scalar",
+      "to": {
+        "node": "10",
+        "field": "noise_seed"
+      }
+    },
+    "steps": {
+      "inject": "scalar",
+      "to": {
+        "node": "9",
+        "field": "steps"
+      },
+      "default": 3
+    },
+    "start_sigma": {
+      "inject": "scalar",
+      "to": {
+        "node": "9",
+        "field": "start_sigma"
+      },
+      "default": 0.0
+    },
+    "prefix": {
+      "inject": "scalar",
+      "to": {
+        "node": "18",
+        "field": "filename_prefix"
+      }
+    }
+  },
+  "regenerate": {
+    "input": "latent",
+    "targets": {
+      "1080p": {
+        "graph": [
+          1920,
+          1088
+        ],
+        "delivery": [
+          1920,
+          1080
+        ]
+      },
+      "2k": {
+        "graph": [
+          2560,
+          1440
+        ],
+        "delivery": [
+          2560,
+          1440
+        ]
+      }
+    },
+    "default": "2k",
+    "inputFps": 24,
+    "fpsTolerance": 0.02,
+    "minFrames": 121,
+    "maxFrames": 362,
+    "requiresPrompt": true,
+    "note": "B 方案（latent 交接）：入口是上游 OpenH3SaveRefinedLatent 存下的 H3 原生 latent（含音频 latent + 音轨波形 + 帧数），因此没有 h264 解码与 VAE 重编码。内部清单（不进档位矩阵），先用于 A/B 验证。"
+  },
+  "requiresNodes": [
+    "OpenH3LoadRefinedLatent",
+    "LatentUpscaleModelLoader",
+    "MiniMaxH3LatentUpscaleWithModel",
+    "OpenH3RegenRefineLatent",
+    "OpenH3RegenLora",
+    "OpenH3RegenSigmas",
+    "OpenH3RegenFinish",
+    "CLIPLoader",
+    "CLIPTextEncode",
+    "UNETLoader",
+    "VAELoader",
+    "VAEDecode",
+    "BasicGuider",
+    "SamplerCustomAdvanced",
+    "RandomNoise",
+    "KSamplerSelect",
+    "CreateVideo",
+    "SaveVideo"
+  ],
+  "note": "B 方案实验（内部清单）：latent 直通 → 3D 放大 → σ0.909 3 步重画 → 快解码。与视频入口的 C 版共用 LLM/LoRA/曲线/解码，只换草稿入口。",
+  "priority": -96
+}

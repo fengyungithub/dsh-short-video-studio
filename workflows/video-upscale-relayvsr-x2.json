@@ -1,0 +1,207 @@
+{
+  "id": "video-upscale-relayvsr-x2",
+  "displayName": "视频超分 · RelayVSR ×2（参考帧扩散 + 逐帧 Flash 解码）",
+  "capability": "video.upscale",
+  "tier": "quality",
+  "group": "video-upscale",
+  "priority": -30,
+  "note": "RelayVSR（Apache-2.0，Comfy-Org 重打包）· x2（lightx2v 版）。ComfyUI **原生支持**（PR #17511，节点 RelayVSRConditioning / VSRDecode），**不需要自定义节点包**；权重放 models/diffusion_models/ 与 models/vae/，走资产槽 $assets.relayvsr_dit / $assets.relayvsr_vae。与 SeedVR2 的结构性差别：①它只让**每 15 帧**进一次 Wan 参考分支（一步、无文本条件），其余帧由 Flash 解码器逐帧结合 LQ 帧生成 ⇒ 比「每帧都过 DiT」便宜；②自带 int8 KV cache 与因果窗口，长片由实现自己管显存。**依赖**：ComfyUI ≥ PR #17511（2026-11-05 合入 master）+ comfy-kitchen ≥ 0.2.41；核心版本不够时节点缺失、清单不会可用。**实测（2026-11-07 · 124 帧 · 1344×768 源片 · 含权重加载 · A800 80GB）**：x2 → 2688×1536 **25.3s**；x4 → 5376×3072 **83.4s**；同会话对照：像素 U3 x2 **68.1s**、SeedVR2 3B **187.2s**。画质（自校准频谱尺子，同为 2K 网格）：RelayVSR x2 有效宽 **2117（×1.575）**、平坦区闪烁 **1.057**、锐度 192.7；像素 U3 x2 是 2218 / 0.958 / 193.9，SeedVR2 是 2654 / 1.045 / 311.3 —— ⇒ RelayVSR 是「**便宜 + 干净**」的一档（1:1 眼判招牌边缘的振铃比 U3 少），**不是「细节最多」**；要极限细节仍是 SeedVR2，要最稳的时间一致性仍是像素链路。",
+  "description": "视频超分 · RelayVSR ×2（真实场景视频超分）。输入是**画布上已存在的视频**：每 15 帧抽一帧过一步 Wan2.2 5B 参考分支（RelayVSRConditioning → KSampler steps=1/cfg=1），再由 Flash 解码器逐帧结合原始低清帧输出 ×2 画面；音轨原样带回（不经过模型）。交付尺寸 = 源尺寸 × 2，可用 target_width 收敛到指定宽度（按 32 对齐；超出倍率的部分只是插值）。模型自带跨帧时间窗（因果窗口 + int8 KV cache）⇒ chunking=internal，长片不靠外层分块。**要求 ComfyUI 含 RelayVSR 支持（PR #17511）且 comfy-kitchen ≥ 0.2.41**；权重走资产槽可替换。",
+  "upscale": {
+    "sizing": "factor",
+    "chunking": "internal",
+    "factor": 2,
+    "align": 32,
+    "note": "交付尺寸 = 源视频尺寸 × 2（可被 target_width 收敛，按 32 对齐）。`sizing=\"factor\"`：倍率由权重决定（x2 / x4 是两套 checkpoint，不能靠改参数换倍率），target_width 大于自然尺寸时**只是插值**（runner 会告警）。`chunking=\"internal\"`：模型按 15 帧关键帧 + 因果窗口跑，并带 int8 K/V cache；外层切开会在它的时间窗上再加一道硬切 ⇒ runner 不自动分块（`chunk_frames=` 仍照办但会告警）。**比例永远跟源片**（H3 族 1.75:1 ⇒ 4032 宽 = 4032×2304）。"
+  },
+  "assets": {
+    "relayvsr_dit": {
+      "kind": "other",
+      "default": "relayvsr_x2_lightx2v_int8_convrot.safetensors",
+      "env": "DSH_SVS_RELAYVSR_X2_DIT",
+      "label": "RelayVSR ×2 DiT（Wan2.2 5B int8_convrot，放 models/diffusion_models/）"
+    },
+    "relayvsr_vae": {
+      "kind": "other",
+      "default": "relayvsr_flash_vae_x2_fp32.safetensors",
+      "env": "DSH_SVS_RELAYVSR_X2_VAE",
+      "label": "RelayVSR ×2 Flash 解码器（放 models/vae/）"
+    }
+  },
+  "params": {
+    "source_video": {
+      "inject": "scalar",
+      "to": {
+        "node": "1",
+        "field": "file"
+      }
+    },
+    "out_width": {
+      "inject": "scalar",
+      "to": {
+        "node": "8",
+        "field": "width"
+      }
+    },
+    "out_height": {
+      "inject": "scalar",
+      "to": {
+        "node": "8",
+        "field": "height"
+      }
+    },
+    "prefix": {
+      "inject": "scalar",
+      "to": {
+        "node": "10",
+        "field": "filename_prefix"
+      }
+    }
+  },
+  "requiresNodes": [
+    "LoadVideo",
+    "GetVideoComponents",
+    "UNETLoader",
+    "VAELoader",
+    "RelayVSRConditioning",
+    "KSampler",
+    "VSRDecode",
+    "ImageScale",
+    "CreateVideo",
+    "SaveVideo"
+  ],
+  "output": {
+    "mediaType": "video"
+  },
+  "graph": {
+    "1": {
+      "class_type": "LoadVideo",
+      "inputs": {
+        "file": "${source_video}"
+      }
+    },
+    "2": {
+      "class_type": "GetVideoComponents",
+      "inputs": {
+        "video": [
+          "1",
+          0
+        ]
+      }
+    },
+    "3": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "$assets.relayvsr_dit",
+        "weight_dtype": "default"
+      }
+    },
+    "4": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "$assets.relayvsr_vae"
+      }
+    },
+    "5": {
+      "class_type": "RelayVSRConditioning",
+      "inputs": {
+        "model": [
+          "3",
+          0
+        ],
+        "images": [
+          "2",
+          0
+        ]
+      }
+    },
+    "6": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "3",
+          0
+        ],
+        "seed": 0,
+        "steps": 1,
+        "cfg": 1,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "positive": [
+          "5",
+          0
+        ],
+        "negative": [
+          "5",
+          0
+        ],
+        "latent_image": [
+          "5",
+          1
+        ],
+        "denoise": 1
+      }
+    },
+    "7": {
+      "class_type": "VSRDecode",
+      "inputs": {
+        "vae": [
+          "4",
+          0
+        ],
+        "samples": [
+          "6",
+          0
+        ],
+        "images": [
+          "2",
+          0
+        ],
+        "detail": 1
+      }
+    },
+    "8": {
+      "class_type": "ImageScale",
+      "inputs": {
+        "image": [
+          "7",
+          0
+        ],
+        "upscale_method": "area",
+        "width": 32,
+        "height": 32,
+        "crop": "disabled"
+      }
+    },
+    "9": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": [
+          "8",
+          0
+        ],
+        "fps": [
+          "2",
+          2
+        ],
+        "audio": [
+          "2",
+          1
+        ]
+      }
+    },
+    "10": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": [
+          "9",
+          0
+        ],
+        "filename_prefix": "${prefix}",
+        "format": "mp4",
+        "codec": "h264"
+      }
+    }
+  },
+  "estSeconds": 25.3
+}

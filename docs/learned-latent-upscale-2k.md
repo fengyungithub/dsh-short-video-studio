@@ -3,7 +3,7 @@
 > 状态：**已实现**（清单 `minimax-h3-{ref2v,i2v}-ctx-{quality,quality-pdd2,balanced,fast}-2k`，**8 份在役**；`-ctx-balanced-pdd-2k` 一对已弃用退场）
 > 尺寸：**首遍不锁**，交付 = 首遍 ×2 ⇒ 16:9 交付 2688×1536（`fast` 1664×960）、9:16 交付 1536×2688（`fast` 960×1664）、1:1 交付 2688×2688
 > 契约：`resolutionLock` 的**只锁倍率**形态（`docs/tier-strategy-design.md` §3）· 提交流程见 `docs/workflow-contract.md`
-> 相关：`docs/hires-two-pass-upscale.md`（插值版两阶段，图锁定形态）· `docs/minimax-h3-video-benchmark.md`（实测表）
+> 相关：`docs/hires-two-pass-upscale.md`（插值版两阶段，图锁定形态）· `docs/minimax-h3-video-benchmark.md`（实测表）· `docs/research/open-h3-regenerate-2k.md`（**并列路线**：同一份放大器权重，但二遍改成 σ₀0.909 起 3 步「重生成」，调研中）
 
 ## 0. 为什么需要它：hires 到不了 2K
 

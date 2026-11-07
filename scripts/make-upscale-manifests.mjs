@@ -37,6 +37,11 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const OUT = resolve(ROOT, 'workflows')
 
 const GROUP = 'video-upscale'
+
+// RelayVSR 的登记耗时（真机实测：124 帧 · 1344×768 源片 · 含权重加载 · A800 80GB）
+const RELAYVSR_X2_EST = 25.3
+const RELAYVSR_X4_EST = 83.4
+
 const REQUIRES = [
   'LoadVideo', 'GetVideoComponents', 'UpscaleModelLoader',
   'ImageUpscaleWithModel', 'ImageScale', 'CreateVideo', 'SaveVideo',
@@ -139,7 +144,107 @@ const SPECS = [
       '（`tile_size` / `temporal_size` / `overlap` 在图里）。' +
       '**比例永远跟源片**（H3 族 1.75:1 ⇒ 4032 宽 = 4032×2304）。',
   },
+  // -------------------------------------------------------------------------
+  // RelayVSR（Comfy-Org 重打包，PR #17511 合入 ComfyUI master）：x2 / x4 两个 checkpoint
+  // 是两套权重（x2 为 lightx2v 版），所以按既有约定拆成两份平级清单，不是「一个工作流的两个模式」。
+  // -------------------------------------------------------------------------
+  {
+    id: 'video-upscale-relayvsr-x2',
+    displayName: '视频超分 · RelayVSR ×2（参考帧扩散 + 逐帧 Flash 解码）',
+    graph: 'relayvsr',
+    sizing: 'factor',
+    chunking: 'internal',
+    factor: 2,
+    // 比 SeedVR2 更晚加入、且需要较新的 ComfyUI 核心 ⇒ 不做隐式默认
+    priority: -30,
+    estSeconds: RELAYVSR_X2_EST,
+    note: relayvsrNote(2, 'x2（lightx2v 版）'),
+    description: relayvsrDescription(2),
+    upscaleNote: relayvsrUpscaleNote(2),
+    dit: {
+      default: 'relayvsr_x2_lightx2v_int8_convrot.safetensors',
+      env: 'DSH_SVS_RELAYVSR_X2_DIT',
+      label: 'RelayVSR ×2 DiT（Wan2.2 5B int8_convrot，放 models/diffusion_models/）',
+    },
+    vae: {
+      default: 'relayvsr_flash_vae_x2_fp32.safetensors',
+      env: 'DSH_SVS_RELAYVSR_X2_VAE',
+      label: 'RelayVSR ×2 Flash 解码器（放 models/vae/）',
+    },
+  },
+  {
+    id: 'video-upscale-relayvsr-x4',
+    displayName: '视频超分 · RelayVSR ×4（参考帧扩散 + 逐帧 Flash 解码）',
+    graph: 'relayvsr',
+    sizing: 'factor',
+    chunking: 'internal',
+    factor: 4,
+    // 同一家族的另一个倍率：比 x2 更贵（交付像素 4×），更不做隐式默认
+    priority: -40,
+    estSeconds: RELAYVSR_X4_EST,
+    note: relayvsrNote(4, 'x4（原生 4× 权重）'),
+    description: relayvsrDescription(4),
+    upscaleNote: relayvsrUpscaleNote(4),
+    dit: {
+      default: 'relayvsr_x4_int8_convrot.safetensors',
+      env: 'DSH_SVS_RELAYVSR_X4_DIT',
+      label: 'RelayVSR ×4 DiT（Wan2.2 5B int8_convrot，放 models/diffusion_models/）',
+    },
+    vae: {
+      default: 'relayvsr_flash_vae_x4_fp32.safetensors',
+      env: 'DSH_SVS_RELAYVSR_X4_VAE',
+      label: 'RelayVSR ×4 Flash 解码器（放 models/vae/）',
+    },
+  },
 ]
+
+/**
+ * RelayVSR 的说明文案（两份清单只差倍率/权重名，散文由函数生成，避免手抄两遍）。
+ *
+ * 事实来源：ComfyUI PR #17511（2026-11-05 合入 master，节点 RelayVSRConditioning + VSRDecode）、
+ * Comfy-Org/RelayVSR 权重仓、官方模板 relayvsr_x2_video.json。
+ */
+function relayvsrDescription(f) {
+  return (
+    `视频超分 · RelayVSR ×${f}（真实场景视频超分）。输入是**画布上已存在的视频**：` +
+    `每 15 帧抽一帧过一步 Wan2.2 5B 参考分支（RelayVSRConditioning → KSampler steps=1/cfg=1），` +
+    `再由 Flash 解码器逐帧结合原始低清帧输出 ×${f} 画面；音轨原样带回（不经过模型）。` +
+    `交付尺寸 = 源尺寸 × ${f}，可用 target_width 收敛到指定宽度（按 32 对齐；超出倍率的部分只是插值）。` +
+    `模型自带跨帧时间窗（因果窗口 + int8 KV cache）⇒ chunking=internal，长片不靠外层分块。` +
+    `**要求 ComfyUI 含 RelayVSR 支持（PR #17511）且 comfy-kitchen ≥ 0.2.41**；权重走资产槽可替换。`
+  )
+}
+
+function relayvsrUpscaleNote(f) {
+  return (
+    `交付尺寸 = 源视频尺寸 × ${f}（可被 target_width 收敛，按 32 对齐）。` +
+    `\`sizing="factor"\`：倍率由权重决定（x2 / x4 是两套 checkpoint，不能靠改参数换倍率），` +
+    'target_width 大于自然尺寸时**只是插值**（runner 会告警）。' +
+    '`chunking="internal"`：模型按 15 帧关键帧 + 因果窗口跑，并带 int8 K/V cache；' +
+    '外层切开会在它的时间窗上再加一道硬切 ⇒ runner 不自动分块（`chunk_frames=` 仍照办但会告警）。' +
+    '**比例永远跟源片**（H3 族 1.75:1 ⇒ 4032 宽 = 4032×2304）。'
+  )
+}
+
+function relayvsrNote(f, variantLabel) {
+  return (
+    `RelayVSR（Apache-2.0，Comfy-Org 重打包）· ${variantLabel}。` +
+    'ComfyUI **原生支持**（PR #17511，节点 RelayVSRConditioning / VSRDecode），**不需要自定义节点包**；' +
+    '权重放 models/diffusion_models/ 与 models/vae/，走资产槽 $assets.relayvsr_dit / $assets.relayvsr_vae。' +
+    '与 SeedVR2 的结构性差别：①它只让**每 15 帧**进一次 Wan 参考分支（一步、无文本条件），' +
+    '其余帧由 Flash 解码器逐帧结合 LQ 帧生成 ⇒ 比「每帧都过 DiT」便宜；' +
+    '②自带 int8 KV cache 与因果窗口，长片由实现自己管显存。' +
+    '**依赖**：ComfyUI ≥ PR #17511（2026-11-05 合入 master）+ comfy-kitchen ≥ 0.2.41；' +
+    '核心版本不够时节点缺失、清单不会可用。' +
+    '**实测（2026-11-07 · 124 帧 · 1344×768 源片 · 含权重加载 · A800 80GB）**：' +
+    `x2 → 2688×1536 **25.3s**；x4 → 5376×3072 **83.4s**；同会话对照：` +
+    '像素 U3 x2 **68.1s**、SeedVR2 3B **187.2s**。' +
+    '画质（自校准频谱尺子，同为 2K 网格）：RelayVSR x2 有效宽 **2117（×1.575）**、平坦区闪烁 **1.057**、' +
+    '锐度 192.7；像素 U3 x2 是 2218 / 0.958 / 193.9，SeedVR2 是 2654 / 1.045 / 311.3 —— ' +
+    '⇒ RelayVSR 是「**便宜 + 干净**」的一档（1:1 眼判招牌边缘的振铃比 U3 少），**不是「细节最多」**；' +
+    '要极限细节仍是 SeedVR2，要最稳的时间一致性仍是像素链路。'
+  )
+}
 
 /** 固定 7 节点图；倍率只体现在 UpscaleModelLoader 的资产槽与 factor 声明上。 */
 function buildGraph(spec) {
@@ -226,6 +331,69 @@ function buildSeedVR2Graph() {
   }
 }
 
+/**
+ * RelayVSR 原生图（ComfyUI PR #17511；官方模板 `relayvsr_x2_video.json`）。
+ *
+ * 结构（11 节点）：
+ *   1 LoadVideo → 2 GetVideoComponents ────────────────┬→ 5 RelayVSRConditioning(images)
+ *                                                      ├→ 7 VSRDecode(images)
+ *                                                      └→ 9 CreateVideo(audio/fps)
+ *   3 UNETLoader($assets.relayvsr_dit) ─┬→ 5 RelayVSRConditioning → 6 KSampler(steps=1) → 7 VSRDecode
+ *   4 VAELoader($assets.relayvsr_vae) ──┴────────────────────────────────────────────────→ 7 VSRDecode
+ *   7 VSRDecode → 8 ImageScale(交付尺寸) → 9 CreateVideo → 10 SaveVideo
+ *
+ * 三个关键点：
+ *   · **权重决定倍率**：VSRDecode 输出的就是源尺寸 × checkpoint 的 factor（x2 / x4 是两套权重）。
+ *     所以 sizing 仍是 `factor`；`target_width` 与像素链路同义——**事后**收敛，超出倍率的部分只是插值。
+ *     图里第 8 个 ImageScale 就干这件事（无 target_width 时是等尺寸 no-op）。
+ *   · **每 15 帧才进一次参考分支**：5 号节点只把 `relay_keyframes(frames)` 那几帧喂给 Wan 参考模型；
+ *     其余帧由 Flash 解码器逐帧结合 LQ 帧补出来。KSampler 固定 steps=1 / cfg=1 / denoise=1、
+ *     种子固定（超分是确定性后处理，不给调用方「随机重画」的旋钮）。
+ *   · **chunking=internal**：模型自带因果窗口 + int8 K/V cache，长片段由实现自己管显存；
+ *     外层分块会在它的时间窗上再加硬切。音轨照旧不进模型（GetVideoComponents.audio → CreateVideo.audio）。
+ */
+function buildRelayVSRGraph() {
+  return {
+    1: { class_type: 'LoadVideo', inputs: { file: '${source_video}' } },
+    2: { class_type: 'GetVideoComponents', inputs: { video: ['1', 0] } },
+    3: { class_type: 'UNETLoader', inputs: { unet_name: '$assets.relayvsr_dit', weight_dtype: 'default' } },
+    4: { class_type: 'VAELoader', inputs: { vae_name: '$assets.relayvsr_vae' } },
+    5: {
+      class_type: 'RelayVSRConditioning',
+      // 只吃低清帧；倍率/关键帧节奏由模型自己按 images 的帧数决定
+      inputs: { model: ['3', 0], images: ['2', 0] },
+    },
+    6: {
+      class_type: 'KSampler',
+      inputs: {
+        model: ['3', 0],
+        // 固定种子：超分是确定性后处理，不给调用方一个「随机重画」的旋钮
+        seed: 0,
+        steps: 1,
+        cfg: 1.0,
+        sampler_name: 'euler',
+        scheduler: 'simple',
+        positive: ['5', 0],
+        negative: ['5', 0],
+        latent_image: ['5', 1],
+        denoise: 1.0,
+      },
+    },
+    7: {
+      class_type: 'VSRDecode',
+      // detail=1：完整使用模型残差（官方默认）；图里写死，不给调用方留一个会改画质的旋钮
+      inputs: { vae: ['4', 0], samples: ['6', 0], images: ['2', 0], detail: 1.0 },
+    },
+    8: {
+      class_type: 'ImageScale',
+      // 交付尺寸（runner 注入）；无 target_width 时就是源 × factor 的等尺寸 no-op
+      inputs: { image: ['7', 0], upscale_method: 'area', width: 32, height: 32, crop: 'disabled' },
+    },
+    9: { class_type: 'CreateVideo', inputs: { images: ['8', 0], fps: ['2', 2], audio: ['2', 1] } },
+    10: { class_type: 'SaveVideo', inputs: { video: ['9', 0], filename_prefix: '${prefix}', format: 'mp4', codec: 'h264' } },
+  }
+}
+
 /** 每种图形态各自的接线、节点清单与资产槽（清单是它们的产物）。 */
 const GRAPHS = {
   pixel: {
@@ -266,6 +434,24 @@ const GRAPHS = {
         env: 'DSH_SVS_SEEDVR2_VAE',
         label: 'SeedVR2 VAE 权重（放 models/vae/，各档共用）',
       },
+    }),
+  },
+  relayvsr: {
+    build: buildRelayVSRGraph,
+    requiresNodes: [
+      'LoadVideo', 'GetVideoComponents', 'UNETLoader', 'VAELoader',
+      'RelayVSRConditioning', 'KSampler', 'VSRDecode', 'ImageScale', 'CreateVideo', 'SaveVideo',
+    ],
+    params: {
+      source_video: { inject: 'scalar', to: { node: '1', field: 'file' } },
+      // RelayVSR 按权重倍率出帧后再收敛（与像素链路同义：超出倍率的部分只是插值）
+      out_width: { inject: 'scalar', to: { node: '8', field: 'width' } },
+      out_height: { inject: 'scalar', to: { node: '8', field: 'height' } },
+      prefix: { inject: 'scalar', to: { node: '10', field: 'filename_prefix' } },
+    },
+    assets: (spec) => ({
+      relayvsr_dit: { kind: 'other', ...spec.dit },
+      relayvsr_vae: { kind: 'other', ...spec.vae },
     }),
   },
 }

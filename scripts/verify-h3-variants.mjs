@@ -59,10 +59,31 @@ const ok = (name, cond, detail = '') => {
 }
 const deepEq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 
-console.log('\n[1] 生成物 vs 模板：仅允许白名单字段不同')
+console.log('\n[1] 生成物 vs 模板：仅允许白名单字段不同（B 交接节点/注入点先归一化）')
+const SAVE_CLASS = 'OpenH3SaveRefinedLatent'
 for (const [id, [tpl, mode]] of Object.entries(MAP)) {
-  const gen = read(join(WF, id + '.json'))
+  const raw = read(join(WF, id + '.json'))
   const src = read(join(TPL, tpl))
+  // B 交接：balanced 清单会多一个 OpenH3SaveRefinedLatent（旁路存 draft latent）+ 两个注入点。
+  // 它不参与采样/解码，所以比较图结构前剔除；但必须断言接线正确、且是旁路（没人吃它的输出）。
+  const saveIds = Object.entries(raw.graph || {}).filter(([, n]) => n.class_type === SAVE_CLASS).map(([k]) => k)
+  let gen = raw
+  if (saveIds.length) {
+    const graph = { ...raw.graph }
+    for (const k of saveIds) delete graph[k]
+    gen = {
+      ...raw,
+      graph,
+      params: Object.fromEntries(Object.entries(raw.params || {}).filter(([k]) => !['latent_prefix', 'latent_frame_count'].includes(k))),
+    }
+    const sid = saveIds[0]
+    const node = raw.graph[sid]
+    const samplerId = Object.entries(raw.graph).find(([, n]) => n.class_type === 'SamplerCustomAdvanced')?.[0]
+    ok(`${id} 交接节点接在采样器输出上（samples←${samplerId}）`, node?.inputs?.samples?.[0] === samplerId)
+    const referenced = Object.entries(raw.graph).some(([k, n]) => k !== sid && Object.values(n.inputs || {}).some((v) => Array.isArray(v) && v[0] === sid))
+    ok(`${id} 交接节点是旁路（没有节点消费它的输出）`, !referenced)
+    ok(`${id} 声明 latent 注入点`, Boolean(raw.params?.latent_prefix && raw.params?.latent_frame_count))
+  }
   const keys = new Set([...Object.keys(gen), ...Object.keys(src)])
   const unexpected = [...keys].filter((k) => !ALLOW_DIFF.has(k) && !deepEq(gen[k], src[k]))
   ok(`${id} 非白名单字段与模板一致`, unexpected.length === 0, `差异字段：${unexpected.join(', ')}`)
@@ -112,7 +133,7 @@ console.log('\n[2] 档位参数：步数 / 长边 / LoRA 配对')
       ok(`${id} Sol 接线：BasicGuider/BasicScheduler → 2a`,
         m.graph['7'].inputs.model[0] === '2a' && m.graph['9'].inputs.model[0] === '2a')
       if (m.internal) ok(`${id} 已弃用清单不登记 requiresNodes`, m.requiresNodes === undefined)
-      else ok(`${id} requiresNodes=SolAttnMiniMaxH3`, deepEq(m.requiresNodes, ['SolAttnMiniMaxH3']))
+      else ok(`${id} requiresNodes=SolAttnMiniMaxH3（+交接节点）`, deepEq((m.requiresNodes || []).filter((x) => x !== SAVE_CLASS), ['SolAttnMiniMaxH3']))
     }
     if (e.solattn) {
       const sparse = Object.entries(m.graph).find(([, n]) => n.class_type === 'BlockSparseAttention')
@@ -144,7 +165,7 @@ console.log('\n[2] 档位参数：步数 / 长边 / LoRA 配对')
       ok(`${id} 图里没有任何蒸馏 LoRA（PDD 不叠加）`, !hasClass('LoraLoaderModelOnly'))
       ok(`${id} requiresNodes=${
         e.solattn ? 'BlockSparseAttention' : 'MiniMaxH3PDDAccApply'}`,
-        e.solattn ? deepEq(m.requiresNodes, ['BlockSparseAttention']) : deepEq(m.requiresNodes, ['MiniMaxH3PDDAccApply']))
+        e.solattn ? deepEq((m.requiresNodes || []).filter((x) => x !== SAVE_CLASS), ['BlockSparseAttention']) : deepEq((m.requiresNodes || []).filter((x) => x !== SAVE_CLASS), ['MiniMaxH3PDDAccApply']))
       ok(`${id} base 与 PDD 权重同族（ref2va↔ref2va / fl2va↔fl2va）`,
         String(m.assets.unet?.default || '').includes(id.includes('-i2v') ? 'fl2va' : 'ref2va') &&
         String(m.assets.pdd?.default || '').includes(id.includes('-i2v') ? 'fl2va' : 'ref2va'))

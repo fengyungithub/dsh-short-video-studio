@@ -3,11 +3,36 @@
 
 **完全本地 · 免费 · 零云端依赖**的**短剧 / 动画画布工作室**，作为 [DeepSeek Harness](https://github.com/deepseek-ai) 双面插件运行。所有生成都跑在**本地 ComfyUI** 上——不需要任何付费云 API、不消耗额度，装好即用，一次生成、无限出片。
 
-**画质已可达 2K / 4K 交付**：生成侧有**两阶段潜空间放大**（hires：首遍 896×512 → latent ×1.5 → 二遍重建，交付 1344×768）与**学习式 3D latent 放大**（`…-2k` 族：×2 → 交付 **2688×1536**）；后处理侧有独立的**视频超分**能力 `video.upscale`（逐帧 CNN ×2 / ×4，**音轨原样带回**）——原生片段一趟 ×4 即到 **4032×2304**（124 帧实测 **241.3s**），或 2K 再 ×2 到同样尺寸（**261.6s**）。三条路线怎么选见[分辨率与画质（2K / 4K）](#分辨率与画质2k--4k)。
+**画质已可达 2K / 4K 交付**：生成侧有**两阶段潜空间放大**（hires：首遍 896×512 → latent ×1.5 → 二遍重建，交付 1344×768）与**学习式 3D latent 放大**（`…-2k` 族：×2 → 交付 **2688×1536**）；后处理侧有独立的**视频超分** `video.upscale`（逐帧 CNN ×2/×4 + **RelayVSR** 参考帧扩散 ×2/×4，×2 仅 **25.3s**，**内容不变、音轨原样带回**）与**视频重生成** `video.regenerate`（Open-H3 Regenerate，1080p/2K，**会重画内容**）。加速侧可选 **Pika H3 Flex 6 步 / PDD 8 步 / Sol-Attn 块稀疏**，见[社区加速与放大技术](#社区加速与放大技术2026-11-重点)。
 
 > 一句话：**Agent 按你定义的 skill 编排流程，把生成请求派发到本地 ComfyUI 执行，产物落进可视化画布，还能通过飞书远程操控创作。**
 
 > **🌟 模型无关**：FLUX 2 / MiniMax H3 只是插件随附的**内置默认工作流**，不是产品边界。本插件是通用的 ComfyUI 工作流执行器 + 能力注册表——**任何 ComfyUI 能跑的模型**（SDXL / SD3.5 / Qwen-Image / Wan / CogVideoX / LTX / 本地 Kling 等，图片或视频、带不带声音都可以）都能通过[导入一份工作流清单](#导入你自己的-comfyui-workflow)接入，skill 与工具契约无需任何改动。换模型 = 加一份 JSON。
+
+## 社区加速与放大技术（2026-11 重点）
+
+2026-11 最值得用的社区**加速**与**放大 / 重建**技术都已在注册表里，且都做成了**可选实现**：新实现一律 `priority < 0`（或 `internal`），**不改变任何既有默认**，在设置页「＋ 新增策略 / 逐档下拉」里选用；缺节点 / 缺权重会如实置灰，不会静默换实现。实测机器：A800 80GB。
+
+### 🚀 加速（同 prompt / seed · 1344×768 · 124 帧）
+
+| 技术 | 来源 / 依赖 | 实测收益 | 怎么开 |
+|---|---|---|---|
+| **Pika H3 Flex 6 步** | Pika 后训练 LoRA（`pika_h3_flex_ref2va_v1` / `fl2va_v1`，各 1.82GB） | ref2v **178.8 → 135.9s**、i2v **173.6 → 132.2s**（**1.30–1.32×**）；叠原生块稀疏 **84.4s** | 放 `models/loras/`，策略里选 `…-balanced-pika` |
+| **PDD 8 步蒸馏** | [ComfyUI-MiniMax-H3-PDD-Acc](https://github.com/Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc) + acc LoRA（放 `models/pdd_acc/`） | **8 步拿到 20 步以上细节**（锐度 +10.3% / +7.9%）：ref2v 184.7s / i2v 178.8s；叠 Sol **137.3 / 134.1s** | 策略里选 `…-balanced-pdd[-sol]` |
+| **Sol-Attn 块稀疏** | [ComfyUI-SolAttn-Ampere](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere)（`flex_attention`，sm_80+，无需 nvcc） | 成片档 **1.27× / 1.25×**、balanced **1.23×**；fast / 480p 仅 1.03× 且高频 −13.8% ⇒ 低档不要开 | 装节点包后选 `-sol` 实现 |
+| **RIFE 补帧** | RIFE 4.25（ComfyUI 原生节点） | 48fps：124 帧 768×1344 **10.5s**（×2）、120fps 母版 **21.0s** | 后处理 `video_interpolate`；**逐镜补、成片不补** |
+
+### 🔍 放大 / 重建（画布上已有片段 → 更大 / 更实）
+
+| 技术 | 能力 / 实现 | 机制 | 实测（124 帧 · 1344×768 源片） | 什么时候选 |
+|---|---|---|---|---|
+| **像素空间 U3 ×2/×4** | `video.upscale` · `video-upscale-x2/x4` | 逐帧 RealESRGAN | ×2 68.1s → 2688×1536；×4 241.3s → 4032×2304 | 最便宜、时间最稳 |
+| **SeedVR2 3B** | `video.upscale` · `video-upscale-seedvr2-3b` | 一步扩散恢复 | 2K **187.2s**（同会话复测）；有效宽 2654、锐度 311 | 要纹理 / 材质，接受平坦区颗粒 |
+| **RelayVSR ×2 / ×4** | `video.upscale` · `video-upscale-relayvsr-x2/x4` | 每 15 帧一次 Wan2.2 5B 参考分支 + Flash 解码 | ×2 **25.3s** → 2688×1536；×4 **83.4s** → 5376×3072；有效宽 2117、闪烁 1.057 | **最快 + 最干净**（振铃少）；不是细节最多 |
+| **Open-H3 Regenerate 2K** | `video.regenerate` · `open-h3-regenerate-2k`（需 `ComfyUI-Open-H3-Regenerate` 节点包 + 权重） | latent 3D 放大 → σ0.909 / 3 步重画 | 2K **557.3s**（对照 `-ctx-quality-2k` 2120.9s = **3.8×**）；latent 交接 540.3s | **要「纹理 / 小字 / 材质」**，且接受**重画内容**、需提示词 + 抽帧核对 |
+| **生成内 3D latent ×2** | `…-2k` 族（`video.*`） | 首遍 768p → latent ×2 → 低 σ 精修 | 交付 2688×1536，二遍 620–2700s | 生成内 >2K、可与链式续接叠用 |
+
+> **保内容 vs 重画**：`video.upscale`（含 RelayVSR / SeedVR2）**不改内容**；`video.regenerate` **会重画**（身份 / 口型可能漂，必须抽帧核对）。两者都是后处理、都不占 H3 的 token。选型细节：Pika [`docs/research/pika-h3-flex-assessment.md`](docs/research/pika-h3-flex-assessment.md) · PDD / Sol [`docs/minimax-h3-acceleration-lora.md`](docs/minimax-h3-acceleration-lora.md) · 超分 [`docs/video-upscale.md`](docs/video-upscale.md) · 重生成 [`docs/video-regenerate.md`](docs/video-regenerate.md) · 补帧 [`docs/video-interpolate.md`](docs/video-interpolate.md)。
 
 ## 功能亮点
 
@@ -17,7 +42,7 @@
 - **画质/速度三档（tier）：图片与视频同一套 `fast` / `balanced` / `quality`**——图片长边 1024 / 1344 / 2048（文生图），视频长边 832 / 1344 / 1344；图生图按档给参考图重采样预算 768 / 1056 / 2048（quality 档可出 2K 改绘）。**工具面不接受 `workflow=`**：实现由配置决定（设置页的家族偏好 / 档位选择 / 钉实现）。**加速不暴露到产品层**——设置页每个能力只有一条**内置默认策略**，其余策略由你自己命名与组合（见下）。分辨率按画布比例 × 该档长边自动推导，支持 16:9 / 9:16 / 1:1 等任意画幅，snap32；显式传 `width`/`height` 可覆盖（只传一边时另一边按比例补出来）。
 - **图片双模（文生图 / 图生图）**：t2i 用 FLUX 2 直接出卡（角色卡 / 场景卡 / 分镜图），i2i 用 FLUX 2 ReferenceLatent **改绘**——保持主体不变、换背景 / 场景 / 画风 / 去水印；单张参考图、尺寸跟随参考图（≤1MP），`quality`（20 步无 LoRA，保真）/ `fast`（8 步 Turbo LoRA，调试快），可一次出 1–4 张。
 - **同场景续接镜「续得上」**：`continuity_from=上一镜节点 id` ⇒ **链式续接**——把上一镜的**服务端 latent 直接钉进本镜**（画面逐帧接住它的结尾、**音频从接缝继续**，实测接缝画面差 **2.6–7.0**，无续接对照 **32–68**），不需要上传图片、也不吃画质。**r2v 与 i2v 两侧都支持**（i2v 链式实现另见下），跨形状续接（上一镜 r2v → 本镜 i2v）同样可用。链的硬约束见[档位与加速策略](#档位tier与加速策略)与 [`docs/shot-chain-continuity.md`](docs/shot-chain-continuity.md)。
-- **画质可上 2K / 4K**：三条路线都在本地跑通——生成内两阶段放大（hires，交付 1344×768）、生成内**学习式 latent ×2**（`…-2k` 族，交付 **2688×1536**，可与链式续接叠用，见下）、以及独立**视频超分** `video.upscale`（画布片段 → 逐帧 CNN ×2/×4，**音轨原样带回**，原生一趟到 **4032×2304** 只需 **241.3s**/124 帧）。**超分建议按分镜做**（失败只毁一镜、可断点重跑）。详见[分辨率与画质（2K / 4K）](#分辨率与画质2k--4k)。
+- **画质可上 2K / 4K**：四条路线都在本地跑通——生成内两阶段放大（hires，交付 1344×768）、生成内**学习式 latent ×2**（`…-2k` 族，交付 **2688×1536**，可与链式续接叠用，见下）、独立**视频超分** `video.upscale`（画布片段 → 像素 U3 / SeedVR2 / **RelayVSR** 三族实现，**内容不变、音轨原样带回**；RelayVSR ×2 到 2K 只要 **25.3s**/124 帧）、以及独立**视频重生成** `video.regenerate`（Open-H3 Regenerate，1080p/2K，**会重画内容**，要提示词 + 抽帧核对）。**超分建议按分镜做**（失败只毁一镜、可断点重跑）。详见[分辨率与画质（2K / 4K）](#分辨率与画质2k--4k)与[社区加速与放大技术](#社区加速与放大技术2026-11-重点)。
 - **完整后处理**：同场景续接（链式 latent 或末帧串联）、生成式转场镜、抽帧、拼接合成（本机有 ffmpeg 走零重编码，否则 ComfyUI 纯节点链路）、**超分提分辨率**——一条龙出片。
 - **声线一致性与 BGM**：视频参考生成支持**参考音频** `audio_ref_nodes`（H3 Ref2VA 的 `<Audio N>`，≤3 段 / 每段 2–15s / 总 ≤15s / 单文件 ≤15MB）——同一角色跨镜用同一段声线样本锁音色；`extract_audio` 可从已渲片段抽音轨存为画布音频节点；音频可入库为 `voice:` 资产跨会话复用；`comfy_generate_music` 用本地 **MiniMax Music 3** 生成 44.1kHz 立体声 BGM（`duration` 秒 / `lyrics` 分段）。画布上传支持音频，纯音频默认归 `voice refs` 组。
 - **画面内字幕可开关（开场选择）**：`burned-in` **要字幕**（默认——台词由 AV 模型原生烧进画面，无需后期叠加）/ `none` **不要字幕**（对白照常发声、`<d>` 说话人绑定照写，但不写字幕声明，成片无字幕；本流程没有后期字幕轨）。开关记在项目简报（没有 state 字段），开场与中途都可改；中途改要改简报 + 重写受影响镜的提示词并**重渲**。字幕写法仍由 `h3-prompt-writing` 统一裁定，本项只管「要不要」。
@@ -155,16 +180,18 @@ Agent 会按 skill 定义的流程推进：项目简报 → 故事大纲 → 角
 
 ## 分辨率与画质（2K / 4K）
 
-**现在的方案可以做到 2K 与 4K 交付。** 但要分清一件事：**开源版 H3 的原生采样上限就是 768p（1344×768）**，往更高分辨率直接采样会出复制伪影——所以 1344×768 以上的每一个像素都是**放大路线合成出来的**。下面三条都是本机实测跑通的路径：
+**现在的方案可以做到 2K 与 4K 交付。** 但要分清一件事：**开源版 H3 的原生采样上限就是 768p（1344×768）**，往更高分辨率直接采样会出复制伪影——所以 1344×768 以上的每一个像素都是**放大路线合成出来的**。下面五条都是本机实测跑通的路径：
 
 | 路线 | 能力 / 档位 | 机制 | 交付尺寸 | 代价（124 帧，本机 A800 实测） |
 |---|---|---|---|---|
 | **生成内两阶段（hires）** | `image2video` / `reference2video` 的该档实现 | 首遍 896×512 解运动/构图/声音 → 视频 latent 插值 **×1.5** → 二遍重建 | **1344×768**（把放大后的画面拉回原生 768p） | 分钟级 |
 | **生成内学习式放大（>2K）** | `…-2k` 族的档位实现 | 原生 **1344×768** → 学习式 3D latent **×2** → 低 σ 精修 | **2688×1536**（`fast` 档 1664×960） | 二遍精修在 ≈500k token 上超线性：**620–2700s**（分档） |
 | **独立视频补帧（VFI）** | `video.interpolate` 能力 + `video_interpolate` 工具 | 画布上**已有视频** → RIFE 整数倍补帧（×2–×16）→ 需要时 ffmpeg 抽到目标帧率 | 分辨率与时长不变（D2 尾部补齐） | 48fps：124 帧 768×1344 **10.5s**；120fps 母版 **21.0s**（24→60 再加一次 ffmpeg 抽取） |
-| **独立视频超分（U3）** | `video.upscale` 能力 + `video_upscale` 工具 | 画布上**已有视频** → 逐帧 CNN ×2 / ×4 → 收敛到交付尺寸 | **2K：2688×1536**（原生 ×2）<br>**4K 级：4032×2304**（原生 ×4，或 2K 再 ×2） | 逐帧线性、最便宜：**2K 155.7s**（比生成内两阶段便宜 **10.7×**）；4K 241.3s（原生 ×4）/ 261.6s（2K ×2） |
+| **独立视频超分（U3）** | `video.upscale` 能力 + `video_upscale` 工具 | 画布上**已有视频** → 逐帧 CNN ×2 / ×4 → 收敛到交付尺寸 | **2K：2688×1536**（原生 ×2）<br>**4K 级：4032×2304**（原生 ×4，或 2K 再 ×2） | 逐帧线性、最便宜：**2K 68.1s**（同会话复测；比生成内两阶段便宜 **10× 量级**）；4K 241.3s（原生 ×4）/ 261.6s（2K ×2） |
+| **独立视频超分（RelayVSR / SeedVR2）** | `video.upscale` 的 quality 并列实现 | RelayVSR：每 15 帧一次 Wan2.2 5B 参考分支 + Flash 解码；SeedVR2：一步扩散恢复 | RelayVSR **×2 2688×1536 / ×4 5376×3072**；SeedVR2 2K 2688×1536 | **RelayVSR ×2 25.3s / ×4 83.4s**（最快、最干净）；SeedVR2 **187.2s**（细节最多、平坦区带颗粒） |
+| **独立视频重生成（Open-H3）** | `video.regenerate` 能力 + `video_regenerate` 工具 | 画布上**已有视频** + 提示词 → latent 3D 放大 → **σ0.909 起 3 步重画**（会改内容） | **1080p：1920×1080**<br>**2K：2560×1440**（竖屏翻转） | A800 实测 124 帧 2K **541.5s**（`handoff=auto` ⇒ latent）；对照同草稿像素 ×2 **77.8s** / SeedVR2 **347.1s**；`handoff=auto` 优先吃 balanced 渲染自动存的 draft latent |
 
-**怎么选（产品口径）**：**要让已生成的片段提分辨率，默认用 `video_upscale`（U3）**——同交付尺寸下它比生成内两阶段便宜 **6–10×**，且在唯一「干净可比」的格子（2K、同网格、无二次缩放）里有效细节更高（有效宽 ×1.65 vs ×1.425）。生成内两阶段放大（U1）的价值在别处：**能与链式续接叠用**（链上流动的是首遍 latent，交付尺寸不参与续接），且放大后的 latent 还能被第二次采样消费——**但不要再把它当成「上 2K 的手段」**，那条路由已被 U3 取代。**超分建议按分镜做、不要对成片做**：分镜 ≤124 帧落在已验证的显存包线内，失败只毁一镜、可断点重跑。
+**怎么选（产品口径）**：**要让已生成的片段提分辨率，默认用 `video_upscale`（U3）**——同交付尺寸下它比生成内两阶段便宜 **6–10×**，且在唯一「干净可比」的格子（2K、同网格、无二次缩放）里有效细节更高（有效宽 ×1.65 vs ×1.425）。**要更快更干净 → RelayVSR**（×2 25.3s，招牌/边缘振铃比像素 U3 少，但细节量略低）；**要纹理/材质 → SeedVR2 3B**（细节最多，代价是平坦区颗粒与 2.7–7× 耗时）；两者都是 `video.upscale` 的并列实现，在设置页指到 quality 即可。生成内两阶段放大（U1）的价值在别处：**能与链式续接叠用**（链上流动的是首遍 latent，交付尺寸不参与续接），且放大后的 latent 还能被第二次采样消费——**但不要再把它当成「上 2K 的手段」**，那条路由已被 U3 取代。**超分建议按分镜做、不要对成片做**：分镜 ≤124 帧落在已验证的显存包线内，失败只毁一镜、可断点重跑。**要「纹理/小字/材质」而不是「只是更大」→ 用 `video_regenerate`**（Open-H3 重生成，会重画内容、须抽帧核对；balanced 渲染自动存 draft latent，`handoff=auto` 直接复用）。
 
 **诚实边界（必读）**：2K/4K 的**像素尺寸是真的、容器元数据可验**（MP4 `vide` 轨实测 2688×1536），但**「交付 2K」≠「细节等于 2K 渲染」**。U3 是逐帧 CNN、**没有跨帧先验**，它造出来的高频不等于真实细节：实测 2K 交付的**有效细节约 1.9K**，即比原生 1344 多约 **1.4× 线性**（面积 ≈2×）的真细节，但没到 2048、更远没到 2688。所以：**倍数放大适合交付规格与观感，不适合「找回本来没有的细节」**；两条 4K 路线哪个更好**必须眼判**（本机提供了 1:1 裁切对照图，见文档）。另外，极高分辨率下 h264 默认档会出现可见块效应，要更干净可先收敛到 4032 或分两步 ×2。
 
@@ -226,6 +253,7 @@ video_upscale({ video_node: '<长片节点 id>', target_width: 4032, chunk_frame
 | `minimax-h3-{ref2v,i2v}-ctx-{quality,balanced-pdd,fast}-2k` | `video.reference2video` / `video.image2video` | **组「链式续接 + 学习式放大（>2K）」**：ctx 图 + 学习式 latent ×2 放大器（`minimax_h3_latent_upscaler_3d_conv_v1_bf16`）+ denoise 0.3 精修，交付 **2688×1536 带声音**（fast 档 **1664×960** —— 各档保留自己的首遍尺寸：quality/pdd 首遍 1344×768、fast 首遍 832×480）。**关键结论：放大发生在链式存档之后**（`MiniMaxH3MotionContextSaveLatent` 读的是首遍采样器输出）⇒ **交付尺寸不参与续接**，同一条链内只要**首遍尺寸一致**就能续——甚至能和「非放大」的同档实现互接；首遍不同则显式拒跑。`priority: -60`（不做隐式默认）、**三档各有自己的清单**：`fast` 首遍 832×480 → 交付 1664×960、`balanced-pdd` 与 `quality` 首遍 1344×768 → 交付 2688×1536（本族唯一的非 2688 交付是 fast）。每份清单都带 `aspectRatios: ["16:9"]` + `maxDurationFrames: 124`（精修在 ≈500k token 上超线性，不支持竖版 / 长片）。实测（fast 档 56 帧）：起链 114.0s / 续接 246.3s；接缝画面差 **13.33** vs 同实现不续接 **79.57**，响度台阶 **+0.68 dB** vs **−6.34 dB**。有效分辨率（自校准频谱）：2688 网格 ≈1949px。模板 `scripts/make-2k-template.mjs` 从 ctx base 派生，见 [`docs/shot-chain-continuity.md`](docs/shot-chain-continuity.md) 附 F |
 | `video-upscale-x2` · `video-upscale-x4` | `video.upscale` | **视频超分（像素空间，U3）**：输入是画布上**已有的视频节点**（不是提示词），逐帧 CNN ×2 / ×4，**音轨原样带回**（全程不经过模型）。交付尺寸 = 源尺寸 × 倍率，可用 `target_width` 收敛（按 32 对齐）；**比例永远跟源片**——H3 族是 1.75:1，所以 4032 宽对应 **4032×2304**（不是 16:9 的 3840×2160）。逐帧独立 ⇒ 代价线性、**天然可分块**（超预算的长片按 `ImageFromBatch` + `TrimAudioDuration` 切块再拼回，不需要 ffmpeg）。实测 124 帧：原生 →×4→ 4032 **241.3s**；U1 的 2K →×2→ 4032 **261.6s**；U1 的 2K →×2→ 5376 **317.5s**；248 帧 5376 一次过 **551.4s**（无 OOM）。工具入口 `video_upscale`；模型走资产槽 `upscale_x2`/`upscale_x4`（**换权重必须换成同倍率的**）；x4 `priority: -10` 需显式选中。有效分辨率（自校准尺子，**同时看闪烁与平坦区锐度**才敢下判断）：同网格 + 无二次缩放的「原生→×2→2688」读到 ×1.65，优于 U1 单独 2K 的 ×1.45，而耗时只有 1/10.7；4032 上两臂读数接近（×1.96 / ×1.67），但原生×4 那臂平坦区锐度 362 vs 197（输入 68）提示**过锐/振铃**，所以那一格的读数不能当作"细节更多"。眼判对照图见 `e2e-out/4k/compare-4arms-1to1.png`。详见 [`docs/video-upscale.md`](docs/video-upscale.md) |
 | `video-interpolate-rife` | `video.interpolate` | **视频补帧（VFI）**：输入是画布上**已有的视频节点**，RIFE 整数倍补帧（×2–×16，`FrameInterpolate` + `rife_v4.25`），**音轨直通**、分辨率不变。模型原生输出 `(N−1)m+1` 帧，runner 在 ComfyUI 图里**尾部补齐 m−1 帧** ⇒ 母版 `N×m` 帧、时长严格等于源（D2，避免逐镜拼接累积漂移）。目标帧率非整数倍时（24→60 / 24→30）先出 120fps 母版再由 **ffmpeg** 抽到目标帧率。实测（A800）：480×832 124 帧 ×2 **6.3s**；768×1344 124 帧 ×2 **10.5s**、×5 **21.0s**。**逐镜补、成片不补**；`video_concat` 会拒绝混帧率拼接。详见 [`docs/video-interpolate.md`](docs/video-interpolate.md) |
+| `open-h3-regenerate-2k` | `video.regenerate` | **视频重生成（Open-H3）**：输入是画布上**已有的 768p 片段** + 提示词，latent 3D 放大后 **σ0.909 起 3 步 Euler（CFG=1）** 在目标网格上**重画**——**会改内容，不是超分**。交付尺寸由清单声明的**目标网格**给（1080p **1920×1080** / 2k **2560×1440**，竖屏自动翻转；1080p 图内渲染 1088 行再裁回）。**源音轨不参与重采样、原样接回**；帧数与源片一致。护栏（清单声明）：24fps、121–362 帧、必须有提示词——不满足显式报错。工具入口 `video_regenerate(video_node, prompt?, target?, start_sigma?, steps?)`；`start_sigma` 0.8 更贴草稿。**产物必须抽帧核对身份/口型**。`priority: -30` 不做隐式默认。**balanced 清单渲染会顺手存 draft latent**（存盘节点是可选依赖，没装节点包也不影响出片）；`handoff=auto`（缺省）优先走 latent、不可用就退回视频入口并在返回里说明原因。**实测（A800 · 124 帧 · 2K）：557.3s（≈9.3min，含解码，显存峰值 ≈57GiB）**——对照 `-ctx-quality-2k` 的 2120.9s 为 **3.8×**、`-ctx-quality-pdd2-2k` 的 1277.8s 为 **2.3×**。另有 **B 方案实验（latent 交接，`internal` 清单）**：同一草稿同 seed 下精修 **540.3s vs 557.2s**（快 3.0%，算上省掉的上传约 4.5%），两臂放大 latent 相对 L2 **0.182**，但 1:1 眼判差异很小 ⇒ 暂不升为产品路径。详见 [`docs/video-regenerate.md`](docs/video-regenerate.md) §9 |
 | `minimax-music3` | `audio.music` | **MiniMax Music 3 文本生音乐（BGM）**：本地权重 + ComfyUI 原生节点（`MiniMaxMusic3TextEncode` → `KSampler` → `VAEDecodeAudio` → `SaveAudioAdvanced`）。输出 **44.1kHz 立体声**、时长由 `duration`（秒，1–360）控制；纯器乐把 `lyrics` 留空并在 prompt 写 instrumental。未分档（唯一实现）。实测 10s≈8–28s、30s≈122s |
 | `extract-frame` | `image.from_video` | 抽帧（末帧 / 首帧 → 图片节点） |
 | `image-crop` | `image.crop` | **图片裁切（纯像素）**：`LoadImage → ImageCrop → SaveImage`，无提示词、无采样器、**1:1 像素不缩放**。工具入口 `image_crop`：按 `panel`/`panels` 均分（三视图定妆图 ⇒ `panel=0, panels=3` 取正面格）或显式 `x/y/width/height`，矩形自动夹进源图边界。角色卡用它从三视图裁出单视图（两版同源像素、身份按构造一致）。未分档（唯一实现） |
@@ -517,6 +545,42 @@ Qwen 官方对出图的建议是「用提示词改写器」：一句短需求 �
 ## 更新日志
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
+
+### v1.17.0 — Open-H3 Regenerate 2K · RelayVSR 超分 · balanced 自动存 draft latent（2026-11-07）
+
+> **本版重点：社区加速 / 放大技术全部「可选化」**——Pika H3 Flex 6 步、PDD 8 步、Sol-Attn 块稀疏、SeedVR2 3B、RelayVSR ×2/×4、Open-H3 Regenerate 2K、RIFE 补帧都已在注册表里，可在设置页「＋ 新增策略 / 逐档下拉」选用；**全部不改变既有默认**（`priority<0` / `internal`），缺节点 / 缺权重会如实置灰。速查表见 [社区加速与放大技术](#社区加速与放大技术2026-11-重点)。
+>
+> **升级须知**：① 新能力 `video.regenerate` 需自装 `ComfyUI-Open-H3-Regenerate` 节点包与对应权重（base **FL2VA** + 合并 LoRA）；② RelayVSR 需 ComfyUI 含 PR #17511 且 `comfy-kitchen ≥ 0.2.41`；③ 28 份 balanced 视频清单都新增了一个**旁路** `OpenH3SaveRefinedLatent`（可选依赖：缺包时 runner 自动摘除 + 告警，balanced 照常出片）。
+
+#### 新能力：视频重生成 `video.regenerate`（Open-H3 Regenerate）
+
+- **是什么**：画布上**已有的 768p 片段** + 提示词 → latent 3D 放大 → **σ0.909 起 3 步 Euler（CFG=1）** 在**目标网格**上**重画**；交付 **1080p 1920×1080** / **2K 2560×1440**（竖屏自动翻转），帧数与源片一致、**源音轨原样接回**（音频 mask σ=0，从不经过采样器）。**会改内容，不是超分**——身份 / 口型可能漂，产物必须抽帧核对。
+- **契约**：清单声明 `regenerate.targets`（`graph` 32 对齐与实际渲染网格 / `delivery` 裁切后的交付尺寸，1080p 渲 1088 行再裁回）+ 训练域护栏（24fps、121–362 帧、必须有提示词）；校验器 fail-closed。图 23 节点：`PrepareDraft → VAEEncode → LatentUpscale → RefineLatent → SamplerCustomAdvanced(3 步) → Finish(裁帧/接回原音轨)`。
+- **latent 交接**：28 份 balanced 清单渲染时**顺手存 draft latent**（旁路节点，不影响出片）；`video_regenerate(handoff='auto'|'latent'|'video')` 缺省 `auto`——源节点有可用 latent（文件在服务端、121–362 帧、不大于目标网格）就走 latent，否则退回视频入口并在 `handoffReason` 说明；显式 `latent` 不满足**直接报错**，不静默退。
+- **实测（A800 · 124 帧 · 2K）**：**557.3s**（≈9.3min，显存峰值 ≈57GiB）——对照 `-ctx-quality-2k` 的 **2120.9s** 为 **3.8×**、`-ctx-quality-pdd2-2k` 的 1277.8s 为 **2.3×**。B 方案（latent 交接）同草稿同 seed 精修 **540.3s vs 557.2s**（快 3.0%，端到端约 4.5%），但 1:1 眼判差异很小 ⇒ B 的精修清单保持 `internal` 实验件，不替换 C。
+- **短剧系列**：`delivery=regen2k`（9:16 交付 **1440×2560**，≈+150 min/集，≈3.2× 原生；**整季同一路线、不混**）；样片集对照卡新增「2K 重生成」一臂。
+- 文档：[`docs/video-regenerate.md`](docs/video-regenerate.md)（契约 / 图 / 护栏 / A/B / 装法）· 调研 [`docs/research/open-h3-regenerate-2k.md`](docs/research/open-h3-regenerate-2k.md)。
+
+#### 新超分实现：RelayVSR ×2 / ×4
+
+- **接入**：`video-upscale-relayvsr-x2` / `-x4` 两份清单（Comfy-Org 重打包权重，ComfyUI **原生支持**，不需要自定义节点包）。结构 = 每 15 帧抽一帧过一次**一步 Wan2.2 5B 参考分支**（无文本条件）→ `VSRDecode` 的 Flash 解码器逐帧结合「低清帧 + keyframe latent」输出；音轨不进模型。`x2`（lightx2v 版）与 `x4`（原生 4×）是**两套权重** ⇒ 两份平级清单；自带因果窗口 + int8 K/V cache ⇒ `chunking="internal"`。
+- **依赖**：ComfyUI ≥ PR #17511 + `comfy-kitchen ≥ 0.2.41`。权重：`relayvsr_x2_lightx2v_int8_convrot.safetensors` / `relayvsr_x4_int8_convrot.safetensors`（`models/diffusion_models/`，各 5.16 GB）与 `relayvsr_flash_vae_x2_fp32.safetensors` / `relayvsr_flash_vae_x4_fp32.safetensors`（`models/vae/`，各 128 MB）。
+- **实测（124 帧 · 1344×768 · 含权重加载）**：×2 → 2688×1536 **25.3s**；×4 → 5376×3072 **83.4s**。同会话对照：像素 U3 ×2 **68.1s**、SeedVR2 3B **187.2s** ⇒ RelayVSR ×2 是像素链路的 **1/2.7**、SeedVR2 的 **1/7.4**。
+- **画质（自校准尺子，2K 网格）**：有效宽 **2117（×1.575）**、平坦区闪烁 **1.057**、锐度 192.7；像素 U3 ×2 是 2218 / 0.958 / 193.9，SeedVR2 是 2654 / 1.045 / 311.3 ⇒ RelayVSR 是「**便宜 + 干净**」的一档（1:1 眼判招牌边缘振铃更少），**不是细节最多**。
+
+#### 社区加速与放大（本版重点整理）
+
+- **Pika H3 Flex 6 步**：ref2v **178.8 → 135.9s**、i2v **173.6 → 132.2s**（**1.30–1.32×**），叠原生块稀疏 **84.4s**；两个 1.82GB LoRA 放 `models/loras/`，策略里选 `…-balanced-pika`。
+- **PDD 8 步蒸馏**：8 步拿到 20 步以上细节（锐度 +10.3% / +7.9%）：ref2v 184.7s / i2v 178.8s；叠 Sol **137.3 / 134.1s**。
+- **Sol-Attn 块稀疏**：成片档 1.27× / 1.25×、balanced 1.23×；fast / 480p 仅 1.03× 且高频 −13.8% ⇒ 低档不要开。
+- **SeedVR2 3B**：2K 187.2s（同会话复测）；细节最多、平坦区带颗粒 ⇒ `video.upscale` 的 quality 并列实现。
+- **RIFE 补帧**：48fps 124 帧 768×1344 **10.5s**；逐镜补、成片不补。
+
+#### 文档 / 测试
+
+- 新增 `scripts/smoke-regenerate.mjs`（129 项）并接入 `npm run smoke`；新增 `docs/video-regenerate.md`、`docs/research/open-h3-regenerate-2k.md`。
+- [`docs/video-upscale.md`](docs/video-upscale.md) 新增 §6.6（RelayVSR 结构 / 依赖 / 实测 / 装法）；README 新增「社区加速与放大技术」速查表。
+- 全量 `npm run smoke` 通过（与 CI 发布门同一条链路）。自带 skill 升版：`story-short-generator` **3.9.0**（开场交付规格新增「逐镜重生成 2K / 生成内放大 / 48fps」组合）、`short-drama-series-production` **0.3.0**（`delivery=regen2k`）。
 
 ### v1.16.0 — Pika H3 Flex 6 步 · Sol-H3-VAE 解码变体（2026-11-06）
 
@@ -933,4 +997,4 @@ git push origin main --follow-tags   # 推送即触发自动发布（npm + GitHu
 
 ---
 
-更多设计细节：架构 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · 工作流契约 [`docs/workflow-contract.md`](docs/workflow-contract.md) · **链式续接**（机制验证矩阵 / 档位覆盖矩阵 / i2v 实测 / 测量口径）[`docs/shot-chain-continuity.md`](docs/shot-chain-continuity.md) · **形状与续接契约**（`type` 必填、r2v↔i2v 参数表）[`docs/video-shape-contract.md`](docs/video-shape-contract.md) · **声音一致性**（参考音频机制 / 试镜流水线 / 路线图）[`docs/h3-voice-consistency-plan.md`](docs/h3-voice-consistency-plan.md) · [`docs/research/audition-voice-pipeline.md`](docs/research/audition-voice-pipeline.md) · [`docs/research/audio-capability-roadmap.md`](docs/research/audio-capability-roadmap.md) · **短剧系列化** [`docs/short-drama-series-integration-research.md`](docs/short-drama-series-integration-research.md) · 渠道交付 [`docs/channel-delivery.md`](docs/channel-delivery.md)。
+更多设计细节：架构 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · 工作流契约 [`docs/workflow-contract.md`](docs/workflow-contract.md) · **链式续接**（机制验证矩阵 / 档位覆盖矩阵 / i2v 实测 / 测量口径）[`docs/shot-chain-continuity.md`](docs/shot-chain-continuity.md) · **形状与续接契约**（`type` 必填、r2v↔i2v 参数表）[`docs/video-shape-contract.md`](docs/video-shape-contract.md) · **视频超分** [`docs/video-upscale.md`](docs/video-upscale.md) · **视频重生成**（Open-H3，2K/1080p）[`docs/video-regenerate.md`](docs/video-regenerate.md) · **声音一致性**（参考音频机制 / 试镜流水线 / 路线图）[`docs/h3-voice-consistency-plan.md`](docs/h3-voice-consistency-plan.md) · [`docs/research/audition-voice-pipeline.md`](docs/research/audition-voice-pipeline.md) · [`docs/research/audio-capability-roadmap.md`](docs/research/audio-capability-roadmap.md) · **短剧系列化** [`docs/short-drama-series-integration-research.md`](docs/short-drama-series-integration-research.md) · 渠道交付 [`docs/channel-delivery.md`](docs/channel-delivery.md)。

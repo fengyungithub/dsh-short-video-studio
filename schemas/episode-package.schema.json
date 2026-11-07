@@ -624,7 +624,8 @@
             "native",
             "upscale1080",
             "upscale2k",
-            "upscale4k"
+            "upscale4k",
+            "regen2k"
           ]
         },
         "reviewMode": {

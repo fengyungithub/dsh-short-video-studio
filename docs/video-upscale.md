@@ -11,11 +11,16 @@
 | | 说明 |
 |---|---|
 | 能力 | `video.upscale`（注册表里的一个能力，与 generation 能力并列） |
-| 工具 | `video_upscale(video_node, tier?, workflow?, target_width?, chunk_frames?, …)` |
-| 内置实现 | 像素链路：`video-upscale-x2`（`RealESRGAN_x2.pth`）×2、`video-upscale-x4`（`RealESRGAN_x4.pth`）×4；扩散式：`video-upscale-seedvr2-3b`（SeedVR2 3B，见 §6.5） |
-| **不是**生成 | 输入没有提示词。像素链路**没有任何采样器**；`video-upscale-seedvr2-3b` 是**一步扩散恢复**（有 KSampler，但没有文本条件）。两者都**完全不碰 H3**（不占 H3 的 token，也不受 768p 原生上限约束） |
+| 工具 | `video_upscale(video_node, tier?, target_width?, chunk_frames?, …)`（实现由配置面决定，见 §2.2） |
+| 内置实现 | 像素链路：`video-upscale-x2`（`RealESRGAN_x2.pth`）×2、`video-upscale-x4`（`RealESRGAN_x4.pth`）×4；扩散式恢复：`video-upscale-seedvr2-3b`（SeedVR2 3B，见 §6.5）；参考帧扩散：`video-upscale-relayvsr-x2` / `-x4`（RelayVSR，见 §6.6） |
+| **不是**生成 | 输入没有提示词。像素链路**没有任何采样器**；`video-upscale-seedvr2-3b` 是**一步扩散恢复**（有 KSampler，但没有文本条件）；RelayVSR 每 15 帧过一次一步 Wan 参考分支 + 逐帧 Flash 解码（同样无文本条件）。三者都**完全不碰 H3**（不占 H3 的 token，也不受 768p 原生上限约束） |
 | 输入 | 画布上的视频节点（拼接产物、生成产物、外部导入的都可以） |
 | 输出 | 同帧数、同 fps、同音轨的 mp4（**音轨从不经过模型**） |
+
+> **要「重画」而不是「放大」的请用另一个能力**：`video.regenerate`（工具 `video_regenerate`，清单
+> `open-h3-regenerate-2k`）把已有片段在**目标网格**上重新生成——会改内容、要提示词、尺寸不来自源片、有采样器。
+> 两者的逐条对比见 [`video-regenerate.md`](video-regenerate.md) §4 与
+> [`research/open-h3-regenerate-2k.md`](research/open-h3-regenerate-2k.md) §6.5。
 
 **逐帧 CNN** 是最重要的性质，它决定了两件事：
 
@@ -83,7 +88,7 @@
 
 ## 2.2 多实现怎么切换（同一个工具，换的是实现）
 
-`video.upscale` 下**可以有多份清单**（现在 2 份：`video-upscale-x2` / `-x4`；将来加入 SeedVR2 这类扩散/恢复实现就是第 3 份）。
+`video.upscale` 下**可以有多份清单**（现在 5 份：`video-upscale-x2` / `-x4`、`video-upscale-seedvr2-3b`、`video-upscale-relayvsr-x2` / `-x4`）。
 **一份清单 = 一个工作流**：各自独立的图、资产槽、`requiresNodes`、`estSeconds`、`priority`；一次调用只解析出其中一份，
 产物是自足的（画布 `params` 记下 `workflow` / `model` / `sizing` / `assets`）。所以它们是**可共存的平级实现**，不是「一个工作流的两个模式」。
 
@@ -104,7 +109,7 @@
   产物口径也不同（`sizing='factor'` 记 `factor`；`'short-side'` 记 `shortSide` 且 `factor` 为 null）——
   画布标题也会跟着变（「超分 ×2」vs「超分 短边 1088」），这是如实反映，不是 bug。
 
-**当前状态**：SeedVR2 那类实现**尚未加入**（等真机验收：节点是否已装、短边注入后模型是否真按该尺寸渲染）。
+**当前状态**：SeedVR2 与 RelayVSR 都已随包发布；RelayVSR 需要较新的 ComfyUI 核心（见 §6.6 的依赖说明）。
 加进 `workflows/` 之后上面三条切换路径立刻可用，**工具签名不变**——用户始终只看到一个 `video_upscale`。
 这正是 §2.1 那次契约扩展的目的：把「尺寸从哪来 / 显存归谁管」变成可声明的，从而让异质实现能同台。
 
@@ -269,6 +274,67 @@ SeedVR2 的确**更实**——砖墙纹理、伞面布纹、霓虹招牌边缘�
 要「干净、便宜、按分镜批量做」→ U3。**对 3D 动画的平坦色块，颗粒注入的风险比实拍素材更高**，
 所以这一档在动画片型里默认不推荐（已由 `priority` 保证不会被隐式选中）。
 
+
+## 6.6 RelayVSR（参考帧扩散）：同一能力下的第四、第五份实现（真机实测 2026-11-07）
+
+`video-upscale-relayvsr-x2` / `-x4`。**ComfyUI 原生支持**（[PR #17511](https://github.com/Comfy-Org/ComfyUI/pull/17511)，
+2026-11-05 合入 master）：核心节点 `RelayVSRConditioning` + `VSRDecode`，**不需要自定义节点包**。
+**依赖 `comfy-kitchen ≥ 0.2.41`**（窗口注意力实现）；核心版本不够时这两个节点根本不存在。
+
+**图（10 节点）**：`LoadVideo → GetVideoComponents → RelayVSRConditioning`（只喂低清帧）`→ KSampler(steps=1/cfg=1)
+→ VSRDecode`（再吃一次同一份低清帧）`→ ImageScale(交付尺寸) → CreateVideo(audio/fps) → SaveVideo`；
+权重走 `UNETLoader` + `VAELoader`（资产槽 `relayvsr_dit` / `relayvsr_vae`）。
+
+与另外两族的结构差别：
+
+1. **每 15 帧才进一次参考分支**：`relay_keyframes(frames)` 选关键帧（含末帧）过一次一步 Wan2.2 5B（无文本条件），
+   其余帧由 **Flash 解码器**逐帧结合「LQ 帧 + keyframe latent」输出 ⇒ 比 SeedVR2「每帧都过 DiT」便宜得多。
+2. **倍率由 checkpoint 决定**：`x2` 是 lightx2v 版权重、`x4` 是原生 4× 权重 —— 两套权重 ⇒ 两份平级清单，
+   不是「一个工作流的两个模式」。
+3. **自带跨帧语义**：因果窗口（最近 4 个关键帧）+ 每层 int8 K/V cache 支持长片段 ⇒ `chunking="internal"`，
+   runner **不**自动分块（外层硬切会打断它的时间窗）。
+4. **音轨不进模型**：`GetVideoComponents.audio → CreateVideo.audio` 直连。
+
+### 实测（2026-11-07 · A800 80GB · 124 帧 · 1344×768 源片 · 单块 · 含权重加载）
+
+| 臂 | 交付 | 耗时 | 有效宽（自校准尺子） | 增益 | 平坦区闪烁比 | 平坦区锐度 |
+|---|---|---|---|---|---|---|
+| 输入 | 1344×768 | — | 1344 | ×1.00 | — | 68.3 |
+| 像素 U3 ×2 | 2688×1536 | **68.1s** | 2218 | ×1.65 | **0.958** | 193.9 |
+| SeedVR2 3B | 2688×1536 | 187.2s | **2654** | **×1.975** | 1.045 | **311.3** ⚠ |
+| **RelayVSR ×2** | 2688×1536 | **25.3s** | 2117 | ×1.575 | 1.057 | 192.7 |
+| **RelayVSR ×4** | 5376×3072 | **83.4s** | — | — | — | — |
+
+**怎么读**：
+
+* RelayVSR ×2 是**最快的一档**（U3 ×2 的 1/2.7、SeedVR2 的 1/7.4），但**合成高频最少**（有效宽 2117 < 2218 < 2654）。
+  它不是「细节最多」：1:1 眼判（`e2e-out/relayvsr/compare-4arms-1to1.png`）里它的**招牌边缘振铃比 U3 少、
+  暗部颗粒比 SeedVR2 少**，代价是同尺寸下布纹/砖墙不如 SeedVR2 立体。
+* **平坦区闪烁 1.057** 比 U3（0.958）与 SeedVR2（1.045）略高 —— Flash 解码带一点帧间抖动，5% 量级，
+  24fps 下基本不可见；要绝对稳仍选像素链路。
+* RelayVSR ×4 一趟把 1344×768 送到 **5376×3072 只要 83.4s**（像素 ×4 到 4032 的登记值是 241.3s）——
+  **目前最便宜的 5.4K 路线**；4× 臂验了尺寸/帧数/音轨/耗时，并做了与 ×2 的同帧目视一致性（`e2e-out/relayvsr/compare-x2-x4.png`，画面一致、无畸变），但**未做频谱指标**（输出是 24 GB 级张量）。
+* 两份清单 `priority` 是 −30 / −40 ⇒ **不做隐式默认**（不影响「quality = x2」的默认与用户已有档位映射）。
+
+**环境要求与装法**：ComfyUI 需包含 PR #17511，且 `comfy-kitchen ≥ 0.2.41`。本仓库服务器（`yanwk/comfyui-boot`
+容器，ComfyUI 源在宿主机 `/data/comfyui/storage/ComfyUI`，模型卷在 `/data/comfyui/storage-models/models`）的实际做法：
+
+```bash
+# 1) 核心：切到含 PR #17511 的 master 提交（本机 63e5bf59），升级窗口注意力依赖
+git -C /data/comfyui/storage/ComfyUI checkout --detach 63e5bf59
+docker exec comfyui pip install comfy-kitchen==0.2.41 comfyui-frontend-package==1.58.5
+docker restart comfyui
+
+# 2) 权重（hf-mirror）→ 模型卷
+#    diffusion_models/relayvsr_{x2_lightx2v,x4}_int8_convrot.safetensors（各 5.16 GB）
+#    vae/relayvsr_flash_vae_{x2,x4}_fp32.safetensors（各 128 MB）
+```
+
+**验证**：`object_info` 里应出现 `RelayVSRConditioning` / `VSRDecode`，且 `UNETLoader` / `VAELoader`
+能看到上述四个文件名；再跑
+`node scripts/e2e-upscale.mjs --workflow=video-upscale-relayvsr-x2 --src=<mp4> --target=2688`。
+**回滚**：`git checkout v0.44.1`（或升级前的提交）+ 重启；`comfy-kitchen` 可回退到 0.2.40。
+
 ---
 
 ## 7. 诚实边界
@@ -291,17 +357,19 @@ SeedVR2 的确**更实**——砖墙纹理、伞面布纹、霓虹招牌边缘�
 ## 8. 怎么用
 
 ```js
-// 1) 最便宜的真 2K：原生片段 → ×2
+// 1) 用配置面当前选定的实现（本机用户配置现在指向 SeedVR2）：原生片段 → 2K
 video_upscale({ video_node: '<shot-01 nodeId>' })                       // 自然尺寸 2688×1536
 
-// 2) 4K 级：显式选 ×4 实现，收敛到 4032 宽
-video_upscale({ video_node: '<shot-01 nodeId>', workflow: 'video-upscale-x4', target_width: 4032 })
+// 2) 换实现**由配置面决定**（工具不接受 workflow=）：
+//    · 设置页把 video.upscale 的 quality 档指到目标实现；或
+//    · ~/.dsh/dsh-short-video-studio.json 里 pins["video.upscale"] = "video-upscale-relayvsr-x2"（或 "-x4"）
+video_upscale({ video_node: '<shot-01 nodeId>', target_width: 4032 })
 
-// 3) 长素材：手动指定每块帧数（否则按像素-帧预算自动分块）
+// 3) 长素材：手动指定每块帧数（仅 chunking="caller" 的逐帧实现；internal 的实现会告警）
 video_upscale({ video_node: '<long nodeId>', target_width: 4032, chunk_frames: 120 })
 
-// 4) 短边形态的实现（扩散/恢复类，声明 sizing="short-side"）：target_width 是让模型按目标渲染
-video_upscale({ video_node: '<shot-01 nodeId>', workflow: '<某个 short-side 实现>', target_width: 2560 })
+// 4) 短边形态（sizing="short-side"）：target_width 是让模型按目标渲染
+video_upscale({ video_node: '<shot-01 nodeId>', target_width: 2560 })
 ```
 
 * `tier` 缺省 `quality`；**写错的档位会显式报错**（曾因静默退化到 quality 白跑一次 5376×3072）。
@@ -320,6 +388,8 @@ node scripts/e2e-upscale.mjs --target=4032                    # 单块：4032×2
 node scripts/e2e-upscale.mjs --target=4032 --chunk=40         # 分块：4 块 + 拼回，帧数守恒
 node scripts/e2e-upscale.mjs --src=<mp4> --tag=myrun          # 换源片
 node scripts/e2e-upscale.mjs --workflow=video-upscale-seedvr2-3b --src=<mp4> --target=2688   # 换实现（扩散式）
+node scripts/e2e-upscale.mjs --workflow=video-upscale-relayvsr-x2 --src=<mp4> --target=2688  # RelayVSR ×2
+node scripts/e2e-upscale.mjs --workflow=video-upscale-relayvsr-x4 --src=<mp4> --target=5376  # RelayVSR ×4（5.4K）
 
 # 短边形态（sizing="short-side"）的**真机**契约验证：走几何探针夹具（不产细节，只验契约链路）
 #   DSH_SVS_USER_WORKFLOWS 是测试接缝：清单装进临时目录，不碰用户真实配置
@@ -327,7 +397,7 @@ node scripts/e2e-upscale-shortside.mjs                        # 三臂：默认�
 node scripts/e2e-upscale-shortside.mjs --src=<竖版 mp4>        # 换源片（探针按「竖版短边=宽」映射）
 
 # 纯逻辑（不连 ComfyUI、不跑 GPU）：清单契约 / 校验 / 两种尺寸规划 / 分块决策 / 切口接线 / 容器解析 / 注册表集成
-node scripts/smoke-upscale.mjs                                # 156 项（含两种 sizing / 两种 chunking 的契约）
+node scripts/smoke-upscale.mjs                                # 219 项（含两种 sizing / 两种 chunking / 三族实现的契约）
 
 # 低层探针（直接对裸图，用来标定耗时与显存包线）
 node scripts/probe-4k.mjs --src <mp4> --tag t                 # 默认 RealESRGAN_x2
@@ -339,4 +409,5 @@ node scripts/analyze-u3.mjs <输入.mp4> <产物.mp4> [目标宽]     # 有效�
 * 短边探针夹具：`scripts/fixtures/upscale-shortside-probe.json`（`internal: true`，永远不出现在用户的工作流清单里；
   由 `smoke-upscale.mjs` 做 GPU-free 校验，由 `e2e-upscale-shortside.mjs` 做真机验证）。
 * 相关文件：`lib/upscale.js`（纯逻辑）、`lib/index.js` 的 `runUpscale` + `video_upscale`、
-  `workflows/video-upscale-x{2,4}.json`、`scripts/e2e-upscale.mjs`、`scripts/smoke-upscale.mjs`。
+  `workflows/video-upscale-{x2,x4,seedvr2-3b,relayvsr-x2,relayvsr-x4}.json`、`scripts/e2e-upscale.mjs`、
+  `scripts/smoke-upscale.mjs`、`scripts/make-upscale-manifests.mjs`。

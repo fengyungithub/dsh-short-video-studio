@@ -63,6 +63,7 @@ canvas_set_state(aspectRatio="9:16", duration="90 秒（默认；按包 ① 80�
 按 §10 建包（①③④⑤⑥ + beats[] + 镜头预算 + 成本）→ 跑 validate-episode-package.mjs（beat 覆盖）
 → 按 story STEP 5 出七列镜头表（8 列 `beatId` 逐镜回填到 `剧本依据`）→ 跑 STEP 5.5 十四项自检 → 表节点加自检戳
 → 按 story STEP 6 出文本分镜（默认单文本；⑥ 声明可视化才加铅笔图）
+→ 若 ⑥ 的 delivery=regen2k：核对镜头表**每镜 ≥124 帧**且 24fps（否则该镜会被 `video_regenerate` 拒）
 → ask_user_question（方案卡）：包 ①③⑤⑥ + beat 覆盖 + 镜头表摘要 + 分镜 + 渲染参数 + 成本 + 偏差
 ```
 
@@ -83,6 +84,9 @@ canvas_set_state(aspectRatio="9:16", duration="90 秒（默认；按包 ① 80�
 ### 2.4 拼接 + 终检 → 交付卡（G-E，1 张/集）
 
 ```text
+[可选，delivery=regen2k] 逐镜重生成：video_regenerate(video_node=每镜片段, target='2k', handoff='auto')
+  → 每镜必须 extract_frame 抽首/中/末帧核对（身份/口型/构图/画面文字）→ canvas_record_check 留痕
+  → 用重生成后的节点去拼接（整集同尺寸 1440×2560；源片须 24fps + 121–362 帧 ⇒ 镜头表每镜 ≥124 帧）
 [可选，delivery=fps48] 逐镜补帧：video_interpolate(video_node=每镜片段, target_fps=48)
   → 用补帧后的节点去拼接（整片同帧率；含硬切/拼接产物不补）
 video_concat(nodes=[按镜头表顺序，含转场镜], title="EP00X 拼接成片", group="final delivery")
@@ -91,7 +95,7 @@ video_concat(nodes=[按镜头表顺序，含转场镜], title="EP00X 拼接成�
 → 批准后写 series/delivery/epNNN/、state=delivered、ledger 追加一行
 ```
 
-交付卡选项：**批准交付（推荐）** / 重渲某镜 / 重拼 / 逐镜超分 / **逐镜补帧（48fps）** / 补做终检某项。
+交付卡选项：**批准交付（推荐）** / 重渲某镜 / 重拼 / 逐镜超分 / **逐镜重生成 2K（`video_regenerate`，会重画内容）** / **逐镜补帧（48fps）** / 补做终检某项。
 
 - 交付清单必写「本集与上一集为**硬切衔接（非续接）**」（架构上跨集 latent 不可用），避免用户把硬切当缺陷。
 - 交付清单必写 `字幕核验：<总帧数> 帧 / <命中> 例`（逐镜 notes 汇总）；缺这行 = 交付卡不合格。

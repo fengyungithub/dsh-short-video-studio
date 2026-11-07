@@ -187,7 +187,7 @@ T = 目标时长（80–110s，默认 90s）
 - 画面比例：9:16 ｜ 集时长：90s ｜ 音频模式：dialogue-led ｜ 语言：中文
 - 画面内字幕：none（全表 `字幕` 列写 none；逐镜负向尾句 `no subtitle, no burned-in dialogue text`）
 - 视频档位：balanced ｜ 图片档位：balanced ｜ 角色卡引用版本：single ｜ BGM 模式：none
-- 片段审查节奏：batch ｜ 交付画质：原生（768×1344 或按 G-SAMPLE 定的 1080 超分）
+- 片段审查节奏：batch ｜ 交付画质：原生（768×1344）/ 1080 超分 / **2K 重生成（regen2k → 1440×2560，会重画内容，镜头表每镜 ≥124 帧）**（按 G-SAMPLE 定）
 - 声线方案：existing（全季复用/补建 ⑤ 的 `voice:`；audition=全部重新试镜；text-only 才不传参考音频，并记风险）
 - 分镜模式：单文本（默认）/ 单文本+铅笔图（仅可视化预演时）
 - 视觉风格：cinematic-live-action
@@ -232,7 +232,7 @@ T = 目标时长（80–110s，默认 90s）
 | 角色卡引用版本 | `single` |
 | 图片档位 | `balanced` |
 | BGM 模式 | `none` / `in-model`（H3 逐镜自带；本期） |
-| 交付画质 | 原生（样片后可改逐镜超分 1080） |
+| 交付画质 | 原生 / 1080 超分 / **2K 重生成（regen2k，1440×2560，会重画内容；镜头表每镜 ≥124 帧）**（样片后定） |
 | 片段审查节奏 | `batch` |
 | 分镜模式 | `text`（默认）/ `text+pencil`（仅可视化预演） |
 

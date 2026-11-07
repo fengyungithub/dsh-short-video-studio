@@ -239,6 +239,21 @@
         "match_tail": true
       }
     },
+    "24": {
+      "class_type": "OpenH3SaveRefinedLatent",
+      "inputs": {
+        "samples": [
+          "10",
+          0
+        ],
+        "frame_count": null,
+        "filename_prefix": null,
+        "audio": [
+          "11a",
+          0
+        ]
+      }
+    },
     "4a": {
       "class_type": "VAELoader",
       "inputs": {
@@ -397,6 +412,22 @@
         "node": "22",
         "field": "clip_index"
       }
+    },
+    "latent_prefix": {
+      "inject": "scalar",
+      "to": {
+        "node": "24",
+        "field": "filename_prefix"
+      },
+      "default": "h3_handoff"
+    },
+    "latent_frame_count": {
+      "inject": "scalar",
+      "to": {
+        "node": "24",
+        "field": "frame_count"
+      },
+      "default": 0
     }
   },
   "modes": {

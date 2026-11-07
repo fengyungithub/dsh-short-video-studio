@@ -176,6 +176,8 @@ dsh web        # 重启后：会话出现「画布」tab，设置页多出 Comfy
 |---|---|
 | `upscale_x2` | `RealESRGAN_x2.pth` |
 | `upscale_x4` | `RealESRGAN_x4.pth` |
+| `relayvsr_dit` / `relayvsr_vae`（RelayVSR ×2） | `relayvsr_x2_lightx2v_int8_convrot.safetensors` / `relayvsr_flash_vae_x2_fp32.safetensors` |
+| `relayvsr_dit` / `relayvsr_vae`（RelayVSR ×4） | `relayvsr_x4_int8_convrot.safetensors` / `relayvsr_flash_vae_x4_fp32.safetensors` |
 
 **可选加速 / 高质量件（按需，非内置默认）**
 
@@ -186,6 +188,7 @@ dsh web        # 重启后：会话出现「画布」tab，设置页多出 Comfy
 | Sol-Attn 块稀疏注意力（`-sol`） | 第三方节点 [ComfyUI-SolAttn-Ampere](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere)（注册名 `SolAttnMiniMaxH3`，sm_80+） | 选进自己的策略；**缺节点会置灰，不静默回退** |
 | PDD 8 步蒸馏（`-balanced-pdd`） | 节点包 [ComfyUI-MiniMax-H3-PDD-Acc](https://github.com/Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc) + 权重 [aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI](https://huggingface.co/aptech0081/MiniMax-H3-Acc-LoRAs-ComfyUI)（**必须放 `ComfyUI/models/pdd_acc/`**） | 选进自己的策略 |
 | 扩散式超分 SeedVR2 3B | `seedvr2_3b_int8_convrot.safetensors`、`seedvr2_ema_vae_fp16.safetensors` | 选进策略（`priority` 低，不做隐式默认） |
+| 参考帧扩散超分 RelayVSR ×2 / ×4 | `relayvsr_x2_lightx2v_int8_convrot.safetensors` / `relayvsr_x4_int8_convrot.safetensors` + `relayvsr_flash_vae_x2/x4_fp32.safetensors`（需 **ComfyUI ≥ PR #17511 + comfy-kitchen ≥ 0.2.41**） | 选进策略（`priority -30 / -40`，不做隐式默认） |
 | int8_convrot 视频 VAE | [Kijai/MiniMax-H3-experimental](https://huggingface.co/Kijai/MiniMax-H3-experimental) 的 `minimax_h3_video_vae_int8_convrot.safetensors` | 配置 `models.h3VideoVae` 或「资产覆盖」 |
 
 > H3 权重的 ComfyUI 重打包版本见 [Comfy-Org/MiniMax-H3](https://huggingface.co/Comfy-Org/MiniMax-H3)，官方权重与 prompt 写作指南见 [MiniMaxAI/MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3)。
@@ -384,7 +387,7 @@ DSH **设置 → ComfyUI**，五个分区（顺序固定）：
 | `video.reference2video` | 参考绑定生成视频（r2v） | ✅ MiniMax H3 |
 | `video.image2video` | 首末帧串联生成视频（i2v） | ✅ MiniMax H3 |
 | `video.text2video` | 纯文本生成视频 | ⬜ 词汇表已登记，未随包提供 |
-| `video.upscale` | 视频超分（输入是**已有视频**，不是提示词） | ✅ RealESRGAN ×2 / ×4，SeedVR2 3B |
+| `video.upscale` | 视频超分（输入是**已有视频**，不是提示词） | ✅ RealESRGAN ×2 / ×4，SeedVR2 3B，RelayVSR ×2 / ×4（需较新 ComfyUI 核心） |
 | `image.from_video` | 抽帧（视频 → 图片） | ✅ |
 | `audio.tts` | 语音合成 | ⬜ **当前无实现**（旁白由视频 AV 模型原生生成或后期添加） |
 | `audio.music` | 音乐 | ✅ Music 3（独立 BGM 音频节点；未混音） |
@@ -792,6 +795,7 @@ STEP 8 会：**拼接全片**（`video_concat`，含音轨）→（按开场选�
 | 「把 S03 的末帧取出来」 | 抽帧 → 存为图片节点 | `extract_frame` |
 | 「把这几段按顺序拼成成片」 | 拼接（含音轨） | `video_concat` |
 | 「把这两镜放大到 2K / 4K」 | **对单个片段**做像素空间超分（音轨原样带回） | `video_upscale` |
+| 「把 S03 重生成得更清晰（2K）」 | **对单个片段**做重生成（会重画内容；源音轨接回，帧数不变；须抽帧核对身份/口型） | `video_regenerate` |
 | 「把这几镜补到 48 / 60fps」 | **对单个片段**补帧（时长与音轨不变；成片不补） | `video_interpolate` |
 | 「把简报 / 镜头表写到画布上」 | 写文本 / 表格节点 | `canvas_write_node` |
 | 「把这张卡登记进资产库」 | 单项目：**不会**自动做——你**在画布上点「入库」**；系列模式：G-A 资产总览卡批准后 AI 可调 `asset_ingest` | — |
@@ -1467,7 +1471,9 @@ A：看节点 `params.width` / `params.height`（真实交付像素），或看�
 |---|---|---|
 | `video-upscale-x2` | 倍率 = 源 ×2（原生 1344×768 → 2688×1536） | 155.7s（原生源）；清单登记值 261.6s |
 | `video-upscale-x4` | 倍率 = 源 ×4（`priority -10`，需显式选中；常配 `target_width` 收敛到 4032） | 241.3s（原生 → 收敛 4032×2304） |
-| `video-upscale-seedvr2-3b` | 短边形态（扩散式恢复，`priority -20`） | 483s |
+| `video-upscale-seedvr2-3b` | 倍率 = 源 ×2（扩散式恢复，`priority -20`） | 483s（文档登记）；2026-11-07 同机复测 187.2s |
+| `video-upscale-relayvsr-x2` | 倍率 = 源 ×2（参考帧扩散，`priority -30`，需 ComfyUI 含 PR #17511） | **25.3s**（1344×768 → 2688×1536，124 帧） |
+| `video-upscale-relayvsr-x4` | 倍率 = 源 ×4（同上，`priority -40`） | **83.4s**（1344×768 → 5376×3072，124 帧） |
 
 ---
 
