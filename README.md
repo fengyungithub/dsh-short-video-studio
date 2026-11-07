@@ -470,18 +470,6 @@ Qwen 官方对出图的建议是「用提示词改写器」：一句短需求 �
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
 
-### v1.17.1 — 文档重构：README 瘦身 · 实测数据单一事实源 · 显卡型号脱敏（2026-11-08）
-
-> 纯文档版本，**无运行时行为变化**；`npm run smoke` 全量通过。
-
-**📚 文档**
-
-- **README 1000 → 524 行**：新增「30 秒速览」；「内置工作流清单」明细 → [`docs/workflows-catalog.md`](https://github.com/fengyungithub/dsh-short-video-studio/blob/main/docs/workflows-catalog.md)；「可选加速件」→ [`docs/acceleration.md`](https://github.com/fengyungithub/dsh-short-video-studio/blob/main/docs/acceleration.md)；「实测耗时」→ [`docs/benchmarks.md`](https://github.com/fengyungithub/dsh-short-video-studio/blob/main/docs/benchmarks.md)；历史更新日志 → [`CHANGELOG.md`](https://github.com/fengyungithub/dsh-short-video-studio/blob/main/CHANGELOG.md)（README 只留最近 2 版）。
-- **实测数据单一事实源 [`docs/benchmarks.md`](https://github.com/fengyungithub/dsh-short-video-studio/blob/main/docs/benchmarks.md)**：所有数字带条件（冷/热、源片、目标、显存）；统一 U3 ×2 **68.1s（热）/ 155.7s（冷）**、SeedVR2 **187.2s（热）/ 483.4s（冷）**、Regenerate 2K **557.3s**；退役旧值 541.5s。
-- **显卡型号脱敏**：README / USER-MANUAL / docs 共 90+ 处改为「本机单卡」；保留 `sm_80+` 与第三方项目名 `ComfyUI-SolAttn-Ampere`；外部社区引用（LTX / Sol-Attn 的 3090 / 4090 等）保留并标注来源。
-- **链接与导航**：README 的 docs 链接改为 GitHub 绝对地址（npm 包页可直接跳转）；新增 [`docs/README.md`](https://github.com/fengyungithub/dsh-short-video-studio/blob/main/docs/README.md) 文档索引；修复 17 处失效相对链接。
-- 无代码 / workflow / skill 行为变化。
-
 ### v1.17.0 — Open-H3 Regenerate 2K · RelayVSR 超分 · balanced 自动存 draft latent（2026-11-07）
 
 > **本版重点：社区加速 / 放大技术全部「可选化」**——Pika H3 Flex 6 步、PDD 8 步、Sol-Attn 块稀疏、SeedVR2 3B、RelayVSR ×2/×4、Open-H3 Regenerate 2K、RIFE 补帧都已在注册表里，可在设置页「＋ 新增策略 / 逐档下拉」选用；**全部不改变既有默认**（`priority<0` / `internal`），缺节点 / 缺权重会如实置灰。速查表见 [社区加速与放大技术](#社区加速与放大技术2026-11-重点)。
