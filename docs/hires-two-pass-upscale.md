@@ -141,7 +141,7 @@ node scripts/verify-h3-variants.mjs       # 清单一致性无回归（154 断�
 node scripts/e2e-hires.mjs --compare --steps 20 --length 124   # 真机出片 + 对照
 ```
 
-真机实测（本环境 A800 80GB，896×512 → 1344×768，56 帧）：
+真机实测（本机单卡，896×512 → 1344×768，56 帧）：
 
 | 配置 | 结果 |
 |---|---|

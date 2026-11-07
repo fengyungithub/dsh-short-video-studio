@@ -325,7 +325,7 @@ no subtitle, no burned-in dialogue text, no on-screen text, no watermark, no sto
 
 ## 4. 成本
 
-### 4.1 `[MEASURED]` 实测（124 帧 = 5.17s，单卡 Ampere）
+### 4.1 `[MEASURED]` 实测（124 帧 = 5.17s，本机单卡）
 
 | 档位 | 分辨率 | 试镜单条 | 3 takes / 角色 | 2 角色 × 3 takes | 抽音轨 |
 |---|---|---|---|---|---|

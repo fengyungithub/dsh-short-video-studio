@@ -1,7 +1,7 @@
 # 48fps 补帧 A/B 质量检查（RIFE ×2）
 
-> 日期：2026-10-27 ｜ 环境：ComfyUI 0.42.1 + `FrameInterpolate` + `rife_v4.25.safetensors`（A800 80GB）
-> 上游设计：[`../fps-interpolation.md`](../fps-interpolation.md)、[`integration.md`](integration.md)
+> 日期：2026-10-27 ｜ 环境：ComfyUI 0.42.1 + `FrameInterpolate` + `rife_v4.25.safetensors`（本机单卡）
+> 上游设计：[`../fps-interpolation.md`](../../fps-interpolation.md)、[`integration.md`](integration.md)
 > 产物（gitignore，本地）：`e2e-out/ab-48fps/`、`e2e-out/fps-test/`
 
 ## 0. 结论速览

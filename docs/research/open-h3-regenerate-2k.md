@@ -32,10 +32,10 @@
      1:1 可以靠「核心放大 + 自己做音频 mask」绕开，属未验证区域（refiner 在 1:1 的表现未知）。
   3) 参考实现的音频是 **encoded silence**（官方 FastVideo 端口干脆输出无声 MP4）；社区 ComfyUI 包可以把草稿音轨按 σ=0 锁住。
   4) σ₀=0.909 重画幅度大：社区实测「小狐狸的脸漂向狼」（毛色变深、耳尖丢失），**`start_sigma` 0.8 更贴草稿**。
-- **收益（A800 已实测）**：124 帧 / 16:9 / 2K 全量 **557.3 s**（≈9.3 min，暖机、dense、int8 FL2VA、含解码；
+- **收益（本机 已实测）**：124 帧 / 16:9 / 2K 全量 **557.3 s**（≈9.3 min，暖机、dense、int8 FL2VA、含解码；
   显存峰值 ≈57 GiB，产物 2560×1440 / 24fps / 带源音轨）；对照现有 `-ctx-quality-2k` 端到端
   **2120.9 s**（≈35 min）、`-ctx-quality-pdd2-2k` **1277.8 s**（≈21 min）⇒ 比 U1 快 **3.8×**、比 PDD2 版快 **2.3×**。
-  **注意**：NVIDIA 那个 3.9× 是 B200 + MXFP8 + CUDA graph + Sol-Attn 的数字，A800 拿不到；本机数字全部来自 dense 路径。
+  **注意**：NVIDIA 那个 3.9× 是 B200 + MXFP8 + CUDA graph + Sol-Attn 的数字，本机 拿不到；本机数字全部来自 dense 路径。
 - **落地方式（已实施）**：讨论后**没有**塞进 `video.upscale` 契约（提示词 / 尺寸来源 / 内容不变性三条承诺冲突），
   而是新开能力 `video.regenerate` + 工具 `video_regenerate(video_node, prompt?, target?, start_sigma?, steps?)`，
   清单 `open-h3-regenerate-2k`（`priority: -30`，不做隐式默认）。契约与图结构见 [`video-regenerate.md`](../video-regenerate.md)；
@@ -169,7 +169,7 @@ MiniMax 官方 H3 系统 = **H3-Context-IR**（托管，闭源）→ **H3-Base**
 - 与参考的 parity：草稿 latent / 放大 latent **逐位相同**；精修 latent 相对 L2 1.3–3.7%；解码视频 **PSNR 45.2 dB / SSIM 0.993**；
 - 口径提醒：**同 seed PSNR 不能用来判质量**——3 步模型对舍入级变化极其敏感（NVIDIA 自己写明了）。
 
-### 4.4 本机（A800 80 GB）实测
+### 4.4 本机（本机 80 GB）实测
 
 **已实测（2026-11-07，首版落地后）**：124 帧 / 16:9 / 2K（2560×1440），同一份 768p 草稿、int8 FL2VA base、
 合并 LoRA、dense attention（无 Sol-Attn / MXFP8）：
@@ -178,7 +178,7 @@ MiniMax 官方 H3 系统 = **H3-Context-IR**（托管，闭源）→ **H3-Base**
 |---|---:|
 | 5 帧接线冒烟（冷启，含加载 12.45 GB LoRA） | **32.8 s** |
 | **124 帧 2K 全量（暖机）** | **557.3 s**（≈9.3 min） |
-| 显存峰值 | **≈57 GiB**（A800 80 GB） |
+| 显存峰值 | **≈57 GiB**（本机 80 GB） |
 | 产物 | 2560×1440 / 24fps / 124 帧 / 带源音轨，31.7 MB |
 
 ⇒ 相对 U1-2K（2120.9 s）**3.8×**、相对 PDD2-2K（1277.8 s）**2.3×**——比落地前的推算（15–16 min）**快**，
@@ -204,7 +204,7 @@ MiniMax 官方 H3 系统 = **H3-Context-IR**（托管，闭源）→ **H3-Base**
 | 帧数 | ≤124（2K 家族上限） | 5–15 s（121–361 帧），**我们 124 帧落在甜点区** |
 | 链式续接 | 支持（链上流首遍 latent） | 与链式不相干（精修是单镜后处理），可复用同一首遍 latent |
 | 音频 | 二遍 `lock_audio=true`：音频 latent 不参与重采样（保留首遍音轨） | 同样锁死（σ=0）：参考实现填静音、社区节点可 `keep latent audio` 直接复用草稿音轨 |
-| 耗时（A800，124 帧） | 2120.9 s（quality）/ 1277.8 s（PDD2） | **557.3 s（实测，3.8× / 2.3×）** |
+| 耗时（本机单卡，124 帧） | 2120.9 s（quality）/ 1277.8 s（PDD2） | **557.3 s（实测，3.8× / 2.3×）** |
 | 身份/口型风险 | 低（不重画表演） | **中—高**（σ₀ 越大越漂）；σ 0.8 / 0.7 可回退 |
 | 画质取向 | 结构稳、纹理软 | 纹理强、可能「换脸」、闪烁 +30–50% |
 
@@ -218,7 +218,7 @@ MiniMax 官方 H3 系统 = **H3-Context-IR**（托管，闭源）→ **H3-Base**
 
 | 方案 | 做法 | 优点 | 代价 / 风险 |
 |---|---|---|---|
-| **A. 同图两遍** | 一张 manifest：首遍（现有 ctx/标准）→ 放大器 → Open-H3 3 步 → 解码 | 零工具改动；latent 直通、无重编码；音频天然可带 | 需要**同一 base**：**i2v 干净**（首遍与精修都用 FL2VA）；**r2v 需要 Ref2VA + FL2VA 双 checkpoint**，A800 80 GB 上双模型 + 2K 激活未验（现有 1:1 已到 ≈73/79 GiB） |
+| **A. 同图两遍** | 一张 manifest：首遍（现有 ctx/标准）→ 放大器 → Open-H3 3 步 → 解码 | 零工具改动；latent 直通、无重编码；音频天然可带 | 需要**同一 base**：**i2v 干净**（首遍与精修都用 FL2VA）；**r2v 需要 Ref2VA + FL2VA 双 checkpoint**，本机 80 GB 上双模型 + 2K 激活未验（现有 1:1 已到 ≈73/79 GiB） |
 | **B. 两段作业 + latent 交接** | 作业 1 出草稿并 `SaveLatent`；作业 2 用 FL2VA+LoRA 从 latent 精修 | 与官方架构一致；r2v/i2v 都通用；可顺手支持「给外部草稿提 2K」 | 插件要新增 **latent 产物类型 + 第二段作业编排**（现在只有图片/视频/音频/文本），改动面最大 |
 | **C. 独立工具 `video_regenerate`** | 输入画布**已存在的视频节点** → 解码/重编码 → 精修 2K | 最贴官方用法（草稿视频 → 2K）；**改动最小**；可直接拿现成成片试 | 多一次 decode→encode；FastVideo 证据：MP4 路线更锐是**把 h264 噪点变成纹理**（Laplacian 180–244 vs latent 路线 84–106，幅度大但来源是编码噪声）⇒ 画质不如 latent 直通 |
 
@@ -236,7 +236,7 @@ latent 交接 **540.3 s** / 视频交接 **557.2 s**（**快 3.0%**，算上省�
 
 | 项 | 状态 |
 |---|---|
-| ComfyUI | **0.44.1**，`cuda:0 NVIDIA A800 80GB PCIe`（`vram_total` 85.1 GB）、RAM 540 GB |
+| ComfyUI | **0.44.1**，`cuda:0 NVIDIA 本机单卡`（`vram_total` 85.1 GB）、RAM 540 GB |
 | `BlockSparseAttention`（sol-attn 内置） | ✅ 已有（与 rdh/官方默认同一节点，参数可照抄：tau 1.2 / start 0 / end 0.9 / dense `0,1,49`） |
 | 学习式放大器（LBH 3D） | ✅ `MinimaxH3LatentUpscaler3D` + `MinimaxH3LatentUpscaler3DRefineHandoff`，权重 `minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors` 已在 `latent_upscale_models/` |
 | **ComfyUI 核心**放大节点 | ✅ **新增发现**：`LatentUpscaleModelLoader` + `MiniMaxH3LatentUpscaleWithModel`（samples + width/height，**默认就是 2560×1440**，任意 32 对齐尺寸）⇒ 放大不必依赖 rdh 的 `OpenH3RegenUpscale`（它只认预设），**为 1:1 / 任意比例留了口子** |
@@ -302,7 +302,7 @@ LoadVideo → GetVideoComponents → OpenH3RegenPrepareDraft(768p, max_frames=<�
 - 与 PDD / Pika / Sol-H3-VAE 一样：**新增清单 `priority < 0`，不进隐式默认**，在设置页「新增策略」里显式挑；
 - 2K 家族已经有一组 `...-2k` 清单，Open-H3 版建议独立命名（如 `...-2k-regen`），**不要覆盖现有 U1**——
   两者是「稳 / 锐」的取舍，不该互斥替换；
-- `estSeconds` 按 §4.4 的 A800 实测填（557 s 含解码，124 帧暖机）；换卡/换帧数后要重测。
+- `estSeconds` 按 §4.4 的 本机实测填（557 s 含解码，124 帧暖机）；换卡/换帧数后要重测。
 
 ## 7. 风险登记
 
@@ -314,15 +314,15 @@ LoadVideo → GetVideoComponents → OpenH3RegenPrepareDraft(768p, max_frames=<�
 | 4 | **闪烁 +30–50%** | FastVideo 对三种草稿都测得 1.3–1.5× 闪烁比 | 拼接前逐镜看片；必要时降 `start_sigma`；与现有 PDD2-2K 对比同镜 |
 | 5 | **MP4 交接放大编码噪点**（方案 C） | FastVideo：MP4 路线比 latent 路线锐但 PSNR 仅 24–27 dB，能量来自 h264 伪影 | 首选 latent 直通（方案 A/B）；方案 C 只做验证/兜底 |
 | 6 | **尺寸预设限制** | 社区包只认 768p/1080p/2k/4k，无 1:1（核心放大节点可出任意 32 网格，但音频 mask 仍要节点包） | 2K 家族先只声明 16:9 / 9:16；1:1 待核心节点路径验证后再开 |
-| 7 | **A800 上收益远小于 B200** | 3.9× 依赖 MXFP8 + CUDA graph + Sol-Attn；A800 拿不到 | 预期 ≈1.3–2.2×，主要价值在**画质**而非速度；Sol-Attn 作为第二实验变量 |
-| 8 | **显存** | 官方 ≈150 GB（B200）；社区 72 GB 卡实测；现有 2K 1:1 已到 ≈73/79 GiB | A800 80 GB 只跑 16:9 / 9:16；1:1 与长片先不做 |
+| 7 | **本机 上收益远小于 B200** | 3.9× 依赖 MXFP8 + CUDA graph + Sol-Attn；本机 拿不到 | 预期 ≈1.3–2.2×，主要价值在**画质**而非速度；Sol-Attn 作为第二实验变量 |
+| 8 | **显存** | 官方 ≈150 GB（B200）；社区 72 GB 卡实测；现有 2K 1:1 已到 ≈73/79 GiB | 本机 80 GB 只跑 16:9 / 9:16；1:1 与长片先不做 |
 | 9 | **许可** | 权重 MiniMax H3 Community License（地域/用途/再分发条款）；节点包 Apache/MIT/GPL 不一 | 不随插件分发权重；用户自备；优先 Apache 的 rdh，避免 GPL（1038lab） |
 | 10 | **PSNR 不可作判据** | NVIDIA 明说 3 步输出对舍入级变化极敏感；社区同样用肉眼 + Laplacian | 评估用抽帧目检 + Laplacian/闪烁/有效宽度三件套（本仓库已有脚本） |
 
 ## 8. 若立项：验证计划（最小闭环）
 
 1. **冒烟**（纯逻辑，可进 `npm run smoke`）：清单加载 / `requiresNodes` 缺失时置灰 / 资产槽齐备 / 尺寸与帧数守卫；
-2. **一镜三臂 A/B**（A800，16:9，124 帧，同一 768P 草稿、同 prompt、同 seed 的 refine 噪声）：
+2. **一镜三臂 A/B**（本机单卡，16:9，124 帧，同一 768P 草稿、同 prompt、同 seed 的 refine 噪声）：
    - A：现有 `-ctx-quality-2k`（denoise 0.3 / 6 步，2688×1536）
    - B：Open-H3 3 步 σ₀.909（2560×1440）
    - C：Open-H3 3 步 σ₀.80
@@ -330,7 +330,7 @@ LoadVideo → GetVideoComponents → OpenH3RegenPrepareDraft(768p, max_frames=<�
    与草稿的身份相似度（有现成抽帧就用眼睛，别只信 PSNR）；**音频/口型必须人工听核**；
 3. **r2v 与 i2v 各一镜**：验证「LoRA 贴 FL2VA、草稿来自 Ref2VA」这条跨模型链路是否成立；
 4. **竖屏一镜**：1440×2560 走通，确认 `OpenH3RegenFinish` 的裁行逻辑；
-5. **成本**：节点级计时（现有 `/ws` 方法），把 A800 的「精修 3 步 / 解码」拆开记，替换 §4.4 的推算；
+5. **成本**：节点级计时（现有 `/ws` 方法），把 本机 的「精修 3 步 / 解码」拆开记，替换 §4.4 的推算；
 6. 通过后再选 A/B/C 方案落清单；不通过则文档结论写清「不值得」，避免重复调研。
 
 ## 9. 参考

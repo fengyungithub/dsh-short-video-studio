@@ -37,7 +37,7 @@ No listening test was performed (no audio monitoring in this session), so **all 
 `[LOCAL]` `GET /system_stats` reports:
 
 - ComfyUI `0.42.1`, PyTorch `2.15.0.dev`, Python 3.14
-- GPU: **NVIDIA A800 80 GB**, not a 24 GB Ampere card. At probe time only **4.8 GB VRAM was free** (another workload was resident), so I deliberately did **not** run a music smoke test and risk OOM-ing a colleague's job.
+- GPU: **NVIDIA 本机 80 GB**, not a 24 GB Ampere card. At probe time only **4.8 GB VRAM was free** (another workload was resident), so I deliberately did **not** run a music smoke test and risk OOM-ing a colleague's job.
 - Therefore the 24 GB feasibility statements below are **vendor/card claims plus arithmetic**, not measurements on this box.
 
 `[LOCAL]` Native music-related nodes already registered: `TextEncodeAceStepAudio`, `TextEncodeAceStepAudio1.5`, `EmptyAceStepLatentAudio`, `EmptyAceStep1.5LatentAudio`, `MiniMaxMusic3TextEncode`, `EmptyMiniMaxMusic3LatentAudio`, `YuE2GenerateMusic`, `EmptyYuE2LatentAudio`, `ConditioningStableAudio`, `VAEDecodeAudio`, `SaveAudioAdvanced`, `LoadAudio`, `AudioConcat`.
@@ -421,7 +421,7 @@ Weights: Licence 25%, Music quality 20%, Duration fit 20%, VRAM fit 15%, Integra
 
 1. **No listening test.** Quality scores are vendor claims + model class. Before committing, generate the same 3 prompts on ACE-Step 1.5, Stable Audio 3 and MiniMax Music 3 and blind-listen.
 2. **Hugging Face and `stability.ai` direct connections timed out from this sandbox.** I used official GitHub repos, the Stability AI Squarespace mirror (same content), and `hf-mirror.com` metadata where possible; some model-card details (e.g. exact inference defaults) should be re-checked on the HF card from a networked machine.
-3. **Local GPU is A800 80 GB**, not 24 GB. The 24 GB statements are vendor claims/arithmetic; the MiniMax smoke test is still pending because only 4.8 GB was free at probe time.
+3. **Local GPU is 本机 80 GB**, not 24 GB. The 24 GB statements are vendor claims/arithmetic; the MiniMax smoke test is still pending because only 4.8 GB was free at probe time.
 4. **ComfyUI 0.42.1 vs. templates.** The templates in `Comfy-Org/workflow_templates` are current; the local install's node set matches the MiniMax/ACE/YuE/Stable Audio nodes I checked, but the Stable Audio 3 checkpoint files are **not installed**.
 5. **Licences change.** Re-check the exact licence file at integration time; this document is a snapshot dated 2026-10-23.
 6. **Training-data provenance** is only explicitly clean for Stable Audio (Open and 3). ACE-Step / MiniMax / HeartMuLa / DiffRhythm do not make an equivalent public claim in their READMEs; for high-stakes commercial work, ask counsel.

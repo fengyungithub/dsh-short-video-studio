@@ -1,15 +1,15 @@
 # Sol-H3-VAE 解码加速 A/B（Pika ctx + Sol-Attn）
 
-**结论**：在本机 A800 80GB、1344×768×124 帧的 Pika 6 步 + BlockSparseAttention 链式续接清单上，
+**结论**：在本机单卡、1344×768×124 帧的 Pika 6 步 + BlockSparseAttention 链式续接清单上，
 把 `VAEDecode` 换成 Sol-H3-VAE 后 **解码 9.90s → 5.37s（1.84×）**，
 **单镜总耗时 80.5s → 75.9s（−5.7%）**；画质 PSNR 43.4 dB / SSIM 0.985（两段 h264 输出互比，
 含编码损失），音轨逐字节相同。
 
 - 日期：2026-11-06
-- 环境：ComfyUI **0.44.1**（PR #17411 起才认识该权重）、PyTorch 2.15、NVIDIA A800 80GB PCIe、24 fps
+- 环境：ComfyUI **0.44.1**（PR #17411 起才认识该权重）、PyTorch 2.15、NVIDIA 本机单卡、24 fps
 - 权重：`models/vae/sol_h3_vae.safetensors`（6.47 GB，来自 `Efficient-Large-Model/Sol-H3-VAE`，经 hf-mirror 下载）
-- 基线清单：[`workflows/minimax-h3-ref2v-ctx-balanced-pika-solattn.json`](../workflows/minimax-h3-ref2v-ctx-balanced-pika-solattn.json)
-- 实验清单：[`workflows/minimax-h3-ref2v-ctx-balanced-pika-solattn-solvae.json`](../workflows/minimax-h3-ref2v-ctx-balanced-pika-solattn-solvae.json)
+- 基线清单：[`workflows/minimax-h3-ref2v-ctx-balanced-pika-solattn.json`](../../workflows/minimax-h3-ref2v-ctx-balanced-pika-solattn.json)
+- 实验清单：[`workflows/minimax-h3-ref2v-ctx-balanced-pika-solattn-solvae.json`](../../workflows/minimax-h3-ref2v-ctx-balanced-pika-solattn-solvae.json)
 
 ## 变体做法：为什么不是「换个 VAE 文件名」
 
@@ -35,7 +35,7 @@ Sol-H3-VAE 是 **decoder-only** 的蒸馏权重（24 层、非因果、整片解
   两臂喂给解码器的 latent 完全相同；
 - 种子必须每次新取：同 seed + 同图会让 ComfyUI 全图命中缓存（踩过，测出 0.13s 的假数据）。
 
-## 结果（3 对交替，A800 80GB，1344×768×124f）
+## 结果（3 对交替，本机单卡，1344×768×124f）
 
 | 指标 | A：H3 视频 VAE（int8_convrot） | B：Sol-H3-VAE | 变化 |
 |---|---:|---:|---:|
@@ -75,10 +75,10 @@ node scripts/experiment-solvae-ab.mjs --pairs=3
 采样占比越低，解码提速的相对收益越大。为此给 Pika 适配器补了一个 **4 步 fast 清单**
 （Pika 官方只发 6 步 7 值 schedule，4 步是自拟 schedule，属实验实现）：
 
-- [`workflows/minimax-h3-ref2v-ctx-fast-pika-solattn.json`](../workflows/minimax-h3-ref2v-ctx-fast-pika-solattn.json)
+- [`workflows/minimax-h3-ref2v-ctx-fast-pika-solattn.json`](../../workflows/minimax-h3-ref2v-ctx-fast-pika-solattn.json)
   —— lcm + 自拟 4 值 sigma `1.0, 0.948025, 0.8, 0.452381, 0.0`（由官方 6 步 sigma 曲线按 t=0/¼/½/¾/1 线性插值）、Pika LoRA、
   BlockSparseAttention(sol-attn)、832 长边、链式续接
-- [`...-fast-pika-solattn-solvae.json`](../workflows/minimax-h3-ref2v-ctx-fast-pika-solattn-solvae.json)
+- [`...-fast-pika-solattn-solvae.json`](../../workflows/minimax-h3-ref2v-ctx-fast-pika-solattn-solvae.json)
   —— 同上 + Sol-H3-VAE 解码
 
 ## 解码 A/B（832×480×124f，3 对交替）
@@ -95,7 +95,7 @@ node scripts/experiment-solvae-ab.mjs --pairs=3
 
 ## 标准 fast（turbo 4 步 / res_multistep）上的复测
 
-清单：[`workflows/minimax-h3-ref2v-ctx-fast-solvae.json`](../workflows/minimax-h3-ref2v-ctx-fast-solvae.json)
+清单：[`workflows/minimax-h3-ref2v-ctx-fast-solvae.json`](../../workflows/minimax-h3-ref2v-ctx-fast-solvae.json)
 （由 `minimax-h3-ref2v-ctx-fast` 派生，唯一差异 = 解码器）。3 对交替，832×480×124f：
 
 | 指标 | A：H3 int8 VAE | B：Sol-H3-VAE | 变化 |

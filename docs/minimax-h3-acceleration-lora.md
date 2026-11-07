@@ -19,10 +19,10 @@
 | 成片档（quality） | **继续不挂 LoRA**，20 步纯 base（可选提到 25 步） | 4 步蒸馏在运动/音频上明确降质；成片不该用 4 步 |
 | 新增"平衡档"（可选） | **采用 lightx2v `ref2v_turbo_8step_v1.0_768p`（shift 6/3 + 分辨率上 768p）**；~~Alibaba PDD Acc-8Step~~ 当时判为不可用（§9.4），**2026-09-09 晚已复测推翻 → PDD 可用且已落地为独立策略，见 §9.9** | 8 步是官方 Studio 的可用配置；实测 175.8s/镜 vs 成片档 396.6s/镜（省 55.7%，2.25×）。**PDD 8 步 184.7s/镜即可达到成片档以上细节量（§9.9）** |
 | i2v 路径 | **二选一**：保守（不动 base，fast 档沿用现有 LoRA）/ 正确（新增 fl2va pruned base + fl2v 系 LoRA，flush shift 6/3） | 现在 i2v 用 `ref2va` base 跑 `MiniMaxH3ImageToVideo`，属跨变体组合，拿不到 fl2v 系（v1.1/v1.2）的迭代红利 |
-| 明确不采用 | SLA 版 LoRA、w4a8、FP8 权重、t8star int8-convrot 变体、larryvrh 系 | SLA 依赖 sage2 稀疏算子；单卡 Ampere（sm_80）无 FP8 硬件；后两者需专用 loader/采样器节点 |
+| 明确不采用 | SLA 版 LoRA、w4a8、FP8 权重、t8star int8-convrot 变体、larryvrh 系 | SLA 依赖 sage2 稀疏算子；本机单卡（sm_80）无 FP8 硬件；后两者需专用 loader/采样器节点 |
 | 非 LoRA 加速优先级 | P0 int8_convrot VAE ✅已落地 → P1 Sol-Attn(Ampère) ✅**已实测：768p 1.23–1.33×，480p 1.03×**（§9.8） → P2 Sage Attention / First Block Cache → P3 TE-Speed / VDN | 该测试机无 nvcc，Sage 需 CUDA Toolkit 编译；Sol-Attn 纯 Triton JIT，实测可用但**只有 1.2–1.3×，不是翻倍** |
 
-**实测已完成（2026-09-09，单卡 Ampere（sm_80），详见 §9）**：① int8 VAE ✅ 可用、与 fp16 像素等价、省 ~2s/镜且省 2.3GB 常驻；② i2v 换 `fl2va + fl2v LoRA` ✅ 可用、结构正常（+21GB 磁盘）；③ 新增平衡档 8 步 ✅ 175.8s/镜（成片档的 44.3%）；④ PDD Acc-8Step ❌ 当时结论：**在本机 ComfyUI 0.33.3 上不可用**（无 PDD loader，前向张量尺寸崩坏，与 shift 无关）——**已复测推翻：装上专用节点包 + 换预转换权重后跑通，见 §9.9**；⑤ **Sol-Attn 块稀疏 ✅ 跑通**：**成片档 20 步 768p 最快**——ref2v 396.6s→311.2s（**1.27×**）、i2v 394.8s→314.7s（**1.25×**），高频细节持平（±2.5%）；8 步档 1.23×（tau1.2）～1.38×（tau2.0，已饱和）；**480p 仅 1.03× 且偏软（−13.8% 高频），不要开**。两个前提：**必须 `dense_first_percent=0`**（默认 0.2 在本栈上等于完全没开）、节点注册名是 `SolAttnMiniMaxH3`。已落地改动清单见 §9.6。
+**实测已完成（2026-09-09，本机单卡（sm_80），详见 §9）**：① int8 VAE ✅ 可用、与 fp16 像素等价、省 ~2s/镜且省 2.3GB 常驻；② i2v 换 `fl2va + fl2v LoRA` ✅ 可用、结构正常（+21GB 磁盘）；③ 新增平衡档 8 步 ✅ 175.8s/镜（成片档的 44.3%）；④ PDD Acc-8Step ❌ 当时结论：**在本机 ComfyUI 0.33.3 上不可用**（无 PDD loader，前向张量尺寸崩坏，与 shift 无关）——**已复测推翻：装上专用节点包 + 换预转换权重后跑通，见 §9.9**；⑤ **Sol-Attn 块稀疏 ✅ 跑通**：**成片档 20 步 768p 最快**——ref2v 396.6s→311.2s（**1.27×**）、i2v 394.8s→314.7s（**1.25×**），高频细节持平（±2.5%）；8 步档 1.23×（tau1.2）～1.38×（tau2.0，已饱和）；**480p 仅 1.03× 且偏软（−13.8% 高频），不要开**。两个前提：**必须 `dense_first_percent=0`**（默认 0.2 在本栈上等于完全没开）、节点注册名是 `SolAttnMiniMaxH3`。已落地改动清单见 §9.6。
 
 **最大的结构性坑**：`shift_video/shift_audio` 目前在 manifest 的 `graph` 里**硬编码为 12.0/3.0**（`node "2" MiniMaxH3SigmaShift`），既不是可注入参数、也不随质量档变化。而 **LoRA 与其训练 shift 必须配对**（544p 系=12/3，768p 系=6/3）。换任何 768p LoRA 而不改 shift，输出会结构性崩坏，而不是"略糊"。`modes` 当前只支持 `steps` / `loras` / `longSide`，无法表达"按档切 shift" —— 所以换档的正确姿势是**加一份新 workflow JSON**（符合插件"换模型=加一份 JSON"的设计主张），而不是改 JS。
 
@@ -56,7 +56,7 @@ H3 把一切都塞进**一条自注意力序列** `[text | cond rows | audio | v
 | ③ 精度 / 量化 | DiT int8_convrot / fp8 / w4a8、VAE int8_convrot、TE nvfp4_awq | DiT 与 CLIP 已量化 ✅；**VAE 仍是 fp16 ❌** |
 | ④ I/O 与调度 | ComfyUI Comfy Compiler/内存调度、block prefetch、TensorRT VAE、latent 上采样器 | 未动 |
 
-**注意②③会互相稀释**：量化后的 transformer 每个线性层都多一层 dequant，注意力在单步中的占比反而上升或下降取决于硬件（[SolAttn-Ampere docs/why.md](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere) 明确指出："量化 transformer 会增加线性层开销，但注意力不受影响，因此端到端收益 < 注意力层收益"）。单卡 Ampere（sm_80）没有权重流式加载问题，所以注意力的占比比 3090/24GB 场景**更高**，稀疏注意力在本项目上的相对收益应当**更好**。
+**注意②③会互相稀释**：量化后的 transformer 每个线性层都多一层 dequant，注意力在单步中的占比反而上升或下降取决于硬件（[SolAttn-Ampere docs/why.md](https://github.com/cicalooo/ComfyUI-SolAttn-Ampere) 明确指出："量化 transformer 会增加线性层开销，但注意力不受影响，因此端到端收益 < 注意力层收益"）。本机单卡（sm_80）没有权重流式加载问题，所以注意力的占比比 3090/24GB 场景**更高**，稀疏注意力在本项目上的相对收益应当**更好**。
 
 ### 1.3 AV 模型带来一个额外约束
 
@@ -97,15 +97,15 @@ H3 的视频与音频在同一个 forward 里生成。所以步数蒸馏的短�
 
 | 方案 | 是什么 | 为什么不默认用 |
 |---|---|---|
-| **Turbo-SLA**（lightx2v） | 4 步蒸馏 + SLA 85% 稀疏注意力，RTX 5090 上约 2.5× | 收益依赖 `operator: sage2` 稀疏算子；单卡 Ampere（sm_80）无 FP8/Sage2 路径 |
+| **Turbo-SLA**（lightx2v） | 4 步蒸馏 + SLA 85% 稀疏注意力，RTX 5090 上约 2.5× | 收益依赖 `operator: sage2` 稀疏算子；本机单卡（sm_80）无 FP8/Sage2 路径 |
 | **FastVideo FastH3（DMD2 data-free 4-step）** | hao-ai-lab 的数据无关 DMD2 少步蒸馏，`[999,749,500,250]` 阶梯 / cfg1.0、768×1344×124f；含 ComfyUI 提取版与 int8_convrot 整模型（22.9GB） | 预览态（v0.1=step1400 / v0.2=2900），高运动细节仍在成熟中 |
 | **社区蒸馏**（larryvrh 744MB / drbaph pruned 592MB / TenStrip hybrid 4→8 步 / t8star int8-convrot） | 各类自训/融合/转换 | 或需专用采样器节点（larryvrh 需 `ComfyUI-MiniMax-H3-Turbo`）、或需专用 loader（t8star int8-convrot 需 `ComfyUI-LoraInt8Loader`）、或标注"需双时钟采样器或 8–10 步" |
-| **低秩压缩版**（drbaph `resized_avg_rank_*` 284–933MB；Kijai rank20–31 约 300–440MB） | 对官方 LoRA 做精确 SVD 动态秩压缩（Ref2V r21 余弦相似度 99.92%、体积 −83%） | **只省显存/加载时间，不减算力**。单卡 Ampere（sm_80）无必要 |
+| **低秩压缩版**（drbaph `resized_avg_rank_*` 284–933MB；Kijai rank20–31 约 300–440MB） | 对官方 LoRA 做精确 SVD 动态秩压缩（Ref2V r21 余弦相似度 99.92%、体积 −83%） | **只省显存/加载时间，不减算力**。本机单卡（sm_80）无必要 |
 | **风格 / 运动 LoRA**（wushu、yunjing 相机、Combat、Spatial Physics…） | 质量增强类 | 与加速档位正交，可作为独立议题；可与 Turbo 叠加（社区报告），但要单独验 shift 与 strength |
 
 ### 2.3 一张表看清"哪些能用"
 
-| 方案 | ComfyUI 原生可加载 | sm_80（单卡 Ampere，无 FP8）可用 | 与本项目 base 匹配 | 结论 |
+| 方案 | ComfyUI 原生可加载 | sm_80（本机单卡，无 FP8）可用 | 与本项目 base 匹配 | 结论 |
 |---|---|---|---|---|
 | lightx2v fl2v/ref2v turbo（.comfy 版） | ✅ 普通 LoraLoaderModelOnly | ✅ | ✅（ref2v v0.1 ↔ ref2va base） | **生产可用** |
 | Alibaba PDD Acc-8Step（Kijai pruned_comfy） | ✅（需较新 ComfyUI） | ✅ | ✅（pruned 版 ↔ pruned base） | **候选生产** → 该 repack 格式不可用（§9.4），改用 aptech0081 预转换版 ✅ 已落地（§9.9） |
@@ -164,8 +164,8 @@ H3 的视频与音频在同一个 forward 里生成。所以步数蒸馏的短�
 
 ### 4.2 本项目自身的基线（可作对照刻度）
 
-`docs/three-view-experiment.md` 记录：**ComfyUI 0.33.3 / 单卡 Ampere（sm_80）/ `minimax_h3_ref2va_pruned_int8_convrot` / mode=fast（4 步 LoRA）/ 832×480 / 124 帧（5.17s）→ 每臂约 28s**。
-→ 即本项目 fast 档单镜 ≈ 28s（单卡 Ampere（sm_80））。quality 档（20 步 + 1344×768）步数 ×5、像素 ×2.6，单镜成本量级明显跃升 —— 这也是"成片档要不要引入 8 步平衡档"这个问题的由来。
+`docs/three-view-experiment.md` 记录：**ComfyUI 0.33.3 / 本机单卡（sm_80）/ `minimax_h3_ref2va_pruned_int8_convrot` / mode=fast（4 步 LoRA）/ 832×480 / 124 帧（5.17s）→ 每臂约 28s**。
+→ 即本项目 fast 档单镜 ≈ 28s（本机单卡（sm_80））。quality 档（20 步 + 1344×768）步数 ×5、像素 ×2.6，单镜成本量级明显跃升 —— 这也是"成片档要不要引入 8 步平衡档"这个问题的由来。
 
 ### 4.3 注意力加速的参考数字
 
@@ -309,7 +309,7 @@ H3 的视频与音频在同一个 forward 里生成。所以步数蒸馏的短�
 
 ---
 
-## 9. 实测结果（2026-09-09，单卡 Ampere（sm_80）/ ComfyUI 0.33.3，本节为**推翻/确认前面推断**的实证部分）
+## 9. 实测结果（2026-09-09，本机单卡（sm_80）/ ComfyUI 0.33.3，本节为**推翻/确认前面推断**的实证部分）
 
 > 环境：`NVIDIA Ampere 单卡（sm_80）`（sm_80）、torch 2.15.0.dev+cu132、python 3.14.4、`--disable-xformers`（**未开 Sage**）、无 SolAttn/KJNodes 节点。
 > 协议：同 seed `42424242`、同 H3 结构化 prompt、同**单视图**参考图（`e9cd2fee-…` 角色卡）、`length=124`（24fps≈5.17s）；耗时取 ComfyUI `Prompt executed in` 与 `/internal/logs/raw` 的 `s/it`，非墙钟估计。
@@ -464,7 +464,7 @@ node scripts/make-sol-attn-variant.mjs --tau 1.5  # 换 tau 再生成
 - 为什么达不到"跳过 80% 块 ⇒ 提速 2×"：① 块稀疏跳的是**注意力里的一部分**，而一个 DiT 前向还有 FFN/门控/音频分支等固定成本；② 稀疏路径本身有路由（分块均值打分）+ `approx_correction` 回填的开销；③ Ampere 上 `flex_attention` 相对 SDPA 的**每单位工作量本就不占优**（Triton flex 在 sm_80 上通常慢于 FlashAttention2/SDPA），所以"少算 4 倍块"只换来"快 1.2–1.3 倍"。
 - 也就是说：注意力核是**最后一个能抠的杠杆**，但它的量级是 +20~30%，不是翻倍。真要再快，得动**分辨率/步数档位**（成本 ∝ token²·步数），而不是继续换 attention 实现。
 
-### 9.8 Sol-Attn 实测（2026-09-09，单卡 Ampere（sm_80）/ ComfyUI 0.33.3）——✅ 跑通：成片档 1.25–1.27×、8 步档最高 1.38×、480p 无效
+### 9.8 Sol-Attn 实测（2026-09-09，本机单卡（sm_80）/ ComfyUI 0.33.3）——✅ 跑通：成片档 1.25–1.27×、8 步档最高 1.38×、480p 无效
 
 **环境**：服务器已装 `ComfyUI-SolAttn-Ampere`；节点加载日志 `[Sol-Attn] flex_attention compiled (warmup done, correction=ready)`（5.8s）；`object_info` 见 `SolAttnMiniMaxH3` / `SolAttnStats`。torch 2.15.0.dev+cu132、triton 可用（启动日志里 `comfy_kitchen backend triton: available=True, disabled=True` 是 comfy 自己的后端开关，与 Sol-Attn 无关）。
 
@@ -548,7 +548,7 @@ node scripts/make-sol-attn-variant.mjs --tau 1.5  # 换 tau 再生成
 **实测配方（已被本插件模板固化，与节点包 README 逐条一致）**：
 `UNETLoader → MiniMaxH3SigmaShift(12/3) → MiniMaxH3PDDAccApply → BasicGuider(CFG 1.0)`，采样器 **euler**，sigmas = **Apply 节点的 1 号输出**（训练网格），强度 1.0，`nfe=8`，`on_off_grid=error` / `partition_check=error`（fail-closed，不静默降级）；**不叠任何其它蒸馏 LoRA**（lightx2v 系必须摘掉）、不叠 step-caching；base 与权重严格同族（节点有 trunk/head 指纹守卫，ref2va↔ref2va、fl2va↔fl2va，bf16 与 **int8-convrot pruned** base 都可用——本机用的就是 pruned int8_convrot）。
 
-**实测（单卡 Ampere（sm_80）· 同参考图/同 prompt/同 seed 42424242 · 1344×768 · 124 帧）**
+**实测（本机单卡（sm_80）· 同参考图/同 prompt/同 seed 42424242 · 1344×768 · 124 帧）**
 
 | 臂 | 配方 | 耗时 | 帧 60 锐度 mean\|∇\| | 噪声地板 p05 |
 |---|---|---|---|---|
@@ -643,7 +643,7 @@ Fatal Python error: Aborted
 走 **comfy_kitchen 的 CUDA 扩展**，与第三方 `ComfyUI-SolAttn-Ampere`（`torch.compile(flex_attention)`）**是两套实现**。
 §9.10 的崩点（`cudaMallocAsync` 下 `cuMemFreeAsync` abort）只属于后者；原生这套不经过该路径。
 
-**实测环境**：A800 80GB（sm_80，仍带 `: cudaMallocAsync`）、ComfyUI **0.42.1**、torch 2.15.0.dev+cu132、py3.14；
+**实测环境**：本机单卡（sm_80，仍带 `: cudaMallocAsync`）、ComfyUI **0.42.1**、torch 2.15.0.dev+cu132、py3.14；
 1344×768 / 124 帧 / 同 seed / 同参考图。
 
 | 组合 | 耗时 | 相对基线 | 说明 |
@@ -655,7 +655,7 @@ Fatal Python error: Aborted
 | 8 步 LoRA + 原生 sol-attn | 112.8s | 1.47× | 0.37.2 上实测 |
 | **quality 20 步 + ctx（基线）** | 379.1s | 1.00× | 非 PDD 路径（base 20 步 + Motion Context） |
 | **quality 20 步 + ctx + 原生 sol-attn** | **253.8s** | **1.49×** | tau 1.0；画质 MAD 9.66 / PSNR 22.95 dB |
-| comfy kitchen INT8 attention | 170.9s | 0.97× | A800 上**无收益**（INT8 反量化开销抵消） |
+| comfy kitchen INT8 attention | 170.9s | 0.97× | 本机 上**无收益**（INT8 反量化开销抵消） |
 
 **tau 对照（2 seed，同 prompt/参考图，对照同 seed 的 PDD+ctx 基线）**：
 
@@ -689,7 +689,7 @@ Fatal Python error: Aborted
 避免 `continuity_from` 默认落到 1200s 的 2K 实现；仍远低于普通实现的 0，不做普通生成的隐式默认）。
 
 **与 Sage Attention 的关系**：`ModelAttentionBackend`（`comfy kitchen attention`）就是 ComfyUI 官方的 INT8 量化注意力
-（`convrot=True`，与 `int8_convrot` 权重同源技法），等价于"免编译的 SageAttention"；但在这台 A800 上实测 0.97×，
+（`convrot=True`，与 `int8_convrot` 权重同源技法），等价于"免编译的 SageAttention"；但在这台 本机 上实测 0.97×，
 不值得。thu-ml 的 `sageattention` 包仍需 CUDA Toolkit 编译，本机无 nvcc。
 
 ---
@@ -730,4 +730,4 @@ Fatal Python error: Aborted
 - `workflows/minimax-h3-ref2v.json`、`workflows/minimax-h3-i2v.json`（当前资产、shift、档位）
 - `docs/ARCHITECTURE.md`（`$model` 哨兵与 `mode.loras` 插链机制）
 - `docs/workflow-contract.md`（manifest 契约、`modes` 字段）
-- `docs/three-view-experiment.md`（单卡 Ampere（sm_80）/ ComfyUI 0.33.3 / fast 档 28s 基线）
+- `docs/three-view-experiment.md`（本机单卡（sm_80）/ ComfyUI 0.33.3 / fast 档 28s 基线）

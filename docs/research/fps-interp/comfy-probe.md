@@ -9,7 +9,7 @@
 - 宿主 = `t0-server`（172.16.190.20，`ssh t0-server` 免密可用），ComfyUI 跑在 **docker 容器**里（`ps` 显示 `/sbin/docker-init -- bash -c python3.14 ./ComfyUI/main.py …`，容器内 root）。
 - 端口 8188 是本机 → 172.16.190.20:22 的 **ssh 隧道**（`lsof -nP -iTCP:8188`）。
 - 容器挂载（`sudo cat /proc/<pid>/mountinfo`）：代码 `/data/comfyui/storage/ComfyUI`；**模型 `/data/comfyui/storage-models/models` → `/root/ComfyUI/models`**；输入 `/data/comfyui/storage-user/input`（733 个文件）→ `/root/ComfyUI/input`；输出 `…/storage-user/output`。
-- 双卡 **A800 80GB**，ComfyUI 用 cuda:0；探测时另一路 H3 渲染在跑，`vram_free` 15.2 GB。
+- 双卡 **本机单卡**，ComfyUI 用 cuda:0；探测时另一路 H3 渲染在跑，`vram_free` 15.2 GB。
 - **本机与宿主机都没有 ffmpeg/ffprobe**（`which ffmpeg` 空；容器内未知，见 §10）。ComfyUI 的视频解码/编码走容器内 PyAV，不需要 ffmpeg CLI。
 
 ## TL;DR
@@ -28,7 +28,7 @@
 
 | 节点 | 输入 | 输出 | 关键行为（源码） |
 |---|---|---|---|
-| `FrameInterpolationModelLoader` | `model_name: COMBO`（选项 = `folder_paths.get_filename_list("frame_interpolation")`） | `INTERP_MODEL` | `load_torch_file(path, safe_load=True)`；`should_use_fp16(A800)=True` ⇒ 模型走 **fp16**；包进 `CoreModelPatcher` |
+| `FrameInterpolationModelLoader` | `model_name: COMBO`（选项 = `folder_paths.get_filename_list("frame_interpolation")`） | `INTERP_MODEL` | `load_torch_file(path, safe_load=True)`；`should_use_fp16(本机)=True` ⇒ 模型走 **fp16**；包进 `CoreModelPatcher` |
 | `FrameInterpolate` | `interp_model: INTERP_MODEL`、`images: IMAGE`、`multiplier: INT`（default 2，**min 2 / max 16**） | `IMAGE` | 见 §6 算术；**`num_frames < 2` 或 `multiplier < 2` ⇒ 原样返回输入（静默 no-op，无报错）** |
 | `OpticalFlowLoader` | `model_name: COMBO`（`optical_flow` 目录，only `raft_large.pth`） | `OPTICAL_FLOW` | **与补帧无关**：全实例只有一个消费者 `VOIDWarpedNoise`（生成训练数据用）。别为补帧去下 raft（`object_info` 交叉核对） |
 | `LoadVideo` | `file: COMBO`（input 目录文件，`upload: video`） | `VIDEO` | 返回**惰性** `VideoFromFile`（PyAV 打开，不解码） |
@@ -183,7 +183,7 @@ POST /prompt -> 400 {"error": {"type": "prompt_outputs_failed_validation", …},
 | 1344×768，n=124（5.17 s） | 1.53 GB | 3.06 GB | 6.11 GB | 3.51 GB / 0.62 GB |
 | 1344×768，n=372（15.5 s） | 4.61 GB | 9.21 GB | 18.4 GB | 3.51 GB / 0.62 GB |
 
-- 显存侧：A800 单卡 80 GB，探测时 `vram_free` 只有 **15.2 GB**（别的渲染在占）。FILM 峰值 ≈ 3.5 GB + 权重 66 MB + 帧副本 ≈ **4 GB 量级**，与 124/372 帧无关 ⇒ **单镜 1344×768 不需要分块**。
+- 显存侧：本机 单卡 80 GB，探测时 `vram_free` 只有 **15.2 GB**（别的渲染在占）。FILM 峰值 ≈ 3.5 GB + 权重 66 MB + 帧副本 ≈ **4 GB 量级**，与 124/372 帧无关 ⇒ **单镜 1344×768 不需要分块**。
 - 内存侧：**372 帧 ×4 需要 18.4 GB 输出 + 4.6 GB 输入 ≈ 23 GB**（宿主 540 GB RAM，安全）。若将来开 `--gpu-only` 或 `--fp16-intermediates` 数字会变（后者减半），届时需重测。
 - 时间：**不预测秒数**。可核实的成本结构：每帧对 1 次前向；m=2 时 124 帧 = **123 次前向**；m=4 时 FILM 光流只算一次/对（融合 3 次），RIFE 则 3 次完整前向（特征有缓存）。→ 需要真实数字就按 §9 跑一次 `multiplier=2, 24 帧, 512×288` 的图，读 `/history` 的 `execution_start→execution_success`（这正是 §5.2 用的方法）。
 

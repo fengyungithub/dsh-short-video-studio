@@ -1,5 +1,7 @@
 # 学习式放大为什么慢、能怎么快 —— 优化方案与备选放大器调研
 
+> **历史测量提示**：本文是调研期记录，冷/热加载口径未统一（155.7s / 483.4s 为冷加载，68.1s / 187.2s 为热）；当前 canonical 口径与完整条件表见 [`benchmarks.md`](benchmarks.md)。
+
 > 状态：**调研（未做本机 A/B 实测）**。本文提出的每一项都标了「实测 / 推算 / 外部实测」三种口径，
 > 并在 §6 给出落地顺序、预估 GPU 时间与验收判据；**任何一条在没有本仓库同 seed A/B 之前不要写进 README/技能**。
 > 相关：`docs/learned-latent-upscale-2k.md`（U1 路线本体）· `docs/2k-acceleration-variants-analysis.md`（PDD 理论）·
@@ -34,7 +36,7 @@
 
 ## 1. 先定位：时间到底花在哪
 
-### 1.1 本仓库的实测分解（A800 / sm_80 / 2688×1536）
+### 1.1 本仓库的实测分解（本机 / sm_80 / 2688×1536）
 
 `docs/2k-pdd-ab-verdict.md` §4.1 的自洽分解（56 帧，单位秒）：
 
@@ -224,7 +226,7 @@ PDD 把二遍从 6 次评估压到 2 次（`nfe=8, denoise=0.3 → round(8×0.3)
 
 > **2026-11 更新（本文写于 9 月）**：官方 `H3-Regenerate-2K` 仍未开源，但 **NVIDIA 已开源开放替代品
 > Open-H3-Regenerate-2K**（FL2VA + 合并 LoRA，σ₀0.909 起 3 步重生成，768P/1080P/2K/4K，ComfyUI 侧已有适配包）。
-> 按本仓库 2K 二遍实测外推，A800 上约 **15–16 min / 5 s 镜**（推算），比现有 U1-2K（≈35 min）快约 2.2×。
+> 按本仓库 2K 二遍实测外推，本机 上约 **15–16 min / 5 s 镜**（推算），比现有 U1-2K（≈35 min）快约 2.2×。
 > 详见 [`research/open-h3-regenerate-2k.md`](research/open-h3-regenerate-2k.md)。
 > 下文「官方 2K 只能走 API」对**官方模块**仍然成立，但「本地没有 2K 重生成」这条已过时。
 
@@ -310,7 +312,7 @@ PDD 把二遍从 6 次评估压到 2 次（`nfe=8, denoise=0.3 → round(8×0.3)
 | **SeedVR2 3B**（[ComfyUI 原生支持](https://docs.comfy.org/zh/tutorials/utility/seedvr2)，无需任何自定义节点） | 一步扩散恢复 | ✅ | **已实测**：同源同交付（124 帧 · 1344×768 → 2688×1536）**483.4s**，同格 U3 x2 只要 **69.0s ⇒ 7.0×**；官方仓库侧另有「细节重塑更强但慢」的一致说法 | 我们图里**直接把交付尺寸喂模型**（`ImageScale`）⇒ `target_width` 真驱动 | 低（节点与权重本机都已就位） | **已接入**：`video-upscale-seedvr2-3b`（`priority=-20` 不做隐式默认，`chunking="internal"`） |
 | **RTX VSR (nvvfx)** | 驱动级 | ❌ | 12GB 卡上多帧 **OOM/CUDA 崩溃** | — | 低 | ❌ 弃用（同页实测） |
 | **官方 H3-Regenerate-2K** | 闭源重生成 | ✅ | 云端 | **2K** | 需 API key + 重发原始输入 | 本地算力不够时的兜底；不是「放大器」 |
-| **Open-H3-Regenerate-2K**（2026-10 开源替代） | H3 latent 放大 + 3 步重生成 | ✅（FL2VA + 合并 LoRA + Sharp 曲线） | **本地** | 768P / 1080P / **2K** / 4K | 13.7 GB 新权重 + ComfyUI 节点包；已有放大器/快解码器可复用 | **新增候选**：A800 ≈15–16 min/5 s（推算）；比 U1-2K 快 ~2.2×，但重画幅度大（身份/口型风险）— 见 [`research/open-h3-regenerate-2k.md`](research/open-h3-regenerate-2k.md) |
+| **Open-H3-Regenerate-2K**（2026-10 开源替代） | H3 latent 放大 + 3 步重生成 | ✅（FL2VA + 合并 LoRA + Sharp 曲线） | **本地** | 768P / 1080P / **2K** / 4K | 13.7 GB 新权重 + ComfyUI 节点包；已有放大器/快解码器可复用 | **新增候选**：本机 ≈15–16 min/5 s（推算）；比 U1-2K 快 ~2.2×，但重画幅度大（身份/口型风险）— 见 [`research/open-h3-regenerate-2k.md`](research/open-h3-regenerate-2k.md) |
 | **其它 H3 latent upscaler 实现** | latent 空间学习式 | ✅ | 未测 | — | 低（**资产槽可换**） | LBH 上游 / xmarre Plus / Tr1dae / Mamad8 至少四家；2D 档比 3D 档轻 |
 
 **注意最后一行的杠杆**：本仓库的放大器走 `$assets.latent_upscaler` 资产槽（`DSH_SVS_H3_LATENT_UPSCALER` 可覆盖），
@@ -461,7 +463,7 @@ SeedVR2 是扩散模型，官方明说 **VAE 常是瓶颈**，且首次跑有 `t
 `package.json` 的 `npm run smoke` 把 `smoke-upscale.mjs`（与 `smoke-hires-lock.mjs`）纳入 CI 门；
 新增 `scripts/e2e-upscale-shortside.mjs` + 夹具，以及 `DSH_SVS_USER_WORKFLOWS` 测试接缝（清单装临时目录）。
 
-**真机验收（2026-09-24，A800 / ComfyUI 0.35.2）**：factor 形态回归全绿（2688×1536 → 4032×2304，124 帧，266.8s）；
+**真机验收（2026-09-24，本机 / ComfyUI 0.35.2）**：factor 形态回归全绿（2688×1536 → 4032×2304，124 帧，266.8s）；
 短边形态用 `scripts/fixtures/upscale-shortside-probe.json`（几何探针，`internal: true`）三臂真机跑通
 （默认短边 → 1088×1888；`target_width=1504` → 反解短边 1504 → 1504×2592；`internal` + 显式 `chunk_frames=60` → 3 块、124 帧守恒）。
 
@@ -496,7 +498,7 @@ restoration**（`KSampler` 一步、`denoise=1`）。音频同样由 `GetVideoCo
 **目标驱动的意图用 `out_width/out_height` 实现，契约面零新增**（`out_scale` 留给将来「只吃倍率的实现」再补，5 行的事）。
 SeedVR2 的 `sizing` 因此仍声明 `factor: 2`——它的含义退化为「默认倍率」，因为 SeedVR2 接受任意交付尺寸。
 
-**真机验收（2026-09-24，A800）**：`video-upscale-seedvr2-3b` 在 56 帧（1344×768 → 2688×1536）**115.3s** 全绿；
+**真机验收（2026-09-24，本机）**：`video-upscale-seedvr2-3b` 在 56 帧（1344×768 → 2688×1536）**115.3s** 全绿；
 124 帧同口径 **483.4s**，同格 U3 x2 **69.0s（7.0×）**。
 画质（同一把自校准尺子）：有效宽 **2654（×1.975）** > U3 的 2218（×1.65），1:1 眼判也确实更实；
 **但平坦区锐度 311（输入 4.6×，与 4032 那格被判过锐的 362 同档）+ 平坦区闪烁比 1.045（U3 是 0.958）**

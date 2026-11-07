@@ -6,7 +6,7 @@
 > - [`music-generation-models.md`](music-generation-models.md)（21 个音乐模型，许可与集成）
 > - [`audition-voice-pipeline.md`](audition-voice-pipeline.md)（试镜取声流水线设计）
 >
-> 本机事实（`[LOCAL]`，2026-10-23 实测）：ComfyUI **0.42.1**，GPU **NVIDIA A800 80GB**，RAM 540GB，Python 3.14 / torch 2.15。
+> 本机事实（`[LOCAL]`，2026-10-23 实测）：ComfyUI **0.42.1**，GPU **NVIDIA 本机单卡**，RAM 540GB，Python 3.14 / torch 2.15。
 > **MiniMax Music 3 权重已在本机**；**没有任何 TTS 权重**；H3 音频参考通道已实现。
 
 ---
@@ -29,7 +29,7 @@
 
 | 项 | 值 | 影响 |
 |---|---|---|
-| GPU | **A800 80GB**（不是 24GB） | 13GB 级的 Music 3、1.5B 级 TTS 都放得下；可同时驻留 H3 + 音乐 |
+| GPU | **本机单卡**（不是 24GB） | 13GB 级的 Music 3、1.5B 级 TTS 都放得下；可同时驻留 H3 + 音乐 |
 | ComfyUI | **0.42.1** | 原生注册了音乐节点（Music 3 / ACE-Step 1.5 / YuE2 / Stable Audio），无需装自定义节点 |
 | Python / torch | 3.14 / 2.15.0.dev+cu132 | TTS 依赖冲突风险高（多数 TTS 钉 `transformers` 旧版）→ 优先自定义节点或 sidecar 隔离 |
 

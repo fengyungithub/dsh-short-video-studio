@@ -26,7 +26,7 @@
 
 | 项 | 取值 |
 |---|---|
-| 机器 | 单卡 **A800 80GB PCIe**；ComfyUI **0.42.1**；torch 2.15.0.dev+cu132；py3.14；`cudaMallocAsync` |
+| 机器 | 单卡 **本机单卡**；ComfyUI **0.42.1**；torch 2.15.0.dev+cu132；py3.14；`cudaMallocAsync` |
 | 工作流 | `minimax-h3-ref2v-ctx`（fast 档，链式续接模板；config 的 `video.reference2video.fast` 就是它） |
 | 两臂差异 | **唯一差异**：Sol 臂多一个 `2b = BlockSparseAttention`，并把 `7 BasicGuider.model` / `9 BasicScheduler.model` 改指 `2b` |
 | 采样 | 4 步，`res_multistep`，shift **12/3**，fast LoRA `minimax_h3_ref2v_turbo_4step_v0.1` |

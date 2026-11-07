@@ -3,7 +3,7 @@
 > 日期：2026-10-26 ｜ 范围：只验证「剧本 → 机读块 → 集制作包 → 方案卡」的文本/契约链路，**不生成任何视频或图片**。
 > 输入：`.dsh-assets/绛珠泪-交付包/series/episodes/ep001/package.md`（真实项目产物，未修改原件）
 > 迁移副本：[package.md](package.md)（机读块 + 原六节）｜机读块：[machine.json](machine.json)
-> 校验器：[scripts/validate-episode-package.mjs](../../scripts/validate-episode-package.mjs)
+> 校验器：[scripts/validate-episode-package.mjs](../../../scripts/validate-episode-package.mjs)
 
 ## 0. 结果
 

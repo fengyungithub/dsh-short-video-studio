@@ -3,7 +3,7 @@
 > 日期：2026-10-26 ｜ 范围：EP02 前两场（灵河岸·晨 / 灵河岸·夜），验证「已有卡片 node id 复用 + 同一物理场景 + 露瓶复用 + 0 TO-BUILD」。
 > 输入：`04-分集剧本/ep002-灵河岸-甘露化形.md`（前两场）+ `series/production-state.json` 的 node id。
 > 迁移副本：[package.md](package.md) ｜机读块：[machine.json](machine.json)
-> 校验器：[scripts/validate-episode-package.mjs](../../scripts/validate-episode-package.mjs)
+> 校验器：[scripts/validate-episode-package.mjs](../../../scripts/validate-episode-package.mjs)
 
 ## 0. 结果
 

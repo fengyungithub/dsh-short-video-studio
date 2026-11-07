@@ -39,7 +39,7 @@
 |---|---|
 | **D1 档位声明形态** | **一档一清单**（与 H3 一致）：`<family>-<tier>.json`，`group = <family>`；由生成器从模板产出，人只改模板 |
 | **D2 钉实现通道** | **保留配置面 `pins`**（设置页可写）；脚本走 `_internals`；调用面仍无 `workflow` |
-| **D3 图片默认档** | **`quality`（长边 2048 / 2K）** —— 单张成本从 ~6s 涨到 ~63s（A800 实测），是刻意选择 |
+| **D3 图片默认档** | **`quality`（长边 2048 / 2K）** —— 单张成本从 ~6s 涨到 ~63s（本机实测），是刻意选择 |
 | **D4 列表暴露粒度** | `comfy_list_workflows` 主输出 = 能力 → 档位 → {可用性/交付尺寸/耗时}；**实现 id 收进诊断字段**，技能不引用 |
 
 ---
@@ -77,7 +77,7 @@ workflows/<family>-<tier>.json             # 产物，勿手改（同 H3 的约�
 
 生成器负责：把差异表展开成三份清单（各自写死本档的 `steps` 初值）、按 32 对齐校验长边、把 `longSide` 写进 `resolution`、把 `referencePixels` 接到 `params.reference_pixels`、填 `estSeconds`/`label`/`requiresNodes`。
 
-### 3.3 图片档位参数表（本机 A800 实测校准）
+### 3.3 图片档位参数表（本机实测校准）
 
 | capability | tier | 长边 | 典型尺寸(16:9) | steps | 实测耗时 |
 |---|---|---|---|---|---|
@@ -194,7 +194,7 @@ capability + tier
 | **P2** | 工具面去 `workflow`/`mode` + `video_upscale` + `comfy_list_workflows` 诊断字段 + 系统提示词 | `smoke-tools`：生成类工具 schema **不含 `workflow`**；`comfy_render(workflow=)` 报错 |
 | **P3** | 分辨率统一（aspect-ratio + 单边推导 + `reference_pixels` 注入） | 9:16 画布下 t2i 默认 1152×2048；只传 width → 高度按比例推；i2i quality 出 2K |
 | **P4** | 交付尺寸如实回填 + 未支持参数告警 | 节点 `width/height` == 产物真实像素；Qwen+guidance → warnings 有明确提示 |
-| **P5** | 技能/README/文档改写 + 全量 smoke + A800 真机 e2e（t2i/i2i/video 各一次） | `npm run smoke` 全绿 + `scripts/e2e-tier-pipeline.mjs` 全绿 |
+| **P5** | 技能/README/文档改写 + 全量 smoke + 本机 真机 e2e（t2i/i2i/video 各一次） | `npm run smoke` 全绿 + `scripts/e2e-tier-pipeline.mjs` 全绿 |
 
 ### 实施状态（滚动更新）
 

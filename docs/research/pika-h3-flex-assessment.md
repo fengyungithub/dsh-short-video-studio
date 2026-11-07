@@ -228,7 +228,7 @@ comfy_render(capability="video.reference2video", workflow="minimax-h3-ref2v-bala
 | 速度（挑战 PDD） | ≤ 112s | 才考虑提为 balanced 默认候选 |
 | 字幕 | 逐字烧（与 PDD 同级） | 只能做无字幕镜 |
 | 画质 | 锐度 ≥ baseline −5%，音频无异常 | 只做实验清单 |
-| 稳定性 | 连续 3 镜不 OOM（A800 80GB） | 降 ref 数 / 缩时长 |
+| 稳定性 | 连续 3 镜不 OOM（本机单卡） | 降 ref 数 / 缩时长 |
 
 全部达标 → `priority` 调 0（或写进 README 推荐策略）；否则保留 `priority < 0` 的可选项。
 
@@ -262,7 +262,7 @@ comfy_render(capability="video.reference2video", workflow="minimax-h3-ref2v-bala
 
 ---
 
-## 8. 首轮实测（2026-11-06，A800 80GB · 已落地 ref2v 三份实现）
+## 8. 首轮实测（2026-11-06，本机单卡 · 已落地 ref2v 三份实现）
 
 ### 8.1 已落地清单
 
