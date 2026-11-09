@@ -5,7 +5,7 @@
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
 
-### 未发布 — 创作批准门（approval gate）· 审计补卡片检查
+### v1.19.0 — 创作批准门（approval gate）· 审计补卡片检查
 
 > **修复**：角色卡锁定、场景卡锁定、镜头表批准、分镜批准、门 3 片段批准此前只是 SKILL.md 里的文字纪律，agent 跳过完全合法（实测会话 `ff621764`：6 张角色卡前后 0 次 ask，`audit:session` 仍 7/7）。本版把「用户已人工批准」落成 `project.approvals`，并在推进下一步前做代码硬校验。
 
