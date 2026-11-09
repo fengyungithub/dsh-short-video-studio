@@ -484,7 +484,7 @@
   "group": "minimax-h3-i2v-ctx",
   "tier": "balanced",
   "estSeconds": 73,
-  "note": "Pika 6 步 + Sol-H3-VAE（i2v 版）：官方 6 步 sigma + 768p + Sol-Attn + 蒸馏解码器 + 链式续接。冒烟实测（A800 / 124f / first_frame）：73.3s（r2v 同名变体 72.3s）。",
+  "note": "Pika 6 步 + Sol-H3-VAE（i2v 版）：官方 6 步 sigma + 768p + Sol-Attn + 蒸馏解码器 + 链式续接。冒烟实测（本机 / 124f / first_frame）：73.3s（r2v 同名变体 72.3s）。",
   "priority": -55,
   "accel": "solattn",
   "requiresNodes": [

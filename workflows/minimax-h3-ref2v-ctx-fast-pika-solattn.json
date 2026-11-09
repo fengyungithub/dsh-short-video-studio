@@ -427,7 +427,7 @@
   "group": "minimax-h3-ref2v-ctx",
   "tier": "fast",
   "estSeconds": 20,
-  "note": "fast 档 Pika 4 步（lcm + 自拟 4 值 sigma [1.0, 0.948025, 0.8, 0.452381, 0.0]）+ 原生 BlockSparseAttention(sol-attn, tau 1.0) + 链式续接。4 步 schedule 非官方（官方只发 6 步 7 值），质量待评。 实测（A800 80GB / 832x480 / 124f）：整镜 20.1s（对比标准 fast 4 步 22.8s、Pika 6 步 @832 26.0s）。",
+  "note": "fast 档 Pika 4 步（lcm + 自拟 4 值 sigma [1.0, 0.948025, 0.8, 0.452381, 0.0]）+ 原生 BlockSparseAttention(sol-attn, tau 1.0) + 链式续接。4 步 schedule 非官方（官方只发 6 步 7 值），质量待评。 实测（本机 80GB / 832x480 / 124f）：整镜 20.1s（对比标准 fast 4 步 22.8s、Pika 6 步 @832 26.0s）。",
   "priority": -55,
   "accel": "solattn",
   "requiresNodes": [

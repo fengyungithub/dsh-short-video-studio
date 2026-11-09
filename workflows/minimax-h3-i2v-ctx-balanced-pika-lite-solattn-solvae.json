@@ -484,7 +484,7 @@
   "group": "minimax-h3-i2v-ctx",
   "tier": "balanced",
   "estSeconds": 62,
-  "note": "Pika lite 全加速（i2v 版）：4 步自拟 sigma + 768p（1344x768）+ Sol-Attn + Sol-H3-VAE + 链式续接。冒烟实测（A800 80GB / 124f，first_frame 起镜）：62.0s（r2v 同名变体 54.4s，差值是首帧条件编码）。",
+  "note": "Pika lite 全加速（i2v 版）：4 步自拟 sigma + 768p（1344x768）+ Sol-Attn + Sol-H3-VAE + 链式续接。冒烟实测（本机 80GB / 124f，first_frame 起镜）：62.0s（r2v 同名变体 54.4s，差值是首帧条件编码）。",
   "priority": -60,
   "accel": "solattn",
   "requiresNodes": [

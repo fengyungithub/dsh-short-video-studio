@@ -470,7 +470,7 @@
   "group": "minimax-h3-ref2v-ctx",
   "tier": "balanced",
   "estSeconds": 76,
-  "note": "实验：解码换 Sol-H3-VAE（24 层蒸馏非因果，整片并行解码）；采样侧仍是 Pika 6 步 + BlockSparseAttention(sol-attn, tau 1.0)。解码器只能解码，故单独一个 VAELoader 只喂 VAEDecode。实测（A800 80GB / 1344x768 / 124f）：VAEDecode 9.90s → 5.37s（1.84x），整镜 80.5s → 75.9s（−5.7%）；PSNR 43.4dB / SSIM 0.985（h264 输出互比），音轨逐字节相同。见 docs/research/sol-h3-vae-ab.md。",
+  "note": "实验：解码换 Sol-H3-VAE（24 层蒸馏非因果，整片并行解码）；采样侧仍是 Pika 6 步 + BlockSparseAttention(sol-attn, tau 1.0)。解码器只能解码，故单独一个 VAELoader 只喂 VAEDecode。实测（本机 80GB / 1344x768 / 124f）：VAEDecode 9.90s → 5.37s（1.84x），整镜 80.5s → 75.9s（−5.7%）；PSNR 43.4dB / SSIM 0.985（h264 输出互比），音轨逐字节相同。见 docs/research/sol-h3-vae-ab.md。",
   "priority": -100,
   "accel": "solattn",
   "requiresNodes": [

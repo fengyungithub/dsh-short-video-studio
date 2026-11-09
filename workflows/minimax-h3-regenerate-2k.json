@@ -442,7 +442,7 @@
     "CreateVideo",
     "SaveVideo"
   ],
-  "note": "Open-H3-Regenerate-2K 的 ComfyUI 落地：768p 草稿 latent → 3D 放大到目标网格 → 音频 mask 后 3 步重画（σ0.909 起）→ 裁帧 → 源音轨原样接回。**会改内容**：身份/口型可能漂移，start_sigma 0.8 更贴草稿；逐镜抽帧核对后再用。实测（A800 80GB，dense，int8 FL2VA）：2K 124 帧 557.3s（≈9.3min，暖机含解码，显存峰值 ≈57GiB）；5 帧冷启 32.8s（含加载 12.45GB LoRA）。",
+  "note": "Open-H3-Regenerate-2K 的 ComfyUI 落地：768p 草稿 latent → 3D 放大到目标网格 → 音频 mask 后 3 步重画（σ0.909 起）→ 裁帧 → 源音轨原样接回。**会改内容**：身份/口型可能漂移，start_sigma 0.8 更贴草稿；逐镜抽帧核对后再用。实测（本机 80GB，dense，int8 FL2VA）：2K 124 帧 557.3s（≈9.3min，暖机含解码，显存峰值 ≈57GiB）；5 帧冷启 32.8s（含加载 12.45GB LoRA）。",
   "priority": -30,
   "estSeconds": 557
 }

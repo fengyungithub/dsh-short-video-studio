@@ -462,7 +462,7 @@
   "requiresNodes": [
     "BlockSparseAttention"
   ],
-  "note": "quality 20 步 + Sol-Attn + Sol-H3-VAE。实测（A800 80GB / 1344x768 / 124f / 同 seed 连跑）：244.3s；同条件 quality-solattn 基线 247.7s → 仅省 3.4s（−1.4%）。原因：采样 20 步占绝对大头，且本机 assetOverrides 把 H3 视频 VAE 覆盖成 int8（解码本身已 ~4.6s），Sol 解码再省的空间被压缩。",
+  "note": "quality 20 步 + Sol-Attn + Sol-H3-VAE。实测（本机 80GB / 1344x768 / 124f / 同 seed 连跑）：244.3s；同条件 quality-solattn 基线 247.7s → 仅省 3.4s（−1.4%）。原因：采样 20 步占绝对大头，且本机 assetOverrides 把 H3 视频 VAE 覆盖成 int8（解码本身已 ~4.6s），Sol 解码再省的空间被压缩。",
   "group": "minimax-h3-ref2v-ctx",
   "tier": "quality",
   "estSeconds": 244,

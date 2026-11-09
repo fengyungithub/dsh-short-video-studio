@@ -470,6 +470,6 @@
   "group": "minimax-h3-ref2v-ctx",
   "tier": "balanced",
   "estSeconds": 54,
-  "note": "Pika lite 全加速（保留版本）：4 步自拟 sigma + 768p（1344x768）+ 原生 BlockSparseAttention(sol-attn, tau 1.0) + Sol-H3-VAE 解码；链式续接。实测（A800 80GB / 124f）：整镜 54.3s，对照官方 6 步 Pika 116.7s（2.15x）；其中 4 步基线 82.5s、加 Sol-Attn 58.4s、Sol-H3-VAE 再省 ~4.1s。",
+  "note": "Pika lite 全加速（保留版本）：4 步自拟 sigma + 768p（1344x768）+ 原生 BlockSparseAttention(sol-attn, tau 1.0) + Sol-H3-VAE 解码；链式续接。实测（本机 80GB / 124f）：整镜 54.3s，对照官方 6 步 Pika 116.7s（2.15x）；其中 4 步基线 82.5s、加 Sol-Attn 58.4s、Sol-H3-VAE 再省 ~4.1s。",
   "priority": -60
 }

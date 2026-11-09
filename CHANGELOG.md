@@ -26,7 +26,7 @@
 #### `video.regenerate`：Sol-Attn 变体（2K 整轮 2.50×）
 
 - **清单**：`workflows/minimax-h3-regenerate-2k-solattn.json`——与 dense 版逐字相同，只在 `OpenH3RegenLora` 与 `BasicGuider` 之间插原生 `BlockSparseAttention`（sol-attn，`tau=1.0`、`start_percent=0.2`、`min_tokens=12288`）；`priority: -31`，**不改隐式默认**，设置页可显式选用。
-- **实测（A800 80GB · 124 帧 · 2560×1440 · 同草稿/同 prompt/同 seed）**：3 步采样 **506.2s → 176.9s（2.86×）**，整轮 **549.7s → 220.2s（2.50×）**；`tau=1.3` 再降至 149.7s / 193.9s（3.38× / 2.84×）。
+- **实测（本机 80GB · 124 帧 · 2560×1440 · 同草稿/同 prompt/同 seed）**：3 步采样 **506.2s → 176.9s（2.86×）**，整轮 **549.7s → 220.2s（2.50×）**；`tau=1.3` 再降至 149.7s / 193.9s（3.38× / 2.84×）。
 - **质量**：与 dense 输出 PSNR Y 31.2 dB / SSIM 0.930，闪烁代理 7.20 vs 7.37（没有变抖），1:1 目检无可见差；快解码器（`sol_h3_vae`）19.2s vs 原版 VAE 54.1s（2.82×）。
 - 细节与复现见 [`docs/video-regenerate.md`](docs/video-regenerate.md) §11。
 
@@ -49,7 +49,7 @@
 - **是什么**：画布上**已有的 768p 片段** + 提示词 → latent 3D 放大 → **σ0.909 起 3 步 Euler（CFG=1）** 在**目标网格**上**重画**；交付 **1080p 1920×1080** / **2K 2560×1440**（竖屏自动翻转），帧数与源片一致、**源音轨原样接回**（音频 mask σ=0，从不经过采样器）。**会改内容，不是超分**——身份 / 口型可能漂，产物必须抽帧核对。
 - **契约**：清单声明 `regenerate.targets`（`graph` 32 对齐与实际渲染网格 / `delivery` 裁切后的交付尺寸，1080p 渲 1088 行再裁回）+ 训练域护栏（24fps、121–362 帧、必须有提示词）；校验器 fail-closed。图 23 节点：`PrepareDraft → VAEEncode → LatentUpscale → RefineLatent → SamplerCustomAdvanced(3 步) → Finish(裁帧/接回原音轨)`。
 - **latent 交接**：28 份 balanced 清单渲染时**顺手存 draft latent**（旁路节点，不影响出片）；`video_regenerate(handoff='auto'|'latent'|'video')` 缺省 `auto`——源节点有可用 latent（文件在服务端、121–362 帧、不大于目标网格）就走 latent，否则退回视频入口并在 `handoffReason` 说明；显式 `latent` 不满足**直接报错**，不静默退。
-- **实测（A800 · 124 帧 · 2K）**：**557.3s**（≈9.3min，显存峰值 ≈57GiB）——对照 `-ctx-quality-2k` 的 **2120.9s** 为 **3.8×**、`-ctx-quality-pdd2-2k` 的 1277.8s 为 **2.3×**。B 方案（latent 交接）同草稿同 seed 精修 **540.3s vs 557.2s**（快 3.0%，端到端约 4.5%），但 1:1 眼判差异很小 ⇒ B 的精修清单保持 `internal` 实验件，不替换 C。
+- **实测（本机 · 124 帧 · 2K）**：**557.3s**（≈9.3min，显存峰值 ≈57GiB）——对照 `-ctx-quality-2k` 的 **2120.9s** 为 **3.8×**、`-ctx-quality-pdd2-2k` 的 1277.8s 为 **2.3×**。B 方案（latent 交接）同草稿同 seed 精修 **540.3s vs 557.2s**（快 3.0%，端到端约 4.5%），但 1:1 眼判差异很小 ⇒ B 的精修清单保持 `internal` 实验件，不替换 C。
 - **短剧系列**：`delivery=regen2k`（9:16 交付 **1440×2560**，≈+150 min/集，≈3.2× 原生；**整季同一路线、不混**）；样片集对照卡新增「2K 重生成」一臂。
 - 文档：[`docs/video-regenerate.md`](docs/video-regenerate.md)（契约 / 图 / 护栏 / A/B / 装法）· 调研 [`docs/research/open-h3-regenerate-2k.md`](docs/research/open-h3-regenerate-2k.md)。
 
@@ -83,7 +83,7 @@
 
 - **是什么**：Pika 在 MiniMax H3 上后训练的 **6 步蒸馏**版本，两个 LoRA 适配器（`fl2va` / `ref2va`）跑在同一批 base 上，不是新架构。采样配方固定为 `lcm` + `ManualSigmas`（7 个 sigma = 6 步）+ `BasicGuider`、LoRA `strength_model = 1.0`；**不能接 `MiniMaxH3SigmaShift`、不能叠 turbo / Lightning LoRA**（官方明确会破坏输出）⇒ 与现有 8 步 balanced 是**互斥选择**。
 - **新增 12 份清单 + 6 份模板**：ref2v 9 份（`-balanced-pika`、`-ctx-balanced-pika`、`-ctx-balanced-pika-solattn`、`-ctx-balanced-pika-solattn-solvae`、`-fast-pika`、`-fast-pika-solvae`、`-ctx-fast-solvae`、`-ctx-fast-pika-solattn`、`-ctx-fast-pika-solattn-solvae`）、i2v 3 份（`-balanced-pika`、`-ctx-balanced-pika`、`-ctx-balanced-pika-solattn`）。模板在 `scripts/h3-templates/minimax-h3-pika-*.json`，由 `make-h3-variants.mjs` 生成清单。
-- **实测（A800 80GB · 1344×768 · 124 帧 · 同 prompt 同 seed）**：ref2v **178.8s → 135.9s**、i2v **173.6s → 132.2s**，即 **1.30–1.32×**，四次重复稳定（8 步 173.4–178.8s / Pika 133.4–136.1s）。叠**原生块稀疏**再快 1.5×（84.4s），但 ref2v 上帧锐度 −11%（i2v 未掉）。
+- **实测（本机 80GB · 1344×768 · 124 帧 · 同 prompt 同 seed）**：ref2v **178.8s → 135.9s**、i2v **173.6s → 132.2s**，即 **1.30–1.32×**，四次重复稳定（8 步 173.4–178.8s / Pika 133.4–136.1s）。叠**原生块稀疏**再快 1.5×（84.4s），但 ref2v 上帧锐度 −11%（i2v 未掉）。
 - **中文内嵌字幕：逐字烧出**（2 张角色卡 × 5/14/15 字台词共 3 例，含中文标点），与 PDD 同级；现有 lightx2v 8 步是整段不烧。**但出镜窗由模型决定且随台词长度变化**：短句 2–3s 退场、长句挂到片尾，不跟 prompt 声明的结束点走。
 - **链式续接可用**：起链 126.6s / 续接 163.1s，接缝 PSNR **31.0 dB**。
 - **fast 档 Pika 4 步**（`-fast-pika`）是**实验实现**：官方只发 6 步 schedule，4 步 sigma（`1.0, 0.948025, 0.8, 0.452381, 0.0`）由 6 步曲线线性插值得来，整镜 ~20s。

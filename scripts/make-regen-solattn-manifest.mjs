@@ -29,13 +29,13 @@ m.id = 'open-h3-regenerate-2k-solattn'
 m.displayName = 'MiniMax H3 视频重生成（Open-H3 · Sol-Attn · 2K/1080p）'
 m.description =
   '与 open-h3-regenerate-2k 逐字相同，只把原生 BlockSparseAttention（sol-attn）插在合并 LoRA 之后。' +
-  '实测（A800 80GB，124 帧 2K）：3 步采样 506.2s → 176.9s（2.86×），整轮 549.7s → 220.2s（2.50×）；' +
+  '实测（本机 80GB，124 帧 2K）：3 步采样 506.2s → 176.9s（2.86×），整轮 549.7s → 220.2s（2.50×）；' +
   'tau 1.3 再降到 149.7s / 193.9s（3.38× / 2.84×）。与 dense 输出 PSNR Y 31.2 dB、SSIM 0.930，1:1 目检无可见差。'
 m.priority = -31
 m.estSeconds = 194
 m.note =
   'Sol-Attn 变体（原生 BlockSparseAttention，ComfyUI 0.42+ 内置，非第三方 SolAttnMiniMaxH3）。' +
-  '实测：dense 549.7s → sol(tau1.0) 220.2s → sol(tau1.3) 193.9s（124 帧 / 2560×1440 / A800 80GB）；' +
+  '实测：dense 549.7s → sol(tau1.0) 220.2s → sol(tau1.3) 193.9s（124 帧 / 2560×1440 / 本机 80GB）；' +
   '解码器仍用 sol_h3_vae（快解码 19s vs 原版 54s）。与 dense 同 seed 输出 PSNR Y 31.2 / SSIM 0.930，' +
   '闪烁代理指标（相邻帧平均 |Δ|）7.20 vs dense 7.37（更稳）。仍是「重画内容」，产物必须抽帧核对身份/口型。'
 

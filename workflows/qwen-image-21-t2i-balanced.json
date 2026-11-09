@@ -5,7 +5,7 @@
   "runner": "comfyui",
   "displayName": "Qwen-Image 2.1 文生图（日常 1344）",
   "description": "本地 Qwen-Image 2.1（7B MMDiT）文生图：原生支持 2K 出图与 RGBA 透明背景，官方模板默认加载 int8_convrot 权重。图结构对应 ComfyUI 官方模板 image_qwen_image_2_1_t2i（UNETLoader → TextEncodeQwenImage21 → KSampler → VAEDecode），走 euler/simple + cfg=1 的官方路径。",
-  "note": "需要 ComfyUI ≥ v0.37.0（TextEncodeQwenImage21 是 0.37 起的新节点）与三个权重（见 assets）。cfg 固定 1（官方路径）；官方 pipeline 建议 40-50 步 euler，模板从 25 步起，故三档取 20/30/40 步。2048 档实测（A800·int8·40 步）：2048×2048 = 63.4s、2752×1536 = 64.5s、1536×2752 = 65.2s（像素量都在 4.2MP 左右 ⇒ 成本由像素量而非比例决定）。透明背景：提示词写成「This is an RGBA format image with transparency. <主体描述>. The image has an alpha channel and a transparent background.」并以 PNG 保存。",
+  "note": "需要 ComfyUI ≥ v0.37.0（TextEncodeQwenImage21 是 0.37 起的新节点）与三个权重（见 assets）。cfg 固定 1（官方路径）；官方 pipeline 建议 40-50 步 euler，模板从 25 步起，故三档取 20/30/40 步。2048 档实测（本机·int8·40 步）：2048×2048 = 63.4s、2752×1536 = 64.5s、1536×2752 = 65.2s（像素量都在 4.2MP 左右 ⇒ 成本由像素量而非比例决定）。透明背景：提示词写成「This is an RGBA format image with transparency. <主体描述>. The image has an alpha channel and a transparent background.」并以 PNG 保存。",
   "tier": "balanced",
   "group": "qwen-image-21-t2i",
   "estSeconds": 5,

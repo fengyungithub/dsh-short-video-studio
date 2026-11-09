@@ -473,6 +473,12 @@ Qwen 官方对出图的建议是「用提示词改写器」：一句短需求 �
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
 
+### v1.18.0 — 会话归档搬迁画布目录 · Open-H3 重生成 Sol-Attn 变体（2026-11-09）
+
+> **本版重点：归档会话时画布不再原地积压**——配置 `archiveRoot` 后，DSH 里归档会话会把该会话的 `<工作区>/canvas/<sessionId>`（`project.json` + 全部图片/视频/音频）整体搬到归档路径（本地盘 / 外置盘 / NAS），取消归档再搬回；**不配置则与旧版本完全一致**。
+>
+> **另一项（可选、不改默认）**：`video.regenerate` 新增 Sol-Attn 变体 `open-h3-regenerate-2k-solattn`（2K 整轮 **2.50×**），`priority: -31`，需在设置页显式选用。
+
 ### v1.17.0 — Open-H3 Regenerate 2K · RelayVSR 超分 · balanced 自动存 draft latent（2026-11-07）
 
 > **本版重点：社区加速 / 放大技术全部「可选化」**——Pika H3 Flex 6 步、PDD 8 步、Sol-Attn 块稀疏、SeedVR2 3B、RelayVSR ×2/×4、Open-H3 Regenerate 2K、RIFE 补帧都已在注册表里，可在设置页「＋ 新增策略 / 逐档下拉」选用；**全部不改变既有默认**（`priority<0` / `internal`），缺节点 / 缺权重会如实置灰。速查表见 [社区加速与放大技术](#社区加速与放大技术2026-11-重点)。

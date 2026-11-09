@@ -8,7 +8,7 @@
  *   node scripts/fc-cost-model.mjs --json          # 机读输出
  *
  * 只依赖 Node 内置模块；数字全部来自 docs/research/fc-gpu-pricing.md 与
- * docs/minimax-h3-video-benchmark.md（A800 80GB 实测），新价格请改 PRICES/SPECS。
+ * docs/minimax-h3-video-benchmark.md（本机 80GB 实测），新价格请改 PRICES/SPECS。
  */
 
 const args = process.argv.slice(2);
@@ -17,8 +17,8 @@ const opt = (name, def) => {
   return i >= 0 && args[i + 1] !== undefined ? Number(args[i + 1]) : def;
 };
 
-// ── 基准（A800 80GB 实测，见 docs/minimax-h3-video-benchmark.md） ─────────────
-const A800 = {
+// ── 基准（本机 80GB 实测，见 docs/minimax-h3-video-benchmark.md） ─────────────
+const 本机 = {
   ref2vFixed: 19,   // 端到端固定开销：模型就位 + VAE/音频解码 + mp4 封装
   ref2vPerStep: 18.4, // 8 步档单步（147.3s / 8）
   steps: 8,
@@ -71,7 +71,7 @@ const f = (n, d = 2) => Number(n).toFixed(d);
 
 function perShotSec(k) {
   if (!k) return null;
-  return A800.ref2vFixed + (A800.ref2vPerStep * A800.steps) / k;
+  return 本机.ref2vFixed + (本机.ref2vPerStep * 本机.steps) / k;
 }
 
 function episodeSec(k) {
@@ -104,7 +104,7 @@ if (args.includes('--json')) {
 } else {
   console.log(`# FC GPU 成本模型（balanced · 5.17s/镜 · 1344×768 或 768×1344）\n`);
   console.log(`口径：${SHOTS} 镜/集 · 重渲系数 ${RERENDER} · 冷启动 ${COLD_START}s × ${COLD_STARTS_PER_EP}/集 · 整季 ${EPISODES} 集\n`);
-  console.log('| 卡型 | k(A800=1) | 单镜(s) | 单集(s) | 单镜 按量/定时/包月 (元) | 单集 按量 (元) | 整季 按量 (元) | 单集 定时池 (元) | 整季 定时池 (元) | 备注 |');
+  console.log('| 卡型 | k(本机=1) | 单镜(s) | 单集(s) | 单镜 按量/定时/包月 (元) | 单集 按量 (元) | 整季 按量 (元) | 单集 定时池 (元) | 整季 定时池 (元) | 备注 |');
   console.log('|---|---|---|---|---|---|---|---|---|---|');
   for (const r of rows) {
     const cell = r.t ? `${f(r.shotCost.payg)} / ${f(r.shotCost.scheduled)} / ${f(r.shotCost.reserved)}` : '—';

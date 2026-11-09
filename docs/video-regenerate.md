@@ -310,7 +310,7 @@ A/B 之后我们把交接链路做成了产品可用的形态（B 的清单仍�
 
 复现：`node scripts/e2e-2k-vs-regen.mjs`（新写 prompt，约 12–15 分钟，产物落 `e2e-out/2k-vs-regen/`）。
 
-## 11. Sol-Attn 与快解码器 A/B（2026-11-09，本机 A800 80 GB）
+## 11. Sol-Attn 与快解码器 A/B（2026-11-09，本机 本机 80 GB）
 
 **目的**：社区的 3.9× 是 B200 + MXFP8 + CUDA graph 的账；本机能不能只靠**原生 `BlockSparseAttention`（sol-attn）** 拿到大头？
 以及清单里已在用的**快解码器**（`sol_h3_vae`）到底省多少。

@@ -439,7 +439,7 @@
   "group": "minimax-h3-ref2v-ctx",
   "tier": "fast",
   "estSeconds": 18,
-  "note": "实验：fast 档 Pika 4 步 + Sol-H3-VAE 解码（采样侧 Pika lcm 4 步 + BlockSparseAttention）。4 步 sigma 为自拟 [1.0, 0.948025, 0.8, 0.452381, 0.0]，官方 Pika 只发 6 步。 实测（A800 80GB / 832x480 / 124f）：VAEDecode 4.13s → 2.23s（1.85x），整镜 19.2s → 17.95s（−6.6%）。",
+  "note": "实验：fast 档 Pika 4 步 + Sol-H3-VAE 解码（采样侧 Pika lcm 4 步 + BlockSparseAttention）。4 步 sigma 为自拟 [1.0, 0.948025, 0.8, 0.452381, 0.0]，官方 Pika 只发 6 步。 实测（本机 80GB / 832x480 / 124f）：VAEDecode 4.13s → 2.23s（1.85x），整镜 19.2s → 17.95s（−6.6%）。",
   "priority": -55,
   "accel": "solattn",
   "requiresNodes": [

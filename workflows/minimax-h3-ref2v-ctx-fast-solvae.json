@@ -455,6 +455,6 @@
   "group": "minimax-h3-ref2v-ctx",
   "tier": "fast",
   "estSeconds": 21,
-  "note": "实验：标准 fast 4 步（turbo LoRA + res_multistep + shift 12/3）只换解码器为 Sol-H3-VAE；采样侧不动。实测（A800 80GB / 832x480 / 124f）：VAEDecode 4.16s -> 2.12s（1.96x，-49%），整镜 22.8s -> 20.4s（-10.5%）；PSNR 37.3dB / SSIM 0.974（h264 输出互比），同帧锐度 262.6 -> 291.2。",
+  "note": "实验：标准 fast 4 步（turbo LoRA + res_multistep + shift 12/3）只换解码器为 Sol-H3-VAE；采样侧不动。实测（本机 80GB / 832x480 / 124f）：VAEDecode 4.16s -> 2.12s（1.96x，-49%），整镜 22.8s -> 20.4s（-10.5%）；PSNR 37.3dB / SSIM 0.974（h264 输出互比），同帧锐度 262.6 -> 291.2。",
   "priority": -100
 }
