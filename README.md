@@ -50,6 +50,7 @@
 - **画布 + 飞书**：每个会话一个画布 tab（简报 / 卡片 / 镜头表 / 分镜 / 片段 / 成片），文本实时 markdown、媒体内嵌；飞书里远程对话创作，产物自动送达（文本导出 PDF）。
 - **同场景续接**：`continuity_from=上一镜节点 id` 把上一镜的服务端 latent 钉进本镜（画面逐帧接住结尾、音频从接缝继续），r2v / i2v 双侧支持、可跨形状续接。
 - **通用后处理**：抽帧 / 抽音轨 / 裁切 / 拼接 / **超分**（像素 · SeedVR2 · RelayVSR）/ **重生成**（Open-H3）/ **补帧**（RIFE）/ BGM（Music 3）——一条龙出片。
+- **归档可搬走**：给画布配一个归档路径（本地盘 / NAS），DSH 里归档会话时把这个会话的 `canvas/<sessionId>` 整体搬过去、取消归档再搬回；跨盘自动拷贝+删源、冲突留 `.dup`、绝不覆盖，留空则完全等同旧行为。
 - **画布编辑 + 资产库**：画布上的图片 / 视频 / 音频 / 文本都能入库为跨会话资产（id 永久不变、显示名可改），图片可直接作 `ref_nodes`、音频作 `audio_ref_nodes`；画布内可上传、替换、重排、删除。
 - **开场可选的字幕与审查节奏**：画面内字幕 `burned-in`（默认，逐字烧进画面）/ `none`（对白照常发声、无字幕）；片段审查 `per-shot` 逐镜确认 / `batch` 全部渲完一次确认（AI 自检两种模式都逐镜执行）。
 - **输入框生成条**：会话输入框直接写 `/video-generate` / `/image-generate` 斜杠命令，工具条选类型 / 档位 / 比例 / 时长 / 参考图；prompt 写在命令行后，走原生发送键提交。
@@ -326,6 +327,7 @@ node scripts/import-comfy.mjs exported.json \
 ```json
 {
   "canvasHome": "tab",
+  "archiveRoot": "",
   "baseUrl": "http://localhost:8188",
   "apiKey": "",
   "pollMs": 2000,
@@ -340,6 +342,7 @@ node scripts/import-comfy.mjs exported.json \
 ```
 
 - `canvasHome`：**画布挂在哪儿**。`"tab"`（默认）＝会话区视图标签页（与「对话」并列，整屏工作态）；`"sidebar"`＝**右侧栏**标签页（边看对话边生成，还能浮动成可拖拽缩放的面板）。设置页 **ComfyUI → 界面** 里改。两种取值下**只有一个画布实例**——插件启动时只注册选中的那个家，互斥由结构保证，不存在两个 iframe 抢同一份工程的状态问题。入口与「工作区文件」「新建终端」同一套原生做法：右栏折叠时从会话标题栏右上角的展开按钮进入，在引导页点「短视频画布」胶囊。**改选即保存，刷新页面后生效**（设置页有「立即刷新」按钮）。换家只换挂载点：工程数据、生成能力、Agent 工具全都不受影响；
+- `archiveRoot`：**归档路径**（绝对路径，支持 `~/…` 与 NAS 挂载点；设置页 ComfyUI → 归档 里改：点「浏览…」弹宿主系统目录选择器（macOS Finder 风格 / Windows 资源管理器 / Linux zenity，选中后自动保存），也可手输；旁边有路径探测与「立即同步归档」。注意该对话框由 DSH 以 `osascript` + `NSOpenPanel` 打开，面板标准文案按 osascript 的英文 bundle 选语言，**中文系统下也会显示英文**（DSH 实现所致，插件无法改其语言））。DSH 的「归档会话」本身只在注册表里打标记、**不碰工作区文件**；配置该项后，插件在会话归档时把 `<工作区>/canvas/<sessionId>`（`project.json` + 该会话的图片/视频/音频）整体搬到 `archiveRoot/<sessionId>/`，**取消归档时再搬回工作区**（画布首次加载会等回迁落位，不会读到空工程）；插件启动与手动同步会补搬遗漏项。跨盘（NAS/外置盘）自动退化为「拷到 `<目标>.partial-*` → 改名就位 → 删源」，中断时源目录保持原样；目标已有同名不同内容文件会改名 `.dup-<时间>` 保留，绝不覆盖。**留空 = 不迁移**（与旧行为一致；环境变量 `DSH_SVS_ARCHIVE_ROOT` 可覆盖配置文件，搬迁稳定等待用 `DSH_SVS_ARCHIVE_SETTLE_MS` 调）；
 - `models.*` / 环境变量（`DSH_SVS_COMFY_URL` / `DSH_SVS_FLUX_MODEL` / `DSH_SVS_H3_MODEL_REF` / `DSH_SVS_H3_MODEL_FL` / `DSH_SVS_H3_LORA_FL_FAST` / `DSH_SVS_H3_LORA_8STEP` 等）：换模型文件不改图结构；
 - `preferred`：**未分档**能力默认用哪个工作流（设置页「设为默认」写回这里）——**把你导入的工作流设为某能力的默认，即完成「换模型」，内置清单可保留可遮蔽可删除**。H3 视频能力已分档，默认由 `tiers` / 设置页策略决定，不走 `preferred`；
 - `tiers`：**已分档**能力的档位选择（capability → tier → 实现 id，见 [`docs/tier-strategy-design.md`](https://github.com/fengyungithub/dsh-short-video-studio/blob/main/docs/tier-strategy-design.md) §4.1）；设置页点选策略/逐档下拉就是写这里。选「内置默认」= **清空**该能力的条目（回到跟随注册表首选）；

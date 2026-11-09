@@ -60,10 +60,19 @@ global.fetch = async (url) => {
   const body = u.includes('/api/config') ? { ok: true, config: cfgFixture } : apiPayload
   return { json: async () => body, ok: true }
 }
+// 宿主目录选择器（Remote 命名空间）：默认返回一个固定目录，供「浏览…」用例断言。
+// 置空即模拟「远程 / SSH / 纯浏览器」环境（后端是 browse，没有 pick）。
+let fakeRemote = { directoryPicker: { pick: async () => ({ ok: true, value: '/Volumes/nas/dsh-archive' }) } }
 moduleExports.apply({
   slots: {
     inject: (name, fn) => { if (name === 'settings.section') fn() },
     register: (def, Component) => { if (def.name === 'settings.section') settingsComponent = Component },
+  },
+  // pickDirectoryViaHost 读 ctx.get('remote').directoryPicker
+  get: (name) => {
+    if (name === 'remote') return fakeRemote
+    if (name === 'remote.directoryPicker') return fakeRemote && fakeRemote.directoryPicker
+    return undefined
   },
   effect: () => {},
   log: () => {}, warn: () => {}, error: () => {},
@@ -366,3 +375,46 @@ console.log('\n[6] 策略：内置默认 / 用户自建 / 新增（命名 + 自�
   }
 }
 
+console.log('\n[7] 归档路径：宿主系统目录选择器（浏览…）')
+{
+  const posts = []
+  global.fetch = async (url, opts) => {
+    const u = String(url)
+    if (opts && opts.method === 'POST') posts.push(JSON.parse(opts.body || '{}'))
+    const body = u.includes('/api/archive/status')
+      ? { ok: true, config: { archiveRoot: '', normalized: '', valid: true }, probe: { configured: false }, archivedCount: 0, index: { count: 0, sessions: [] }, recent: [] }
+      : u.includes('/api/config') ? { ok: true, config: cfgFixture } : apiPayload
+    return { ok: true, json: async () => body }
+  }
+  resetHooks()
+  let tree = await renderStable(settingsComponent, {})
+  const browseBtn = findAll(tree, (n) => n.type === 'button' && String(textOf(n)).includes('浏览')).at(0)
+  ok('归档区有「浏览…」按钮', Boolean(browseBtn))
+
+  if (browseBtn) {
+    await browseBtn.props.onClick({ target: {} })
+    await new Promise((r) => setImmediate(r))
+    tree = await renderStable(settingsComponent, {})
+    ok('选中的目录写回输入框',
+      findAll(tree, (n) => n.type === 'input' && n.props.value === '/Volumes/nas/dsh-archive').length === 1)
+    ok('选择后自动保存 archiveRoot', posts.some((p) => p.archiveRoot === '/Volumes/nas/dsh-archive'))
+    ok('提示已选择并保存', textOf(tree).includes('已选择并保存'))
+  }
+
+  // 没有 pick 能力（远程 / SSH / 纯浏览器）：按钮仍在，但点了只提示手动输入，不抛异常
+  fakeRemote = { directoryPicker: {} }
+  resetHooks()
+  tree = await renderStable(settingsComponent, {})
+  const browseBtn2 = findAll(tree, (n) => n.type === 'button' && String(textOf(n)).includes('浏览')).at(0)
+  if (browseBtn2) {
+    let threw = null
+    try {
+      await browseBtn2.props.onClick({ target: {} })
+      await new Promise((r) => setImmediate(r))
+      tree = await renderStable(settingsComponent, {})
+    } catch (e) { threw = e }
+    ok('无 pick 能力时不抛异常', !threw, threw && String(threw))
+    ok('无 pick 能力时提示直接输入路径', textOf(tree).includes('没有可用的系统目录选择器'))
+  }
+  fakeRemote = { directoryPicker: { pick: async () => ({ ok: true, value: '/Volumes/nas/dsh-archive' }) } }
+}
