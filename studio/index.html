@@ -17,7 +17,7 @@
       document.documentElement.setAttribute('data-theme', t)
     })()
   </script>
-  <link rel="stylesheet" href="./app.css?v=8">
+  <link rel="stylesheet" href="./app.css?v=9">
 </head>
 <body>
   <script>window.__DSH_SVS_TOKEN__ = "__DSH_SVS_TOKEN_VALUE__";</script>
@@ -30,6 +30,7 @@
     <div class="brand">🎬 短视频画布</div>
     <div class="meta" id="meta"></div>
     <div class="topbar-bar">
+      <button class="btn" id="config" type="button" title="项目配置（STEP 0 参数；生成前硬门的真相源）">⚙ 配置</button>
       <button class="btn btn-accent" id="add-upload" type="button" title="从本机选择图片（png/jpg/webp/gif，可多选），直接成为画布上的角色卡/场景卡等资产">＋ 上传图片</button>
       <button class="btn" id="add-assets" type="button" title="把已入库的跨会话资产（角色/场景/风格锚点）取到当前画布">📚 资产库</button>
       <label class="follow" id="follow-toggle" title="勾选后：进入画布自动定位到最新主线节点；Agent 对话期间新增主线节点会自动滚动跟随（按会话记忆勾选状态）">
@@ -42,6 +43,6 @@
   </header>
   <main id="canvas" class="canvas"></main>
   <button id="jump" class="jump-btn" type="button" title="返回顶端">↑ TOP</button>
-  <script type="module" src="./app.js?v=8"></script>
+  <script type="module" src="./app.js?v=9"></script>
 </body>
 </html>

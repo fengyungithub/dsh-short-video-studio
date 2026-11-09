@@ -10,7 +10,7 @@
 1) read  series/production-state.json          # 当前集 / stage / doneShots / 资产与声线台账
 2) read  episodes/epNNN.md + 分集目录该行 + series/bible.md（按需段）
 3) asset_list()  →  asset_to_canvas(id=…) × N   # 本集用到的角色/状态/场景/道具
-4) canvas_set_state(…)                          # 一次写全：画幅/时长/音频/档位/卡版本/reviewMode/shotGate/十个分组
+4) canvas_set_state(…)                          # 一次写全：flow=series / 画幅/时长/音频/档位/图片档位/交付/卡版本/声线/字幕/语言/风格/BGM/reviewMode/shotGate/十个分组
 5) canvas_write_node(kind=text, group="story planning", title="EP00X 本集规格", content=…)  # 只读规格卡：参数 + 节点数（动态）
 6) canvas_write_node(kind=text, group="story planning", title="EP00X 集制作包", content=…)
 7) 加载 story-short-generator，声明总控与注入点，从 STEP 3 起
@@ -19,12 +19,13 @@
 开场先做的状态写入（**每集唯一写入点；story 只读不写**）：
 
 ```text
-canvas_set_state(aspectRatio="9:16", duration="90 秒（默认；按包 ① 80–110s 调整）", audioMode="dialogue-led",
-                 mode="balanced", characterCardVariant="single", reviewMode="batch", shotGate="verdict",
+canvas_set_state(flow="series", aspectRatio="9:16", duration="90 秒（默认；按包 ① 80–110s 调整）", audioMode="dialogue-led",
+                 mode="balanced", imageTier="balanced", delivery="native",
+                 characterCardVariant="single", voicePlan="existing", subtitles="none", language="zh",
+                 style="cinematic-live-action", bgmMode="none", reviewMode="batch", shotGate="verdict",
                  groupOrder=["story planning","character cards","voice auditions","scene cards",
                              "prop cards","shot table","text storyboards","shot prompts",
                              "shot clips","final delivery"])
-# 声线方案无 state 字段：existing（阶段 C 建）/ text-only（降级），写进系列圣经与集制作包 ⑥
 ```
 
 > `production-state.json` 的 `stage` 从 `package` 走到 `delivered`，**每步都先写文件再回复用户**。
@@ -55,7 +56,7 @@ canvas_set_state(aspectRatio="9:16", duration="90 秒（默认；按包 ① 80�
 - 建卡后的逐卡锁定**不单独弹卡**，并入 §2.2 的方案卡。
 - 场景 / 道具 / 声线已在阶段 C 建好；本集只物化，不重画。
 - **story 不写资产库**；缺卡生成后只返回节点，由 production 入库/记账。
-- **阶段 C 首次建卡同此分工**：production 主持（清单/总览卡/入库清单/台账），生成与自检委托 story（STEP 3 / 3.5 / 4 / 4.5）；委托时必须声明「阶段 C 资产建卡 + 跳过门 0 / E-STEP 0」，否则 story 会判「缺本集包」反过来加载 production（死循环）。
+- **阶段 C 首次建卡同此分工**：production 主持（清单/总览卡/入库清单/台账），生成与自检委托 story（STEP 3 / 3.5 / 4 / 4.5）；委托时必须声明「阶段 C 资产建卡 + 跳过门 0 / E-STEP 0」，否则 story 会判「缺本集包」反过来加载 production（死循环）。**批准门按卡拦**：角色卡在 STEP 3 锁定后按人落账（`canvas_approve(target='assets', nodeIds=[三视图, 单视图])`），否则下一张角色卡会被 deny；**G-A 批准后由执行方（story）再对全部卡片调一次 `canvas_approve(target='assets')` 收口**——委托模式生成与批准留痕都归执行方，production 不代调。
 
 ### 2.2 建包 → 镜头表 → 分镜 → 方案卡（G-P，1 张/集）
 
@@ -70,6 +71,15 @@ canvas_set_state(aspectRatio="9:16", duration="90 秒（默认；按包 ① 80�
 方案卡选项：**批准开渲（推荐）** / 改包某节 / 改镜头表或分镜 / 只渲 1 镜试片 / 回改剧本。
 **不要**在方案卡之外再弹 story 的门 1 / 门 2 / 分镜批准 / 渲染参数卡。
 
+批准后由执行方（story）立刻落批准账本：
+
+```text
+canvas_approve(target='shotTable', nodeId=<镜头表节点>)     # 表顶须已有 shot-table self-check: passed 戳
+canvas_approve(target='storyboard', nodeId=<分镜节点>)
+```
+
+未落账时 `Sxx` 视频生成会被插件直接 deny；改表 / 改分镜后批准失效，需重新确认再落账。
+
 ### 2.3 逐镜 → 片段卡（门 3，1 张/集）
 
 ```text
@@ -80,6 +90,7 @@ canvas_set_state(aspectRatio="9:16", duration="90 秒（默认；按包 ① 80�
 
 - 续接 / 转场镜（i2v 双端锚定）按 story STEP 7 执行；跨场景每个边界 1 个转场镜。
 - 片段卡逐条列：镜号 → 节点 id → 时长 → 自检结论（含抽帧核对项）→ 人工听核要点。
+- **片段卡批准后由执行方调用 `canvas_approve(target='clips', nodeIds=[全部正片 + 转场镜节点])`**（这些节点须已 `canvas_record_check(pass)`）；重渲的镜需重新确认再落账，否则 `video_concat` 会被 deny。
 
 ### 2.4 拼接 + 终检 → 交付卡（G-E，1 张/集）
 

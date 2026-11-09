@@ -78,7 +78,7 @@ series-writer 剧本（文件）
 | 图片档位 | `balanced` | 卡片是全程复用的锚点；≈6s/张；需要更高细节时再选 `quality`（≈45s/张） |
 | 角色卡引用版本 | `single`（竖屏默认） | `three` 在 9:16 下**未实测**；要试就只在样片集试，别整季混用 |
 | 片段审查节奏 | `batch` | 量产默认全部渲完一次确认；口型/一致性不过关仍**当场**弹单镜处置卡 |
-| 声线方案 | **`existing`**（阶段 C 一次性建立） | 有对白角色在阶段 C 做一次试镜 / 复用 `voice:`，全季复用；`text-only` 仅作降级，交付清单必须记「跨集音色无保证」。无 state 字段，写进系列圣经与集制作包 ⑥ |
+| 声线方案 | **`existing`**（阶段 C 一次性建立） | 有对白角色在阶段 C 做一次试镜 / 复用 `voice:`，全季复用；`text-only` 仅作降级，交付清单必须记「跨集音色无保证」。写进 `state.voicePlan`（画布配置卡）与系列圣经 / 集制作包 ⑥ |
 | 每集场景数 | **1–2 个物理场景** | 上游「每集 3–5 场」必须压缩：同一物理场景的多次换景算 1 场；**跨场景每个边界要 1 个转场镜**（占 1 镜预算） |
 | 交付画质 | **先原生，样片后定** | 原生 768×1344；要 1080×1920 只能**逐镜超分**（9:16 不支持生成内放大），+≈78 min/集；要 **2K 纹理/小字**可走**逐镜重生成**（`regen2k`，9:16 交付 **1440×2560**，+≈150 min/集，**会重画内容**、要求每镜 ≥124 帧 24fps）；**48fps 只能逐镜补帧**（成片不补），+≈3 min/集，见 §9 |
 | 视觉风格 | `cinematic-live-action` | 真人写实最适合国内竖屏短剧；由用户最终确认（7 选 1，见 story skill） |
@@ -86,15 +86,22 @@ series-writer 剧本（文件）
 **开场必须用 `canvas_set_state` 一次写全**（主会话与每集会话各写一次；下面是**示例**，实际值按 S-STEP 0 结果填）：
 
 ```
+flow=series
 aspectRatio=9:16
 duration=90 秒（默认；按包 ① 目标 80–110s 调整）
 audioMode=dialogue-led
 mode=balanced
+imageTier=balanced
+delivery=native          # native / upscale1080 / upscale2k / upscale4k / regen2k / fps48
 characterCardVariant=single
+voicePlan=existing       # existing（阶段 C 建）/ audition / text-only（降级）
+subtitles=none
+language=zh
+style=cinematic-live-action
+bgmMode=none             # none / in-model
 reviewMode=batch
-shotGate=verdict        # 逐镜自检门：默认开启；off=关闭，frames=只要求抽帧
+shotGate=verdict         # 逐镜自检门：默认开启；off=关闭，frames=只要求抽帧
 groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）]
-# 声线方案无 state 字段：existing（阶段 C 建）/ text-only（降级），写进系列圣经与集制作包 ⑥
 ```
 
 **切换成本**：改画幅 / 改档位 / 改字幕开关 = 已产集作废、需重渲；改风格 = 全部卡片与片段作废。逐项都要显式确认，不许静默改。
@@ -138,7 +145,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 **规格卡还要写**：预计单集成本、整季成本、样片集是否先做。
 
-> **写入位置**：系列圣经 §1 + `production-state.series` + 主会话 `canvas_set_state`（只有 state 字段的项）；`imageTier` / `subtitles` / `delivery` / `voicePlan` / `style` 无 state 字段，必须写圣经与本卡。E-STEP 0 只读校验，不再问。
+> **写入位置**：系列圣经 §1 + `production-state.series` + 主会话 `canvas_set_state`（**全部参数都有 state 字段**：flow / 画幅 / 时长 / 音频 / 视频档位 / 图片档位 / 交付 / 角色卡版本 / 声线 / 字幕 / 语言 / 风格 / BGM / 审查 / 自检 / 分组）。圣经与本集规格卡仍记录一份给人看，但生成以画布「项目配置」卡为准。E-STEP 0 只读校验，不再问。
 
 ### 1.1 覆盖 / 沿用表（与上下游冲突时以本表为准）
 
@@ -288,7 +295,7 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 **在哪做**：**EP01 会话（首个集会话）**——该会话已声明 story 的十个分组，卡片与 `voice auditions` 都有落点。主会话只保留圣经 / 目录 / 台账，**不建卡**（否则节点会掉进未声明分组）。
 
-> **分工（必须照做）**：本阶段 = **本 skill 主持 + 委托 `story-short-generator` 执行生成与 AI 自检**（STEP 3 角色卡 / 3.5 声线 / 4 场景卡 / 4.5 道具卡；人工锁卡并入 G-A 一张卡）。本 skill 只负责：资产清单、资产总览卡、入库清单、`asset_ingest`、台账。**本 skill 全程不调用任何图片 / 视频生成工具。**
+> **分工（必须照做）**：本阶段 = **本 skill 主持 + 委托 `story-short-generator` 执行生成与 AI 自检**（STEP 3 角色卡 / 3.5 声线 / 4 场景卡 / 4.5 道具卡；人工锁卡并入 G-A 总览卡 + 入库）。**注意批准门按卡拦**：每张新角色卡在生成下一张前必须已 `canvas_approve(target='assets')`（同角色重出除外），所以角色锁定确认按卡收、按卡落账，G-A 总览卡再做全量收口（见 §6.4）。本 skill 只负责：资产清单、资产总览卡、入库清单、`asset_ingest`、台账。**本 skill 全程不调用任何图片 / 视频生成工具。**
 >
 > 委托时**必须**声明两句，否则会死循环：①「本会话为**阶段 C 资产建卡**」；②「**跳过门 0 与 E-STEP 0**，不建本集镜头表、不弹规格卡」。原因：此时 EP01 的 `package.md` 还没建，story 的入口探测会判「有圣经缺本集包」→ 反过来加载本 skill 补包 ⇒ `PROD → SSG → PROD` 循环。
 
@@ -325,6 +332,8 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 批准后把资产 id 与 `voice:` 写进 `production-state.json` 的 `assets`（含 `voices[]`），并在主会话 `series bible` 组写一张资产台账表（角色/状态/场景/道具/声线 → 资产 id → 适用集范围）。**未批准的条目不得入库**；`asset_ingest` 默认拒绝覆盖同名。
 
+**G-A 批准同时落批准账本**：由执行方（`story-short-generator`，委托建卡的会话里它负责生成与 AI 自检）调用 `canvas_approve(target='assets')`。**委托模式下生成由 story skill 执行，批准留痕也由执行方调用**——production 只主持清单 / 总览卡 / 入库 / 台账，不代调。角色卡在 STEP 3 已按人落过账的，这里再全量收口一次即可；**未落账的卡会拦住后续镜头表与片段生成**（若 G-A 只批准选中项，未批准卡要么补批准、要么本集不引用）。
+
 ---
 
 ## 7. 阶段 D：样片集（EP01，门 G-SAMPLE）
@@ -350,11 +359,11 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 
 1. **读状态**：`series/production-state.json` → 当前集 / stage / doneShots / 资产台账（含 `voices[]`）。
 2. **读输入**：`episodes/epNNN.md` + 分集目录该行 + `series/bible.md` 相关段（不要全读，按需）。
-3. **写画布设置**：`canvas_set_state` 一次写全（§1 代码块：`9:16` / 目标时长（80–110s，默认 90 秒）/ `dialogue-led` / `balanced` / `single` / `batch` / `verdict`（自检门）/ 十个分组）。**这是 `reviewMode`、`shotGate`、`groupOrder` 与「图片尺寸基准」的唯一写入点**——**必须先写 state 再物化/建卡**：画布的 `aspectRatio` 决定图片档位的宽高，缺省是 16:9，9:16 项目若先建卡再写 state，角色卡/场景卡会按横版生成（L1 实测踩过）；story 进入后只读、校验、缺值告警，不重写。**漏了这一步 = story 读不到 `reviewMode`：每集从 3 张卡变成「1 张方案 + 18 张片段 + 1 张交付」（≈20 张）。**
+3. **写画布设置**：`canvas_set_state` 一次写全（§1 代码块：`flow=series` / `9:16` / 目标时长（80–110s，默认 90 秒）/ `dialogue-led` / `balanced` / 图片档位 / 交付画质 / `single` / 声线方案 / 字幕 / 语言 / 风格 / BGM / `batch` / `verdict`（自检门）/ 十个分组）。**这是 `reviewMode`、`shotGate`、`groupOrder` 与「图片尺寸基准」的唯一写入点**——**必须先写 state 再物化/建卡**：画布的 `aspectRatio` 决定图片档位的宽高，缺省是 16:9，9:16 项目若先建卡再写 state，角色卡/场景卡会按横版生成（L1 实测踩过）；story 进入后只读、校验、缺值告警，不重写。**漏了这一步 = story 读不到 `reviewMode`：每集从 3 张卡变成「1 张方案 + 18 张片段 + 1 张交付」（≈20 张）。**
 4. **物化资产**：只从台账/集制作包的 **asset id** 物化——`asset_list` 校验 → `asset_to_canvas(id=…)` 把本集用到的角色/状态/场景/道具/声线取回画布（复用也要可见）。**不要用上一集的 node id**；`asset_to_canvas` 会在节点写 `params.assetId`，可据此校验来源。
 5. **写本集规格卡**：`canvas_write_node(kind="text", group="story planning", title="EP00X 本集规格", content=…)`，只读展示 `9:16 / 目标时长 / dialogue-led / 视频档位 / 图片档位 / 单视图 / batch / 字幕 none / 交付画质（native/upscale…）/ 风格 / 声线方案 / assetMode`，并附**当前节点数（动态，主线/总）**。**它不是新参数来源**：参数来源是系列圣经 §1 + 集制作包 ⑥；节点数只是画布状态。
 6. **建集制作包**：按 §10 生成 `package.md`，同时写该集画布文本节点（group `story planning`）。量产集 `params.assetMode=library`；EP01/试产才用 `draft`。
-7. **委托生产**：加载 `story-short-generator`，按 §8.2 从 STEP 3 起执行，并声明**每集 3 张卡的合并规则**（方案 / 片段 / 交付）。
+7. **委托生产**：加载 `story-short-generator`，按 §8.2 从 STEP 3 起执行，并声明**每集 3 张卡的合并规则**（方案 / 片段 / 交付）；**3 张卡批准后由执行方（story）调用 `canvas_approve` 落账**（方案 → `shotTable` + `storyboard`，片段 → `clips`），未落账的生成与拼接会被插件 deny。
 8. 若 `stage` 已是 `clips` 且有 `doneShots`：**断点续跑**——`canvas_list_nodes` 找回已渲片段，从第一个缺的镜继续（不要重渲已完成的镜）。
 
 ### 8.2 委托时的覆盖规则（组合税，必须照做）
@@ -362,11 +371,11 @@ groupOrder=[主会话] 或 [story skill 的十个分组（含 voice auditions）
 | 处 | 做什么 | 不许做什么 |
 |---|---|---|
 | STEP 0 | 读 ⑥ 预填表落地；state 已由 §8.1 第 4 步一次写全，这里只校验 | **不许再向用户逐项问十三项**；不许第二次写 state 覆盖 §8.1 |
-| STEP 1/2 | 跳过（简报/大纲已被系列圣经与集制作包覆盖）；只在 `story planning` 写一页「本集简报」，**必须承载交付画质 / 风格 / 图片档位 / 字幕 / 声线方案五个无 state 字段的配置** | 不许重写整片 8 拍弧 |
+| STEP 1/2 | 跳过（简报/大纲已被系列圣经与集制作包覆盖）；只在 `story planning` 写一页「本集简报」，**承载交付画质 / 风格 / 图片档位 / 字幕 / 声线方案等配置的人读副本；生成以画布配置卡为准** | 不许重写整片 8 拍弧 |
 | STEP 3/3.5/4/4.5 | 先 `asset_list` / `asset_to_canvas`；**缺卡才新建**，且按本片型形态（角色双版、场景单视图、道具单视图）。**STEP 3.5 不重跑试镜**：从台账 `voices[]` 取 `voice:<id>`，缺 id 才算缺口 | 不许绕过资产台账另建一套；不许每集重抽声线 |
 | STEP 5 | 用 8 列镜头意图生成七列镜头表；`续接` 按实际场景边界重定；台词逐字；**第 8 列的 `beatId` 逐镜回填到 `镜头描述` 首行 `剧本依据: B0x`**（B0x = 包 §2.1 beat 清单的编号，**不许自创序号**） | 不许改台词、不许改事件；不许丢掉 beat 回指 |
-| 门 1 / 门 2 / 分镜模式 / 分镜批准 / 渲染参数 | **合并为「方案卡（G-P）」**：包 ①③⑤⑥ + 镜头表 + 分镜 + 渲染参数 + 成本估计，一张卡批准 | **STEP 5.5 十四项自检照跑**（第 12 项核对剧本覆盖：**包 §2.1 的 beatId 集合 ↔ 镜表首行，每个 beat 至少被 1 镜引用**；第 13 项对白容量，第 14 项资产—设定一致性）；不许把门 1/2 再单独弹给用户 |
-| STEP 5.5–8 | **规则照执行**（十四项自检、门 3 AI 自检、续接链、失败梯度、拼接、终检）；人工门按 **3 张卡**（方案 / 片段 / 交付） | **硬约束不可覆盖**——这些是实测资产；不许把 3 张卡拆回逐门确认 |
+| 门 1 / 门 2 / 分镜模式 / 分镜批准 / 渲染参数 | **合并为「方案卡（G-P）」**：包 ①③⑤⑥ + 镜头表 + 分镜 + 渲染参数 + 成本估计，一张卡批准；**批准后由执行方落账** `canvas_approve(target='shotTable', nodeId=<表节点>)` + `canvas_approve(target='storyboard', nodeId=<分镜节点>)` | **STEP 5.5 十四项自检照跑**（第 12 项核对剧本覆盖：**包 §2.1 的 beatId 集合 ↔ 镜表首行，每个 beat 至少被 1 镜引用**；第 13 项对白容量，第 14 项资产—设定一致性）；不许把门 1/2 再单独弹给用户 |
+| STEP 5.5–8 | **规则照执行**（十四项自检、门 3 AI 自检、续接链、失败梯度、拼接、终检）；人工门按 **3 张卡**（方案 / 片段 / 交付）；**片段卡批准后由执行方 `canvas_approve(target='clips', nodeIds=[全部正片 + 转场镜节点])`**，未落账不能 `video_concat` | **硬约束不可覆盖**——这些是实测资产；不许把 3 张卡拆回逐门确认 |
 
 ### 8.3 本集执行顺序（只留指针）
 

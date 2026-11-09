@@ -5,6 +5,16 @@
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
 
+### 未发布 — 创作批准门（approval gate）· 审计补卡片检查
+
+> **修复**：角色卡锁定、场景卡锁定、镜头表批准、分镜批准、门 3 片段批准此前只是 SKILL.md 里的文字纪律，agent 跳过完全合法（实测会话 `ff621764`：6 张角色卡前后 0 次 ask，`audit:session` 仍 7/7）。本版把「用户已人工批准」落成 `project.approvals`，并在推进下一步前做代码硬校验。
+
+- **新工具 `canvas_approve(target=assets|shotTable|storyboard|clips, nodeIds?, nodeId?, note?)`**：把用户的锁定/批准落账。`shotTable` 要求表顶已有 `shot-table self-check: passed` 戳；`clips` 要求片段已 `canvas_record_check(pass)`。
+- **创作批准门（`tools/pre-execute`，story/series）**：出新角色卡前其他角色卡必须已批；出场景/道具卡前角色卡必须已批；写七列镜头表前资产卡必须全批；Sxx 视频前资产/镜头表/分镜必须已批；`video_concat` 前所有输入镜头必须在 `approvals.clips`。**没有连续 deny 降级**；逃生阀 `DSH_SVS_APPROVAL_GATE=off`。
+- **失效规则**：批准绑定 `settings.breakingRev` 与内容哈希；重出卡 / 改表 / 改分镜 / 重渲片段会失效对应批准，破坏性配置变更清空全部批准。
+- **`canvas_get_state` 返回 `approvals` 摘要**；门组新增 `approval`，并删掉声明了但从未实现的 `deliver` 死字段。
+- **`audit:session` 修复**：单片模式不再 SKIP A1/A2，改为检查角色卡/场景卡确认、镜头表+分镜 ask 在首个 Sxx 视频之前；`--session` 同时识别裸 id 与 `session-` 前缀，显式 sid 找不到时 exit 2（不再静默审计最新会话）；新增 `scripts/smoke-audit-session.mjs`。
+
 ### v1.18.0 — 会话归档搬迁画布目录 · Open-H3 重生成 Sol-Attn 变体（2026-11-09）
 
 > **本版重点：归档会话时画布不再原地积压**——配置 `archiveRoot` 后，DSH 里归档会话会把该会话的 `<工作区>/canvas/<sessionId>`（`project.json` + 全部图片/视频/音频）整体搬到归档路径（本地盘 / 外置盘 / NAS），取消归档再搬回；**不配置则与旧版本完全一致**。

@@ -568,7 +568,13 @@ Skill 会**先用选项卡问清规格**，然后才动第一张图。每一项�
 | 10 | **片段审查节奏** | `per-shot` 逐镜审查（**默认推荐**）/ `batch` 批量审查 | 只改**人工确认的时机**，不改 AI 自检次数 |
 | 11 | **逐镜自检门** | 开启（`verdict`，**默认推荐**）/ 只要求抽帧（`frames`）/ 关闭（`off`） | 是否强制每镜自检留痕；关闭 = 不做逐镜 AI 自检（人工确认照旧）。走 state 字段 `shotGate` |
 
-确认后 Agent 会把**画布比例 / 总时长 / 音频模式 / 视频档位（state 里的 `mode`）/ 角色卡引用版本（`characterCardVariant`）/ 片段审查节奏（`reviewMode`）/ 逐镜自检门（`shotGate`，默认开启）/ 分组顺序（`groupOrder`）**写进画布设置，并把「视觉风格 / 字幕 / 图片档位 / 交付画质」记进项目简报（这四项没有对应的 state 字段）。
+确认后 Agent 会把**片型 `flow` / 画布比例 / 总时长 / 音频模式 / 视频档位（`mode`）/ 图片档位（`imageTier`）/ 交付画质（`delivery`）/ 角色卡引用版本（`characterCardVariant`）/ 声线方案（`voicePlan`）/ 字幕（`subtitles`）/ 语言（`language`）/ 视觉风格（`style`）/ BGM（`bgmMode`）/ 片段审查节奏（`reviewMode`）/ 逐镜自检门（`shotGate`）/ 分组顺序（`groupOrder`）**一次写进画布设置，插件自动在画布顶部生成**「项目配置（STEP 0）」卡**。卡上的参数就是之后每次生成的真相源：
+
+- 画布顶栏「⚙ 配置」可直接改（下拉/输入），保存时会提示哪些已有产物会受影响；
+- 每次生成前有**配置门**：未建卡时首次生成会被拒一次（先让 Agent 建卡）、显式宽高与画幅不一致、`fast` 档用三视图、配置=单视图却引用三视图都会被拒绝；
+- 改「画幅 / 风格 / 角色卡版本 / 字幕 / 音频」等破坏性参数后，旧卡片/镜头表/片段需要重建（插件会在保存时提示，最终一致性仍由流程检查）。
+
+项目简报里仍会写一份参数记录给人看，但**生成以配置卡为准**。
 
 **中途改主意怎么办**：
 
@@ -577,6 +583,7 @@ Skill 会**先用选项卡问清规格**，然后才动第一张图。每一项�
 - 「交付画质加超分」→ 随时可加：对**单个分镜**放大后再重跑拼接（第 9 章）。
 - 「加上 48fps」→ 对**单个分镜**补帧后再重跑拼接（`video_interpolate`）；**整片必须同一帧率**（混帧率拼接会被 `video_concat` 直接拒绝），成片不补（硬切处会出鬼影）。
 - 「关掉逐镜自检门」→ `canvas_set_state(shotGate='off')`；只想放松到「看过就行」用 `frames`。默认 `verdict`（每镜必须记录 pass）。
+- 「改画幅 / 档位 / 字幕 / 风格」→ 画布「⚙ 配置」里改，或让 Agent `canvas_set_state(…)`；保存后会提示受影响产物，破坏性改动需要重建对应卡片 / 镜头表 / 片段。
 - 「加字幕 / 关字幕」→ 改项目简报 + 重写受影响镜的提示词库 + **重渲**（字幕是画面内生成物，不能后期补 / 裁；已渲片段不自动重做）。
 
 ### 5.3 七套视觉风格
@@ -648,6 +655,13 @@ Skill 会**先用选项卡问清规格**，然后才动第一张图。每一项�
 **渲完每一镜，AI 立即自检（不许推迟；`shotGate` 开启时，默认开启）**，六项：与计划一致（抽首 / 中 / 末帧，动作密集镜按 1.5–2s 加抽）、人物一致性（对照角色卡逐项核对）、**口型与字幕**（只有说话人动嘴；开场选「要字幕」时字幕与镜头表 `字幕` 字段逐字一致、无整段缺失，选「不要字幕」时改为核对画面里**没有任何字幕**）、无污染（无分镜痕迹 / 无水印文字 / 无角色副本；fast 档须留 G-ref 已过的痕迹）、音频（**AI 不能听音**，由你在确认卡里听核）、风格一致。
 
 **自检结论必须落画布（插件代码硬门，不是纪律）**：每镜自检完必须 `extract_frame` 抽帧核对，然后 `canvas_record_check(nodeId=<本镜片段>, verdict="pass"|"fail", frames=[抽出的帧], checks={plan,character,lipsync,subtitle,contamination,audio,style}, notes=…)` 记一笔。**`checks` 把六项落成结构化结论**（`pass` / `fail` / `na`；`audio` 由你听核时写 `na`，`silent` 镜的 `lipsync`/`subtitle` 也可 `na`）；`verdict="pass"` 时任何一项 `fail` 都会被工具拒绝。**没 `pass` 的镜头，插件会在生成下一镜前直接拒绝**（拼接 / 超分是后处理，不受此门约束）；画布卡片会显示「⏳ 待自检 / ✅ 自检通过 / ❌ 自检未过」（未过时附带失败项，如 `❌ 自检未过（subtitle/lipsync）`）。重渲同一节点（复用它的 `nodeId`）不受限——重渲会把状态重置为「待自检」。门控强度用 `canvas_set_state(shotGate='verdict'|'frames'|'off')`：`verdict` 默认（必须 pass）、`frames`（只要求抽过帧，不强制结论）、`off`（关闭）。**自检门只管 AI 自检留痕，不替代你的人工确认**（确认时机仍由 `reviewMode` 决定）。
+
+**创作批准必须落账（插件代码硬门，story / series）**：用户在角色卡锁定、场景/道具卡锁定、镜头表批准、分镜批准、片段批准上的选择，必须由 AI 在**当场**调用 `canvas_approve(target=…)` 写进批准账本，否则下一步会被插件直接拒绝：
+- `assets`：角色卡/场景卡/道具卡锁定（每张/每组一次；场景/道具卡必须在角色卡锁定之后才能生成）
+- `shotTable`：七列镜头表批准（表顶必须已有 `shot-table self-check: passed` 戳）
+- `storyboard`：分镜批准
+- `clips`：门 3 片段批准（per-shot 每镜一次 / batch 批量一次；片段必须已 `canvas_record_check(pass)`）
+未落账时：出新卡、写七列镜头表、生成 Sxx 视频、`video_concat` 都会被拒绝。批准绑定配置版本与内容哈希——**重出卡 / 改表 / 改分镜 / 重渲片段会让对应批准失效**，破坏性配置变更（画幅/风格/角色卡版本等）清空全部批准。逃生阀：`DSH_SVS_APPROVAL_GATE=off`。`canvas_get_state()` 可读回 `approvals` 摘要，确认哪一步还缺批准。
 
 **人工确认时机由 `reviewMode` 决定**：
 
@@ -1274,7 +1288,7 @@ whenToUse: 适用于……不适用于……
 | `canvas_write_node` | `kind`（text\|table）、`title`、`content` | 写文本 / 表格（同时导出 PDF / HTML 供飞书送达） |
 | `canvas_write_prompt_bank` / `canvas_get_prompt` | `prompts{fast,balanced,quality}` / `nodeId`+`tier` | 提示词库：每镜三段落画布；当前策略三段同文 |
 | `canvas_group_nodes` / `canvas_reorder` | `nodeIds[]`、`group` | 归组 / 排序 |
-| `canvas_get_state` / `canvas_set_state` | `aspectRatio` / `duration` / `audioMode` / `mode` / `reviewMode` / `groupOrder` | 读写项目设置 |
+| `canvas_get_state` / `canvas_set_state` | `flow` / `aspectRatio` / `duration` / `audioMode` / `mode` / `imageTier` / `delivery` / `characterCardVariant` / `voicePlan` / `subtitles` / `language` / `style` / `bgmMode` / `reviewMode` / `shotGate` / `groupOrder` | 读写项目设置；写入会同步「项目配置」卡（rev +1） |
 | `asset_list` | `type`、`query` | 查资产库 |
 | `asset_to_canvas` | `id`、`title` / `group` / `nodeId` | 物化回画布 |
 | `asset_ingest` | `approvalNodeId`、`items[]`（nodeId/srcPath/type/name/state/character/cardVariant/source）、`allowOverwrite` | 系列模式下，用户批准清单后由 AI 入库；默认不覆盖同名 |
@@ -1285,6 +1299,9 @@ whenToUse: 适用于……不适用于……
 
 | 报错 | 含义 |
 |---|---|
+| `配置门未通过：本项目还没有配置卡…` | 先 `canvas_set_state(flow=…, …)` 建卡（或画布「⚙ 配置」）再生成 |
+| `配置门未通过：画幅比例不一致…` | 去掉显式 `width/height`，让工具按画布 `aspectRatio` 推导 |
+| `配置门未通过：fast 档只能引用单视图角色卡…` | 把 `ref_variant` 设为 `single`，或改用同角色单视图卡 |
 | `缺少或非法的 type：…` | 视频工具必须显式声明 `type=r2v` 或 `i2v` |
 | `type=r2v（参考绑定）不接受 first_frame_node。…` | r2v 没有首帧槽位；要首帧锚定请改 `type=i2v` |
 | `type=i2v（首帧/末帧串联）必须传 first_frame_node：…` | i2v 缺首帧 |

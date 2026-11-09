@@ -28,7 +28,7 @@
 
 - 选「连续短剧」但系列 skill 未安装、且用户同意 → 降级为单片，并在简报里注明「无系列上下文」。
 - **不重复问**：进入委托模式后，生产规格与分镜模式由集制作包 ⑥ 预填（13 项），不再逐项追问，只补问包里缺的项；与 `short-drama-series-production` 冲突时以它为准。
-- **委托模式的门合并**：每集人工确认由 production 合并为 **3 张卡**（方案卡 = 集制作包 + 镜头表 + 分镜 + 渲染参数；片段卡 = 门 3 batch；交付卡 = 终检 + 交付）。本 skill 的**门 1 / 门 2 / 分镜模式 / 分镜批准 / 渲染参数卡不再单独弹**，但 **STEP 5.5 十四项自检与门 3 的 AI 逐镜自检照做**——省的是人工确认次数，不是自检。遇到 G-ref / 同镜 3 次失败 / 口型字幕不过 / 意图冲突，仍按本 skill 的异常门当场打断。**集制作包 8 列镜头意图的第 8 列「集内节拍」必须逐镜回填到镜头表 `镜头描述` 首行 `剧本依据: B0x`**（第 12 项据此核对剧本覆盖）。
+- **委托模式的门合并**：每集人工确认由 production 合并为 **3 张卡**（方案卡 = 集制作包 + 镜头表 + 分镜 + 渲染参数；片段卡 = 门 3 batch；交付卡 = 终检 + 交付）。本 skill 的**门 1 / 门 2 / 分镜模式 / 分镜批准 / 渲染参数卡不再单独弹**，但 **STEP 5.5 十四项自检与门 3 的 AI 逐镜自检照做**——省的是人工确认次数，不是自检。遇到 G-ref / 同镜 3 次失败 / 口型字幕不过 / 意图冲突，仍按本 skill 的异常门当场打断。**批准仍要落账（由执行方调用）**：G-A 资产批准后 `canvas_approve(target='assets')`（角色卡在 STEP 3 锁定后先按人落账——`canvas_approve(target='assets', nodeIds=[三视图, 单视图])`，否则下一张角色卡会被 deny；G-A 再全量收口）；方案卡（G-P）批准后 `canvas_approve(target='shotTable', nodeId=<镜头表节点>)` + `canvas_approve(target='storyboard', nodeId=<分镜节点>)`；片段卡（门 3）批准后 `canvas_approve(target='clips', nodeIds=[全部正片 + 转场镜节点])`。**没落账的批准，插件在生成 / 拼接时会直接 deny**。集制作包 8 列镜头意图的第 8 列「集内节拍」必须逐镜回填到镜头表 `镜头描述` 首行 `剧本依据: B0x`（第 12 项据此核对剧本覆盖）。
 - **委托模式的资产/交付边界**：资产**物化、入库、台账**由 production 负责；本 skill 只校验物化节点 `params.assetId`，缺卡时生成后**交回 production 入库**，不自己写资产库。交付包 / 系列台账 / 成本由 production 汇总；本 skill 只写**本集终检结论与片段清单**，委托模式下**不弹交付卡、不写系列交付包**。
 - **委托模式的 handback**：每集收尾向 production 交回 `finalNodeId` / `clipNodeIds` / `shots` / `rework` / `costMinutes` / `warnings` / `assetNodeIds`（本集新生成的卡）；production 写 `production-state.json` 与 ledger。
 - **剧本冲突**：台词/事件与剧本不一致、或镜头装不下时，**停线退回 production/writer**；本 skill 只拆镜/改时长/改表演，**不许自行改写台词或事件**。
@@ -40,18 +40,19 @@
 
 | 参数 | 来源 | 预检动作 |
 |---|---|---|
+| 片型 flow `series` | 系列圣经 §1 + `canvas_set_state.flow` | 读回校验；缺/不一致 → 停线 |
 | 画幅 `9:16` | 系列圣经 §1 + `canvas_set_state.aspectRatio` | 读回校验；缺/不一致 → 停线 |
 | 目标时长（80–110s，默认 90s） | 圣经 + 集制作包 ① / `state.duration` | 校验；例外必须已写 `episodeSecondsException` |
 | 音频 `dialogue-led` | 圣经 + `canvas_set_state.audioMode` | 读回校验 |
 | 视频档位 `balanced` | 圣经 + `canvas_set_state.mode` | 读回校验 |
-| 图片档位 `balanced` | 圣经 + 集制作包 ⑥ | 校验（无 state 字段） |
+| 图片档位 `balanced` | 圣经 + 集制作包 ⑥ / `state.imageTier` | 读回校验 |
 | 角色卡版本 `single` | 圣经 + `canvas_set_state.characterCardVariant` | 读回校验 |
 | 审查节奏 `batch` | 圣经 + `canvas_set_state.reviewMode` | 读回校验 |
 | 逐镜自检门 `verdict`（默认开启） | 圣经 + `canvas_set_state.shotGate` | 读回校验；缺省按 `verdict` |
-| 字幕 `none` | 圣经 + 集制作包 ⑥ | 校验（无 state 字段） |
-| 交付画质 `delivery` | 圣经 + 集制作包 ⑥（native / upscale1080 / upscale2k / upscale4k / **regen2k**） | 校验；整季同一路线（`regen2k` = 逐镜重生成 1440×2560，会重画内容；本集镜头表每镜须 ≥124 帧 24fps） |
-| 风格 / 声线方案 / assetMode | 圣经 + ⑥ | 校验 |
-| BGM 模式 `bgmMode` | 圣经 + ⑥（none / in-model） | 校验；`in-model` 要求镜头表 `BGM` 子字段逐镜写清 |
+| 字幕 `none` | 圣经 + 集制作包 ⑥ / `state.subtitles` | 读回校验 |
+| 交付画质 `delivery` | 圣经 + 集制作包 ⑥ / `state.delivery`（native / upscale1080 / upscale2k / upscale4k / **regen2k**） | 校验；整季同一路线（`regen2k` = 逐镜重生成 1440×2560，会重画内容；本集镜头表每镜须 ≥124 帧 24fps） |
+| 风格 / 声线方案 / assetMode | 圣经 + ⑥ / `state.style` / `state.voicePlan` | 读回校验 |
+| BGM 模式 `bgmMode` | 圣经 + ⑥ / `state.bgmMode`（none / in-model） | 读回校验；`in-model` 要求镜头表 `BGM` 子字段逐镜写清 |
 | 节点数（主线/总） | `canvas_list_nodes()` | **只展示、不是参数**；动态 |
 
 **流程**
@@ -69,7 +70,7 @@
 
 ## 委托模式的硬边界
 
-- **门**：production 出 3 张人工卡（方案 / 片段 / 交付）；SKILL 的 门 1 / 门 2 / 分镜模式 / 分镜批准 / 渲染参数卡不再单独弹，但 STEP 5.5 十四项自检与门 3 AI 逐镜自检照做。
+- **门**：production 出 3 张人工卡（方案 / 片段 / 交付）；SKILL 的 门 1 / 门 2 / 分镜模式 / 分镜批准 / 渲染参数卡不再单独弹，但 STEP 5.5 十四项自检与门 3 AI 逐镜自检照做。**3 张卡批准后由执行方（本 skill）调 `canvas_approve` 落账**：G-A `assets` / G-P `shotTable` + `storyboard` / 片段卡 `clips`；未落账的生成与 `video_concat` 会被插件 deny。
 - **资产**：物化/入库/台账归 production；SKILL 只校验物化节点 `params.assetId`，缺卡生成后交回 production 入库，不写资产库。
 - **交付**：交付包/系列台账/成本归 production；SKILL 只写本集终检与片段清单，不弹交付卡、不写系列交付包。
 - **handback**：`finalNodeId` / `clipNodeIds` / `shots` / `rework` / `costMinutes` / `warnings` / `assetNodeIds` / `changedShots` / `scriptVersion`。

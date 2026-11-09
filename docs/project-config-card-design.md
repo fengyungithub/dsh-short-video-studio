@@ -4,7 +4,7 @@
 >
 > 适用范围：单片（story-short-generator）、连续短剧（short-drama-series-production 的每一集），以及后续新增片型（品牌 / 电商等，通过 §10 的门组机制接入）。
 >
-> 状态：设计稿 v0.2，决策已定（§15），待实施。实施按 §14 分期。
+> 状态：**P0 已实施 + P1 部分落地**（2026-11-09：settings v2 / flow 推断 / applyProjectConfig / 配置卡 / 画布面板 / `POST /canvas/state` / R1·R2·R3·R12 / rev；另已接 `gateOn` 流程门、R6·R8·R9 漂移门、`configRev` 盖章）。剩余 P1（post-execute 简报告警、tierOverride 标记）与 P2 见 §14。
 
 ---
 
@@ -555,11 +555,17 @@ stale(node) = node.params.configRev != null
 
 | 期 | 内容 | 预估 |
 |---|---|---|
-| **P0（MVP）** | settings v2（含 `flow` 推断）+ `applyProjectConfig` + 配置卡 + 画布面板 + `POST /canvas/state` + R1/R2/R3/R12 + `rev` | 主要工作量 |
-| **P1** | 漂移门 R6–R9、`configRev` 盖章、post-execute 简报冲突告警、R5 tier override 标记、后处理 warning；现有流程门加 `gateOn` 过滤 + §10.6 矩阵 | 中等 |
+| **P0（MVP）** ✅ | settings v2（含 `flow` 推断）+ `applyProjectConfig` + 配置卡 + 画布面板 + `POST /canvas/state` + R1/R2/R3/R12 + `rev`；冒烟 `smoke-config-card/gate/profile` + `preview-config-panel` | 已完成 |
+| **P1** | 漂移门 R6/R8/R9 ✅、`configRev` 盖章 ✅、`gateOn` 流程门过滤 ✅；post-execute 简报冲突告警、R5 tier override 标记、R7 提示词库漂移 | 部分完成 |
 | **P2** | 系列锁定/继承/一致性门、电商/品牌 profile 与专属门、独立 `kind: config`（若需要）、配置历史与回滚、影响预览精确化、`canvas_get_state` 自愈 | 按需 |
 
 **P0 不做**：独立节点 kind、配置历史、系列层改动成本联动、brief → settings 自动回填、新片型专属门。
+
+**P0 实施备注（2026-11-09）**
+
+- 已落地：`normalizeSettings` / `flow` 推断、`applyProjectConfig`、配置卡（文本节点 + PDF 导出）、画布「⚙ 配置」面板、`POST /canvas/state`（`expectedRev` 409）、配置门 R1/R2/R3/R12、R6/R8/R9 漂移门、`runRender` 缺省值注入、产物与镜头表/提示词库 `configRev` 盖章、`GATE_PROFILES` + `gateOn`（plan / shot / production 按 flow 启停）、配置卡写/删保护、HTTP `/generate/*` 同规则兜底。
+- 已知 P1 缺口：post-execute 简报冲突告警、`tierOverride` 标记、R7（提示词库漂移）与系列锁定/继承。
+- 测试：`smoke-config-card` / `smoke-config-gate` / `smoke-config-profile` / `preview-config-panel`（均已挂 `npm run smoke`）。
 
 ---
 
@@ -588,5 +594,5 @@ stale(node) = node.params.configRev != null
 | `studio/app.css` | 面板样式 |
 | `skills/story-short-generator/SKILL.md` | STEP 0 写 `flow='story'`；说明「配置卡可改」；改配置后的重建要求；读取 `rev` |
 | `skills/short-drama-series-production/*` | 委托模式写 `flow='series'`；继承与锁定说明；集制作包 ⑥ 与配置卡一致性 |
-| `scripts/` | 三个冒烟脚本（card / gate / profile）+ `package.json` 挂载 |
+| `scripts/` | 三个冒烟脚本（card / gate / profile）+ 配置面板真浏览器预览（`preview-config-panel`）+ `package.json` 挂载 |
 | `USER-MANUAL.md` / `README.md` | 配置卡与门的说明 |

@@ -2,6 +2,8 @@
 
 > 后续变更（2026-10-26）：**图片档位默认已从 `quality` 改为 `balanced`**（单片 + 连续短剧）。本文表格里的「quality 默认」是审计当时的状态，不是当前默认。
 
+> 后续变更（2026-11-09）：新增**创作批准门（approval gate）**。本文 §2.1 里 G-S17（角色卡锁定）/ G-S18（场景卡锁定）/ G-S19（道具卡锁定）/ G-S20（门 1 镜头表）/ G-S22（分镜批准）/ G-S24（门 3 片段批准）不再只是文字纪律：用户确认后由 `canvas_approve(target=assets|shotTable|storyboard|clips)` 落账，插件在「出新卡 → 写七列镜头表 → 生成 Sxx 视频 → video_concat」四道边界做 `tools/pre-execute` 硬校验。批准绑定 `settings.breakingRev` 与内容哈希，重出卡/改表/改分镜/重渲片段会失效；无连续 deny 降级，逃生阀 `DSH_SVS_APPROVAL_GATE=off`。实现见 `lib/index.js` 的 `makeApprovalGateListener`，回归见 `scripts/smoke-approval-gate.mjs`。本文其余门（简报/大纲/试镜/门 1 的创意选项等）仍是 skill 文字纪律。
+
 > 审计对象：`skills/story-short-generator/SKILL.md`（976 行，下称 **SSG**）、`skills/short-drama-series-production/SKILL.md`（355 行，下称 **PROD**）、`skills/short-drama-series-writer/SKILL.md`（609 行，下称 **WRI**），必要时引用 `skills/short-drama-series-production/references/episode-package.md`（下称 **PACK**）与 `references/production-runbook.md`（下称 **RUN**）。
 >
 > 约定：本文所有证据写成 `文件:行号`，行号即当前工作树版本；`SSG:213` 读作 `skills/story-short-generator/SKILL.md` 第 213 行。

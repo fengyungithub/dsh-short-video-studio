@@ -41,6 +41,7 @@ import { markdownToHtml } from './markdown.js'
   const el = {
     canvas: document.getElementById('canvas'),
     meta: document.getElementById('meta'),
+    config: document.getElementById('config'),
     refresh: document.getElementById('refresh'),
     locate: document.getElementById('locate'),
     jump: document.getElementById('jump'),
@@ -49,6 +50,9 @@ import { markdownToHtml } from './markdown.js'
     addUpload: document.getElementById('add-upload'),
     addAssets: document.getElementById('add-assets'),
   }
+
+  // 当前项目快照（配置面板 / 影响预览用）
+  let currentProject = null
 
   // 最新主线节点 id（渲染时记录，供空白点击 / 顶部按钮 / 跟随模式定位）
   let latestMainNodeId = null
@@ -250,6 +254,173 @@ import { markdownToHtml } from './markdown.js'
     b.addEventListener('click', onClick)
     return b
   }
+
+  // ---- 项目配置（STEP 0）：画布「⚙ 配置」面板 ---------------------------------
+  // 真相源是项目 settings（服务端 applyProjectConfig）；面板只是它的编辑投影。
+  const CONFIG_FLOW_OPTIONS = [
+    ['story', 'story（单片故事）'],
+    ['series', 'series（连续短剧单集）'],
+    ['brand', 'brand（品牌宣传）'],
+    ['ecommerce', 'ecommerce（电商）'],
+    ['free', 'free（自由）'],
+  ]
+  const CONFIG_STYLE_OPTIONS = [
+    ['', '（未设）'],
+    ['cinematic-live-action', '电影真人写实'],
+    ['pixar-3d', '皮克斯感 3D'],
+    ['ghibli-2d', '吉卜力 2D'],
+    ['anime-cel', '日式二次元赛璐璐'],
+    ['ink-wash-oriental', '水墨东方古风'],
+    ['comic-halftone', '欧美漫画半调'],
+    ['guofeng-xianxia', '国风仙侠 3D'],
+  ]
+  const CONFIG_FIELD_DEFS = [
+    { key: 'flow', label: '片型 flow', type: 'select', options: CONFIG_FLOW_OPTIONS, note: '决定启用哪些流程门' },
+    { key: 'aspectRatio', label: '画幅', type: 'text', list: ['16:9', '9:16', '1:1', '4:3'] },
+    { key: 'duration', label: '总时长', type: 'text', list: ['30 秒', '60 秒', '90 秒', '120 秒'] },
+    { key: 'audioMode', label: '音频模式', type: 'select', options: [['silent', 'silent（静音）'], ['dialogue-led', 'dialogue-led（对白）'], ['narration-led', 'narration-led（旁白）']] },
+    { key: 'mode', label: '视频档位', type: 'select', options: [['fast', 'fast'], ['balanced', 'balanced'], ['quality', 'quality']] },
+    { key: 'imageTier', label: '图片档位', type: 'select', options: [['fast', 'fast'], ['balanced', 'balanced'], ['quality', 'quality']] },
+    { key: 'delivery', label: '交付画质', type: 'select', options: [['native', '原生'], ['upscale1080', '1080 超分'], ['upscale2k', '2K 超分'], ['upscale4k', '4K 超分'], ['regen2k', '2K 重生成'], ['fps48', '48fps 补帧']] },
+    { key: 'characterCardVariant', label: '角色卡版本', type: 'select', options: [['single', '单视图'], ['three', '三视图（fast 档不可用）']] },
+    { key: 'voicePlan', label: '声线方案', type: 'select', options: [['existing', 'existing（复用/补建）'], ['audition', 'audition（重新试镜）'], ['text-only', 'text-only（无锚点）']] },
+    { key: 'subtitles', label: '画面内字幕', type: 'select', options: [['none', '无'], ['burned-in', '画面内烧字']] },
+    { key: 'language', label: '语言', type: 'select', options: [['auto', '自动'], ['zh', '中文'], ['en', 'English']] },
+    { key: 'style', label: '视觉风格', type: 'select', options: CONFIG_STYLE_OPTIONS },
+    { key: 'bgmMode', label: 'BGM 模式', type: 'select', options: [['none', 'none'], ['in-model', 'in-model（H3 逐镜自带）']] },
+    { key: 'reviewMode', label: '审查节奏', type: 'select', options: [['per-shot', 'per-shot（逐镜确认）'], ['batch', 'batch（全部渲完一次确认）']] },
+    { key: 'shotGate', label: '逐镜自检门', type: 'select', options: [['verdict', 'verdict（必须 pass）'], ['frames', 'frames（只抽帧）'], ['off', 'off（关闭）']] },
+  ]
+  const CONFIG_LABELS = Object.fromEntries(CONFIG_FIELD_DEFS.map((d) => [d.key, d.label]))
+  const CONFIG_BREAKING = new Set(['flow', 'aspectRatio', 'duration', 'audioMode', 'delivery', 'characterCardVariant', 'voicePlan', 'subtitles', 'language', 'style', 'bgmMode'])
+
+  function openConfigPanel() {
+    ;(async () => {
+      const project = currentProject || await api('/canvas')
+      const settings = project.settings || {}
+      const dlg = openDialog('项目配置（STEP 0）')
+      const note = document.createElement('p')
+      note.className = 'form-note'
+      note.textContent = settings.configured
+        ? `配置版本 rev ${settings.rev || 0} · 更新者 ${(settings.meta || {}).updatedBy || 'default'}。改动会立即成为后续生成与门的真相源。`
+        : '尚未建配置卡。保存后即建卡；未建卡前首次生成会被配置门拒绝一次。'
+      dlg.body.appendChild(note)
+
+      const grid = document.createElement('div')
+      grid.className = 'config-grid'
+      dlg.body.appendChild(grid)
+      const inputs = {}
+      for (const def of CONFIG_FIELD_DEFS) {
+        const row = document.createElement('label')
+        row.className = 'config-row'
+        const lab = document.createElement('span')
+        lab.className = 'config-label'
+        lab.textContent = def.label
+        row.appendChild(lab)
+        let ctrl
+        if (def.type === 'select') {
+          ctrl = document.createElement('select')
+          for (const [v, t] of def.options) {
+            const o = document.createElement('option')
+            o.value = v
+            o.textContent = t
+            ctrl.appendChild(o)
+          }
+          const cur = settings[def.key] == null ? '' : String(settings[def.key])
+          // 自定义值（如用户自建风格 id）不在选项里时补一个，避免保存时被静默改回默认
+          if (!def.options.some(([v]) => v === cur)) {
+            const o = document.createElement('option')
+            o.value = cur
+            o.textContent = (cur || '（空）') + '（当前值）'
+            ctrl.insertBefore(o, ctrl.firstChild)
+          }
+          ctrl.value = cur
+          if (ctrl.value === '' && def.options.length) ctrl.value = def.options[0][0]
+        } else {
+          ctrl = document.createElement('input')
+          ctrl.type = 'text'
+          ctrl.value = settings[def.key] == null ? '' : String(settings[def.key])
+          if (def.list) {
+            const listId = 'svs-config-list-' + def.key
+            ctrl.setAttribute('list', listId)
+            const dl = document.createElement('datalist')
+            dl.id = listId
+            for (const v of def.list) {
+              const o = document.createElement('option')
+              o.value = v
+              dl.appendChild(o)
+            }
+            row.appendChild(dl)
+          }
+        }
+        ctrl.dataset.key = def.key
+        row.appendChild(ctrl)
+        if (def.note) {
+          const n = document.createElement('span')
+          n.className = 'config-note'
+          n.textContent = def.note
+          row.appendChild(n)
+        }
+        inputs[def.key] = ctrl
+        grid.appendChild(row)
+      }
+      const locked = new Set(Array.isArray(settings.meta?.locked) ? settings.meta.locked : [])
+      for (const k of locked) {
+        if (inputs[k]) {
+          inputs[k].disabled = true
+          inputs[k].title = '系列圣经锁定字段：请在系列层修改'
+        }
+      }
+      // fast 档禁用三视图
+      const syncFast = () => {
+        const isFast = inputs.mode.value === 'fast'
+        const three = inputs.characterCardVariant.querySelector('option[value="three"]')
+        if (three) three.disabled = isFast
+        if (isFast && inputs.characterCardVariant.value === 'three') inputs.characterCardVariant.value = 'single'
+      }
+      inputs.mode.addEventListener('change', syncFast)
+      syncFast()
+
+      dlg.foot.appendChild(dialogBtn('取消', dlg.close))
+      const save = dialogBtn('保存配置', async () => {
+        const patch = {}
+        for (const def of CONFIG_FIELD_DEFS) {
+          const v = String(inputs[def.key].value || '').trim()
+          const cur = settings[def.key] == null ? '' : String(settings[def.key])
+          if (v !== cur) patch[def.key] = v
+        }
+        if (!Object.keys(patch).length) {
+          dlg.close()
+          alertBox('没有改动')
+          return
+        }
+        const breaking = Object.keys(patch).filter((k) => CONFIG_BREAKING.has(k))
+        const hasArtifacts = (project.nodes || []).some((n) => !n.params?.configCard)
+        if ((breaking.length || patch.flow) && hasArtifacts) {
+          const ok = await modal(
+            '将改动：' + Object.keys(patch).map((k) => CONFIG_LABELS[k] || k).join(' / ') +
+            '\n这会改变后续生成与已有产物的有效性；已出片段不会自动删除。仍然保存？',
+            { okText: '仍然保存', cancel: true },
+          )
+          if (!ok) return
+        }
+        save.disabled = true
+        try {
+          await api('/canvas/state', {
+            method: 'POST',
+            body: JSON.stringify({ patch, expectedRev: settings.configured ? (settings.rev || 0) : undefined }),
+          })
+          dlg.close()
+          await load()
+        } catch (e) {
+          save.disabled = false
+          alertBox('保存失败：' + (e.message || String(e)) + '\n（如果提示配置已被更新，请关闭后刷新再改）')
+        }
+      }, 'btn-accent')
+      dlg.foot.appendChild(save)
+    })().catch((e) => alertBox('打开配置失败：' + (e.message || String(e))))
+  }
+
 
   /** 读取本地文件为 base64 dataURL。 */
   function readFileDataUrl(file) {
@@ -832,7 +1003,14 @@ import { markdownToHtml } from './markdown.js'
     const actions = document.createElement('div')
     actions.className = 'node-actions'
 
-    if (node.kind === 'text' || node.kind === 'table') {
+    if (node.params && node.params.configCard) {
+      const cfgBtn = document.createElement('button')
+      cfgBtn.className = 'btn btn-accent'
+      cfgBtn.textContent = '⚙ 编辑配置'
+      cfgBtn.title = '配置卡由系统维护：用配置面板修改（直接改文本会被拒绝）'
+      cfgBtn.onclick = () => openConfigPanel()
+      actions.appendChild(cfgBtn)
+    } else if (node.kind === 'text' || node.kind === 'table') {
       const editBtn = document.createElement('button')
       editBtn.className = 'btn'
       editBtn.textContent = '编辑'
@@ -1025,6 +1203,8 @@ import { markdownToHtml } from './markdown.js'
       + (project.settings?.duration ? ' · 时长 ' + project.settings.duration : '')
       + ' · 音频 ' + (project.settings?.audioMode || 'silent')
       + ' · 档位 ' + (project.settings?.mode || 'quality')
+      + ' · 片型 ' + (project.settings?.flow || 'free')
+      + (project.settings?.configured ? ' · rev ' + (project.settings?.rev || 0) : ' · 未配置')
       + (project.settings?.characterCardVariant ? ' · 角色卡 ' + (project.settings.characterCardVariant === 'three' ? '三视图' : '单视图') : '')
       + ' · 审查 ' + (project.settings?.reviewMode === 'batch' ? '批量' : '逐镜')
       + ' · 自检 ' + (project.settings?.shotGate === 'off' ? '关闭' : project.settings?.shotGate === 'frames' ? '抽帧' : '开启')
@@ -1263,6 +1443,7 @@ import { markdownToHtml } from './markdown.js'
     el.refresh.disabled = true
     try {
       const project = await api('/canvas')
+      currentProject = project
       render(project)
       initAutoFollow()
     } catch (err) {
@@ -1273,6 +1454,7 @@ import { markdownToHtml } from './markdown.js'
   }
 
   el.refresh.addEventListener('click', load)
+  if (el.config) el.config.addEventListener('click', openConfigPanel)
 
   // 手动添加资产：顶栏按钮（空画布空态的 CTA 在 render 里单独绑定）。
   // 按钮文案在 index.html 里是「上传图片」；这里以 JS 统一改成「上传素材」，避免文案和 accept（图片 + 音频）不一致。

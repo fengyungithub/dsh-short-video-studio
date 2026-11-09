@@ -96,7 +96,7 @@ whenToUse: |
 5. **生成档位**：`fast`（调试 / 调构图，长边 832）/ `balanced`（日常，画质与耗时平衡，长边 1344）/ `quality`（成片，长边 1344）。允许先 fast 走通全片再升档重出（`fast`→`balanced`、`fast`→`quality`、`balanced`→`quality` 都允许）。
 6. **逐镜自检门**（`shotGate`，**默认开启**）：开启（`verdict`，每镜抽帧核对 + `canvas_record_check(pass)` 才放行下一镜）/ 只要求抽帧（`frames`）/ 关闭（`off`，不做逐镜 AI 自检留痕，片段批准前仍可人工看）。
 
-确认后用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode / shotGate），**同一次调用一并传 `groupOrder=["brand intake","creative plan","asset plates","shot prompts","shot clips","final delivery"]**，并写入生产简报。
+确认后用 `canvas_set_state` 持久化：`flow='brand'`、aspectRatio、duration、audioMode、mode（视频档位）、imageTier（图片档位）、delivery（交付画质）、subtitles（画面内字幕）、language、shotGate，**同一次调用一并传 `groupOrder=["brand intake","creative plan","asset plates","shot prompts","shot clips","final delivery"]**，并写入生产简报。**这些参数全部落在画布「项目配置」卡上**（用户可在画布「⚙ 配置」里改）；插件生成前按配置做硬门控，未建卡时首次生成会被拒一次。
 
 > **每镜必须显式传 `type` 与 `tier`**：`type=r2v`（参考绑定）/ `type=i2v`（首末帧串联）——**工具面 `type` 必填**，且与参数冲突会报错；`tier=fast|balanced|quality` 同样逐镜显式写，**不要依赖缺省**——缺省是 `quality`（成本最高档）。
 

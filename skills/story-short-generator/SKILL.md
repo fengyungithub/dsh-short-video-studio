@@ -44,6 +44,7 @@ whenToUse: |
 | 查跨会话资产库 / 物化资产到画布 | `asset_list` / `asset_to_canvas` |
 | 抽帧（自检关键帧；转场镜的前末帧锚点） | `extract_frame` |
 | **记录逐镜自检结论（自检门放行凭据）** | `canvas_record_check(nodeId, verdict="pass"\|"fail", frames?, notes?)` |
+| **用户批准后落批准账本（批准门放行凭据，见「批准账本与批准门」）** | `canvas_approve(target='assets'\|'shotTable'\|'storyboard'\|'clips', nodeIds?, nodeId?, note?)` |
 | 拼接全片（含音轨） | `video_concat` |
 | 从试镜片段抽声线（STEP 3.5） | `extract_audio(video_node=…)` → 画布 audio 节点；**单片**由用户点「入库」；**剧集**在 G-A 资产总览批准后由 production 调 `asset_ingest` 登记为 `voice:` |
 | 提分辨率 / 超分（STEP 0 已问；见 STEP 0 与 STEP 8） | `video_upscale`（对**单个片段**放大） |
@@ -239,7 +240,7 @@ whenToUse: |
 | `canvas_set_state` | 本 skill 写一次 | production 写；本 skill 只读/校验 |
 | 人工门 | 单片门清单（13 张规格卡 + 阶段卡） | 3 张卡（方案/片段/交付），见系列参考 |
 
-生产规格确认后（**单片由本 skill 写；委托模式由 production 写，本 skill 只校验**；连续短剧分支用集制作包 ⑥ 预填，不再逐项问）用 `canvas_set_state` 持久化（aspectRatio / duration / audioMode / mode = **视频档位** / characterCardVariant = **角色卡引用版本** / reviewMode = **片段审查节奏**：`per-shot` 逐镜 / `batch` 批量 / shotGate = **逐镜自检门**：`verdict` 开启（默认）/ `frames` 只要求抽帧 / `off` 关闭），**同一次调用一并传 `groupOrder`**（见下方分组清单），并写入项目简报。这些设置贯穿镜头时长、分辨率推导、分镜、逐镜生成与交付。**「交付画质」「视觉风格」「图片档位」「字幕」「声线方案」「BGM 模式」六项没有对应的 state 字段**，必须写进项目简报——交付画质是后续超分 / 重生成 / 拼接步骤的唯一依据；视觉风格决定每次生成要追加哪一份风格锁后缀；**BGM 模式决定 STEP 5 `BGM` 子字段与 STEP 7 `non_diegetic_music` 写不写**；**图片档位决定 STEP 3 / 4 / 4.5 / 6 生成卡片与分镜图时传哪个 `tier`**；**字幕选择决定 STEP 5 镜头表 `字幕` 列、STEP 7 逐镜 prompt 写不写字幕声明、以及门 3 / 终检把字幕核对换成「无字幕」核对**；**角色卡引用版本（`characterCardVariant`）是 STEP 7 每镜 `ref_variant` 的来源**（fast 镜强制 single），**视频档位（`mode`）决定该选项可不可选 three**；**片段审查节奏（`reviewMode`）有 state 字段**，STEP 7 渲染前 `canvas_get_state` 读回它决定门 3 的人工确认时机（缺省按 `per-shot`）。
+生产规格确认后（**单片由本 skill 写；委托模式由 production 写，本 skill 只校验**；连续短剧分支用集制作包 ⑥ 预填，不再逐项问）用 `canvas_set_state` 持久化：`flow='story'`（委托模式 `flow='series'`）、`aspectRatio`、`duration`、`audioMode`、`mode`（视频档位）、`imageTier`（图片档位）、`delivery`（交付画质）、`characterCardVariant`（角色卡版本）、`voicePlan`（声线方案）、`subtitles`（字幕）、`language`、`style`（视觉风格）、`bgmMode`、`reviewMode`（逐镜/批量）、`shotGate`（verdict/frames/off），**同一次调用一并传 `groupOrder`**（见下方分组清单），并写入项目简报。**这些参数全部落在画布「项目配置」卡上**（`canvas_get_state` 可读；用户可在画布「⚙ 配置」里改）：插件每次生成时按配置注入缺省值并在生成前做硬门控（未建卡 / 画幅 / 角色卡版本）。项目简报仍写一份给人看，但**以配置卡为准**；用户改配置后按“改动影响”判断哪些产物要重建（画幅 / 风格 / 角色卡版本 / 字幕 / 音频等属破坏性变更）。**不要用 `canvas_write_node` 直接改配置卡**（会被拒绝），改配置走「⚙ 配置」或 `canvas_set_state`。
 
 > **每镜必须显式传 `type='r2v'` 与 `tier`**（**工具面 `type` 必填**，缺了直接报错；`type` 与参数冲突——如 r2v 带首/末帧——也会报错）。**连续性靠 `continuity_from`，不靠 `type`**：连续镜头传上一镜节点 id，独立镜头不传。「哪些镜是连续镜头」在 STEP 5 的 `续接` 列里定死。
 > `tier=fast|balanced|quality` 同样逐镜显式写，**不要依赖缺省**——缺省是 `quality`（成本最高档）。同一镜头要换档时改 `tier` 重渲，不要靠「隐式默认」蒙。**同一条链内首遍尺寸必须一致**（≈同档：`fast` 832×480、`balanced`/`quality` 1344×768；链上传递的是首遍 latent，不能缩放；不一致会显式报错）。
@@ -261,7 +262,7 @@ whenToUse: |
 
 > **剧集委托模式**：跳过 1/2（用「本集简报」代替），从 3 开始；交付清单/终检由 production 汇总，本 skill 只写终检与片段清单。
 
-**分组名由本 Skill 定义**（插件本身不预设任何片型词汇）。在 Step 0 用 `canvas_set_state(groupOrder=["story planning","character cards","voice auditions","scene cards","prop cards","shot table","text storyboards","shot prompts","shot clips","final delivery"])` 一次性声明展示顺序，画布即按此顺序渲染分组。之后所有 `group` 参数必须用这十个精确名字；未声明的分组会排在末尾。
+**分组名由本 Skill 定义**（插件本身不预设任何片型词汇）。在 Step 0 用 `canvas_set_state(flow='story', groupOrder=["story planning","character cards","voice auditions","scene cards","prop cards","shot table","text storyboards","shot prompts","shot clips","final delivery"])` 一次性声明展示顺序，画布即按此顺序渲染分组（委托模式传 `flow='series'`）。之后所有 `group` 参数必须用这十个精确名字；未声明的分组会排在末尾。
 
 ## STEP 1–2：简报 / 大纲（单片）
 
@@ -330,6 +331,10 @@ image_crop(image_node=<上一步 nodeId>, panel=0, panels=3,
 
 自检通过后出选项卡：锁定角色设计（两版）并继续（推荐）/ 重新生成三视图（单视图会跟着重裁）/ 只调裁切矩形重裁单视图 / 调整具体视觉细节 / 增加另一张角色卡。
 
+用户选「锁定角色设计（两版）并继续」后，**立刻调用 `canvas_approve(target='assets', nodeIds=[三视图节点, 单视图节点])`** 把这两版落进批准账本。**同项目还有角色卡未批准时，插件会 deny 下一张角色卡的生成**——所以每锁一个角色就落一次账，不要攒到最后一起批；多角色项目里「增加另一张角色卡」前也必须先锁定当前角色（否则下一张会被 deny）。
+
+> **剧集委托模式**：角色锁定确认并入 production 的 G-A 资产总览卡，但**批准门不认「稍后统一批」**——每张角色卡在 STEP 3 当场确认后仍要按人落账（`canvas_approve(target='assets', nodeIds=[三视图节点, 单视图节点])`），否则下一张角色卡会被 deny。G-A 总览卡全部批准后，执行方再对全部卡片调一次 `canvas_approve(target='assets')` 收口（幂等）。
+
 锁定后提示用户：想跨会话复用就在画布点该卡的「入库」按钮人工登记（AI 不自动入库；两版分别入库，标题带版本后缀）。同时警告：后续修改已锁定的角色设计会连带重做镜头表、分镜与已渲片段。
 
 ## STEP 3.5：声线（按模式）
@@ -355,7 +360,7 @@ image_crop(image_node=<上一步 nodeId>, panel=0, panels=3,
 2. **与场景设定一致**：主环境布局、关键光态（日景 / 夜景）、情绪子空间与节点描述一致；镜头表 `固定地标` 列要引用的地标真实存在、屏幕位置可读、未被杂物遮挡；整体符合**所选风格锁**。
 3. **失败处置**：任一不过 → 复用同 seed 微调重出或修订节点描述后重出，重跑本自检；**未过自检的场景卡不得弹「锁定」选项卡**。资产库物化复用的卡无需重检。
 
-自检通过后出选项卡：锁定场景设计并继续（推荐）/ 重新生成场景卡 / 增加另一个场景角度 / 调整光位或布局。同样提示人工入库。
+自检通过后出选项卡：锁定场景设计并继续（推荐）/ 重新生成场景卡 / 增加另一个场景角度 / 调整光位或布局。用户选「锁定场景设计并继续」后调用 **`canvas_approve(target='assets')`**（`nodeIds` 缺省=当前全部卡片）落账；**存在未批准的角色卡时，插件会 deny 场景卡 / 道具卡的生成**。同样提示人工入库。
 
 ## STEP 4.5：道具卡
 
@@ -382,7 +387,7 @@ image_crop(image_node=<上一步 nodeId>, panel=0, panels=3,
 
 **道具卡是可选产物**：只在道具是叙事关键且**反复出现**时才建卡并进 `ref_nodes`（每张卡占一个参考槽位）；单次出现的小道具写进镜头描述即可。**单镜 `ref_nodes` 数量 >2 的形态未实测**，加了道具卡就优先在 `balanced` / `quality` 档生成。
 
-自检通过后出选项卡：锁定道具设计并继续（推荐）/ 重新生成道具卡 / 调整材质或配色 / 不要道具卡（改用文字描述）。
+自检通过后出选项卡：锁定道具设计并继续（推荐）/ 重新生成道具卡 / 调整材质或配色 / 不要道具卡（改用文字描述）。用户确认锁定后调用 **`canvas_approve(target='assets')`**（道具卡与场景卡共用 `assets` 记账）。
 
 ## STEP 5：七列标准镜头表
 
@@ -480,7 +485,7 @@ image_crop(image_node=<上一步 nodeId>, panel=0, panels=3,
 13. **对白容量**：逐镜数字数——单镜单句 **≤16 字**（12–13 字逐字最稳），**≥18 字整句必须拆成相邻两镜**，每镜一句短对白。阈值与拆镜口径按 `h3-prompt-writing`「字幕与画面内文案」§3（本节不复述）。拆镜 = 改表 / 拆行 + 重跑本门。
 14. **资产—设定一致性（实测驱动，规划期必查）**：逐镜核对「本镜要求的物 / 人 / 光 / 环境」与 `绑定` 的卡是否一致——**卡里有台座就按台座写、卡里是玉柱就是玉柱**。不一致只能走两条路：① **改卡**（重出场景卡 / 道具卡，或给关键道具建卡）；② **改镜头设定**。**禁止用 prompt 否定卡里的内容**：A/B 实测——在 prompt 里写 `no pedestal, no dais` / `plain dark timber post` 去否认场景卡里的玉柱与台座，模型前 1/3 仍按卡画玉柱、后 2/3 被文字掰成木柱，产生**镜头内形变**（比原问题更贵）；台座也只被削弱、没消失。卡里**没有**、但本镜必须出现的东西（手持道具、背景人数）才走 prompt（写法见 STEP 5「签名道具写法」）。
 
-十四项全过后，在画布表格节点顶部加 `shot-table self-check: passed at <时间戳>` 戳，并出选项卡：批准自检并进入分镜（推荐）/ 查看自检详情 / 修订失败项 / 重新跑自检。
+十四项全过后，在画布表格节点顶部加 `shot-table self-check: passed at <时间戳>` 戳，并出选项卡：批准自检并进入分镜（推荐）/ 查看自检详情 / 修订失败项 / 重新跑自检。用户选「批准自检并进入分镜」后调用 **`canvas_approve(target='shotTable', nodeId=<镜头表节点>)`**（该 target 要求表顶已有自检戳，且必须传 `nodeId`）；**未批准的镜头表，插件会 deny Sxx 视频生成**。改表后批准失效，必须重跑十四项自检、重新打戳再落一次账。
 
 > **剧集委托模式例外**：**不出这张卡**——自检照跑、戳照打，结论并入 production 的「方案卡（G-P）」一起给人看（见 `references/series-delegated-mode.md`）。别因为本行没写「委托」就把门 2 单独弹给用户。
 
@@ -594,6 +599,8 @@ image_crop(image_node=<上一步 nodeId>, panel=0, panels=3,
 
 选项卡：批准分镜并渲染镜头视频（推荐）/ 抽取或回填某镜 / 重画选定铅笔分镜（仅可视化模式）/ 修复角色一致性 / 修复场景逻辑 / 修复镜头标记 / 修复音频与口型标记。
 
+用户选「批准分镜并渲染镜头视频」后调用 **`canvas_approve(target='storyboard', nodeId=<分镜节点>)`**（单文本分镜文档节点；可视化模式仍以文档为准）。**未批准的分镜，插件会 deny Sxx 视频生成**；改分镜后批准失效，需重新确认再落账。
+
 ## STEP 7：逐镜视频生成
 
 ### 渲染前的门
@@ -610,11 +617,13 @@ image_crop(image_node=<上一步 nodeId>, panel=0, panels=3,
 
 **逐镜自检门**：沿用 Step 0 选择；用户要改时在「改规格卡」里选 开启（`verdict`）/ 只要求抽帧（`frames`）/ 关闭（`off`），**改了就 `canvas_set_state(shotGate=…)`**。从下一镜起生效：新渲的片段按新档打标 / 不打标（`off` 不打标 = 不参与门控）；已渲片段不重做。
 
+**配置门（代码强制，生成前自动跑）**：插件读画布「项目配置」卡（settings）做契约检查：**未建卡**时本次生成会被 deny 一次（按提示 `canvas_set_state(flow=…, …默认值)` 建卡后重试）、显式 `width`/`height` 与 `aspectRatio` 不一致、`fast` 档用三视图卡、配置=单视图却引用三视图。deny 信息里带修复办法；**不要原样重试同一请求**。用户改配置后，画幅 / 风格 / 角色卡版本 / 字幕 / 音频等属破坏性变更，按影响面重建产物。
+
 **镜头表一致性门（代码强制，生成前自动跑）**：插件按 `title` 里的 `Sxx` 在画布镜头表里找到该行，校验：prompt 里台词 / 字幕与表**逐字一致**、`length/24` 与表时长一致（±1s）、`audio_ref_nodes` 与 `声线参考` 一致、显式 `width`/`height` 与画布 `aspectRatio` 一致、`fast` 档不得用三视图卡（`ref_variant=three` / 直接传 three 卡）。不一致会 deny 并列出差异（同一 agent 连续 deny 2 次后降级放行）。⇒ **每镜 `title` 必须带镜头号**（如「S03 片段」）；转场镜（「S03→S04 转场」）、锚点式重渲（标题含「锚点」）、试镜片段不参与；**新镜 / 拆镜必须先把行写进镜头表再渲**，否则会被判「镜头表没有该镜」。
 
 **档位与能力可用性**：一个能力支持多档，**具体有哪些档、每档什么代价，以 `comfy_list_workflows` 为准**（不同能力可以不同，用户在设置页增删实现后也会变）——不要假设档位数量或名称。请求了该能力没有的档会**显式报错并列出可用档位**（工具不会静默换档）。遇到这类报错就改请求可用档位，**不要原样重试同一请求**。用户选的**交付画质**若是「生成内放大」，要在选档时确认该档解析到的实现确实出高分辨率（显式宽高会被它锁定，工具会回 warning），并确认画幅/单镜帧数在它的限制内。
 
-**角色卡版本（渲染前强制）**：先 `canvas_get_state()` 读 `settings.characterCardVariant`（STEP 0 用户选择；缺省按 `single`）。每镜的 `ref_variant` = **本镜 `tier==='fast'` ? `single` : `characterCardVariant`**；**必须显式传**，不要依赖工具默认。组装 `ref_nodes` 时传对应版本的角色卡（或双版本任意一张 + `ref_variant`），工具只做同角色换版，不再按 tier 自动选。
+**角色卡版本（渲染前强制）**：先 `canvas_get_state()` 读 `settings.characterCardVariant`（STEP 0 用户选择；缺省按 `single`）。每镜的 `ref_variant` = **本镜 `tier==='fast'` ? `single` : `characterCardVariant`**；**建议显式传**（不传时工具按配置卡注入，但显式写便于审计）。组装 `ref_nodes` 时传对应版本的角色卡（或双版本任意一张 + `ref_variant`），工具只做同角色换版，不再按 tier 自动选。
 
 **参考图形态门禁（G-ref，渲染前强制；仅 `fast` 档）**：`fast` 镜必须是单主体 / 单视图 / 零文字 / 无拼图（判定方式与证据见「参考图形态与档位」节）。任一不满足 → **停在这里，不要调生成工具**，出选项卡给四个出路：升到 `balanced` / `quality` 按原图渲染（推荐）/ 换单视图卡后重渲 / 用户手动裁图上传 / 放弃该参考图。`balanced` / `quality` 档无此门禁。**混合档位下最常见的踩线点：项目档位是 `balanced` / `quality`（用户可能选了 three），却把某一镜临时降到 `fast`——本门禁对该镜立即生效（强制 single）**，要么升档、要么传 `ref_variant='single'`（双版本流程下直接强制单视图，不需要临时补卡）。
 
@@ -622,7 +631,7 @@ image_crop(image_node=<上一步 nodeId>, panel=0, panels=3,
 
 **标记残留复查（渲染前强制，1 秒）**：发出去前扫一眼本镜提示词库该段——不得残留分镜标记：`[char:` / `[scene:` / `[hook:` / `[audio_mode:` / `[speaker:` / `[cont:` / `[BEAT]` / `[HANDOFF`。标记与参考图上的文字同类：**写进 prompt 就会被当成要画的内容**。命中就剥掉，用 `canvas_write_prompt_bank` 回写同一 nodeId（保持三档同文），再渲。
 
-**字幕开关（渲染前读回）**：`canvas_get_state` **读不到**这一项（没有 state 字段）——从**项目简报**读 STEP 0 的「字幕」选择。`none` 时本镜 prompt **不写任何字幕声明**（`<d>…</d>` 对白照写）、负向尾句加 `no subtitle, no burned-in dialogue text`；`burned-in` 时按 `h3-prompt-writing` 的字幕规范写。**开关改了必须重写提示词库并重渲**（字幕是画面内生成物，不能后期补 / 裁）。
+**字幕开关（渲染前读回）**：`canvas_get_state` 读 `settings.subtitles`（`none` / `burned-in`；缺省 `none`）。`none` 时本镜 prompt **不写任何字幕声明**（`<d>…</d>` 对白照写）、负向尾句加 `no subtitle, no burned-in dialogue text`；`burned-in` 时按 `h3-prompt-writing` 的字幕规范写。**开关改了必须重写提示词库并重渲**（字幕是画面内生成物，不能后期补 / 裁）。
 
 **档位与分辨率/耗时同源**：工具返回会带 `tier` / `resolution`（以及排查用的 `implementation`）。回复与交付清单按**「档位 + 交付尺寸 + 时长」**汇报（用户按档位决策，不按实现名）；`implementation` 只在排查问题或用户主动问「用的哪个工作流」时再提。实测参考（16:9 · 124 帧 ≈ 5.17s，随硬件/驱动/模型版本浮动，只作量级参考）：ref2v `fast`(832×480) 24.6s ｜ `balanced`(1344×768) 166.3s ｜ `balanced` 带加速 136.3s ｜ `quality`(1344×768) 396.6s ｜ `quality` 带加速 311.2s。**续接镜**耗时与同档独立镜接近（多采 22 帧再裁掉，实测在噪声内）；接缝质量实测：画面差 2.6–7.0（同 seed 不续接对照 32–68）。转场镜 / 锚点式重渲走 i2v：`fast` 26.1s ｜ `balanced`(1344×768) 177.3s ｜ `balanced` 带加速 130.5s ｜ `quality` 394.8s ｜ `quality` 带加速 314.7s。画质：`balanced`(8 步) 帧锐度比 `quality`(20 步) 高约 13%；`fast` 档细节最弱、适合调构图 / 走位。
 
@@ -725,12 +734,14 @@ image_crop(image_node=<上一步 nodeId>, panel=0, panels=3,
 
 确认卡（每镜一次 `ask_user_question`）：批准本镜并生成下一镜（推荐）/ 重渲染本镜 / **换单视图角色卡重渲（参考图形态类问题）** / 升档重渲本镜（字幕字准 / 漏烧类问题；字幕关时改为口型、画面瑕疵类）/ **放大本镜（`video_upscale`，内容不变、不打断续接链）** / **补帧本镜（`video_interpolate`，48fps）** / 修复角色不一致 / 修复场景不一致 / 修复跨镜空间锚点漂移 / 查看自检详情。
 
+用户选「批准本镜并生成下一镜」后调用 **`canvas_approve(target='clips', nodeIds=[本镜片段节点])`**；**未进批准账本的镜头，`video_concat` 会直接 deny**。重渲本镜会让该镜批准失效，重渲后需重新确认再落一次账。
+
 #### B. `batch` 批量审查
 
 1. **生成阶段**：按镜头表顺序连续生成（链式续接 / 独立镜起链的规则完全照旧），每镜渲完**立即自检**；通过就直接推进下一镜，**不弹卡**；不过就按「逐镜失败回退阶梯」自动重渲。**同一镜连续 3 次失败仍必须弹选项卡**（求助门不可省，不许静默跳过、不许降级交付）。
 2. **例外（两种模式一致）**：门 3 自检第 3 项（口型 / 字幕字准）不过关时**当场**弹单镜处置卡（重新生成本镜 / 升档重渲 / 改短句 / 拆镜）——这类问题人工决定比 AI 闷头重试省成本，**不压到批量卡里**。
 3. **批量审查卡**：全部正片镜 + 转场镜渲完、且**全部通过自检**后，出**一张** `ask_user_question`，逐条列出：镜头号 → 画布节点标题 / 节点 id → 时长 → 自检结论（含关键帧抽样核对项、`fast` 档的 G-ref 留痕）→ 需要人工听核的音频项。选项：**全部批准并进入拼接（推荐）** / 重渲染选定镜（报镜头号，**说明会连锁重渲下游续接镜**）/ **换单视图卡重渲选定镜** / 升档重渲选定镜 / 放大选定镜（`video_upscale`，内容不变、不打断续接链）/ 补帧选定镜（`video_interpolate`，48fps，整片同帧率）/ 查看某镜自检详情与抽帧 / 改回 `per-shot` 逐镜审查（后续镜改为逐镜确认）。
-4. **批准语义**：整卡「全部批准」＝全部片段批准，可直接进 STEP 8 拼接；**不接受部分批准**——要改就选「重渲染选定镜」，重渲后**重新出批量审查卡**（只列受影响的片段）。
+4. **批准语义**：整卡「全部批准」＝全部片段批准，可直接进 STEP 8 拼接；**不接受部分批准**——要改就选「重渲染选定镜」，重渲后**重新出批量审查卡**（只列受影响的片段）。批准后调用 **`canvas_approve(target='clips', nodeIds=[全部正片镜 + 转场镜的节点 id])`**（这些节点必须已 `canvas_record_check(pass)`）；重渲受影响镜后重新出卡、重新落账。
 5. **代价必须提前讲清**（STEP 0 选项卡与渲染档位卡都要说）：坏镜头晚发现；续接链上任何一镜重渲都要**顺次重渲下游**，「重渲与续接链」那笔账在批量模式下一次结清。
 6. **音频仍由人工听核**：AI 不能听音，批量卡必须逐条列出片段与听核要点，不能只写一句「已全部生成」。
 7. **渠道提醒**：`batch` 下一次 `ask` 会触发插件把**全部片段**自动送达（飞书单文件上限 20 MiB，超限记在节点 `params.deliveryError`）——片段多 / 体积大时先把片段清单写进回复正文，并提示用户到画布取。
@@ -794,7 +805,7 @@ image_crop(image_node=<上一步 nodeId>, panel=0, panels=3,
 
 ### 拼接全片
 
-全部片段**经门 3 批准**后（`per-shot` 逐镜批准 / `batch` 批量审查卡批准），用 `video_concat(nodes=[按镜头表顺序的片段节点 id，含转场镜], title="拼接成片", group="final delivery")` 拼成完整成片（含音轨）。后端由插件自动选择——本机有 ffmpeg 走 ffmpeg，没有就走 ComfyUI 纯节点链路，两者对本 Skill 透明。
+全部片段**经门 3 批准**后（`per-shot` 逐镜批准 / `batch` 批量审查卡批准），用 `video_concat(nodes=[按镜头表顺序的片段节点 id，含转场镜], title="拼接成片", group="final delivery")` 拼成完整成片（含音轨）。拼接前插件会核对 `approvals.clips`：**任一输入镜头未落 `canvas_approve(target='clips')` 就直接 deny**。后端由插件自动选择——本机有 ffmpeg 走 ffmpeg，没有就走 ComfyUI 纯节点链路，两者对本 Skill 透明。
 
 拼接的三条限制，必须提前告知用户：
 
@@ -891,9 +902,36 @@ image_crop(image_node=<上一步 nodeId>, panel=0, panels=3,
 
 默认推荐项放最前，始终允许用户自定义输入。用户说「继续」时按选了推荐项处理。
 
+## 批准账本与批准门（代码强制）
+
+「用户口头说好」不算批准：**每一次人工批准都要用 `canvas_approve` 落成账本**，否则下游生成会被插件直接 deny。工具只有一个入口：`canvas_approve(target, nodeIds?, nodeId?, note?)`；账本按 **4 个 target** 记账（`assets` / `shotTable` / `storyboard` / `clips`），对应下面**5 道批准门**。
+
+| target | 记什么 | 什么时候调 |
+|---|---|---|
+| `assets` | 角色卡 / 场景卡 / 道具卡已锁定（`nodeIds` 可省略，缺省=当前全部卡片） | STEP 3 每锁一个角色（传三视图 + 单视图节点）；STEP 4 / 4.5 锁场景 / 道具后 |
+| `shotTable` | 七列镜头表已获批（**必传 `nodeId`**；表顶须已有 `shot-table self-check: passed at <时间戳>` 戳） | STEP 5.5 十四项自检通过 + 用户批准后 |
+| `storyboard` | 分镜文档已获批（**必传 `nodeId`**） | STEP 6 分镜批准后 |
+| `clips` | 指定片段已人工确认（`nodeIds`=本次获批的视频节点；这些节点必须已 `canvas_record_check(pass)`） | 门 3：`per-shot` 每镜一次；`batch` 批量卡一次 |
+
+**5 道批准门**（插件 pre-execute 自动跑，不靠 AI 自觉）：
+
+1. 生成新角色卡前：同项目其他角色卡未批准 → deny（同角色重出放行，并让它的旧批准失效）。
+2. 生成场景卡 / 道具卡前：存在未批准的角色卡 → deny。
+3. 写七列镜头表前：存在未批准的资产卡 → deny。
+4. 生成 `Sxx` 视频前：资产（若已有卡）/ 镜头表（若已有表）/ 分镜（若已有分镜节点）都必须已 `canvas_approve`。
+5. `video_concat` 前：所有输入镜头都必须在 `approvals.clips` 里。
+
+**失效规则（改了就重新确认）**：
+
+- 重出卡 → 该卡（及同角色旧版）的批准失效；改镜头表 → `shotTable` 批准失效（计划变了，分镜 / 片段批准也随之失效）；改分镜 → `storyboard` 批准失效；重渲某镜 → 该镜的 `clips` 批准失效。
+- **破坏性配置变更**（画幅 / 风格 / 角色卡版本等）→ 清空全部批准，按新配置重新过门。
+- 逃生阀：环境变量 `DSH_SVS_APPROVAL_GATE=off` 可整体关闭批准门。**只在排障 / 试跑时用**，定稿交付前必须开着复核一遍。
+
+> **没调用 `canvas_approve` 时，视频生成与拼接会被插件直接 deny**——deny 信息会指出缺哪个 target 的批准，补批准（必要时重跑对应自检）再继续，**不要原样重试或连续重试硬闯**。
+
 ## 重生成与最新资产纪律
 
-用户重做或修订任何产物时，下游步骤必须用最新批准的产物：
+用户重做或修订任何产物时，下游步骤必须用最新批准的产物。**任何重做都会让对应批准失效**（重出卡 / 改表 / 改分镜 / 重渲片段），要按「批准账本与批准门」重新确认并重新 `canvas_approve` 后才能继续生成 / 拼接：
 
 - 角色卡重做后，后续镜头表、分镜、片段必须按精确角色名引用新卡；旧卡节点在画布上明确标记为废弃。**改设定只能改三视图**：三视图重出后必须**重新裁一次单视图**（复用同一 nodeId 重裁）并保持 `pairedNodeId` 双向有效——禁止只换单视图、也禁止让单视图停在旧设定。
 - 场景卡重做后同理，并重新核对所有引用该场景的 `固定地标` 与 `光位基线`。
