@@ -5,6 +5,39 @@
 
 > 更早版本的完整变更见 [GitHub Releases](https://github.com/fengyungithub/dsh-short-video-studio/releases)（每次打 `v*` tag 自动生成）。
 
+### v1.18.0 — 会话归档搬迁画布目录 · Open-H3 重生成 Sol-Attn 变体（2026-11-09）
+
+> **本版重点：归档会话时画布不再原地积压**——配置 `archiveRoot` 后，DSH 里归档会话会把该会话的 `<工作区>/canvas/<sessionId>`（`project.json` + 全部图片/视频/音频）整体搬到归档路径（本地盘 / 外置盘 / NAS），取消归档再搬回；**不配置则与旧版本完全一致**。
+>
+> **另一项（可选、不改默认）**：`video.regenerate` 新增 Sol-Attn 变体 `open-h3-regenerate-2k-solattn`（2K 整轮 **2.50×**），`priority: -31`，需在设置页显式选用。
+
+#### 会话归档 → 画布目录搬迁（`archiveRoot`）
+
+- **背景**：DSH 的「归档会话」只写一个标记（`~/.dsh/storages/workspace.json` 的 `archivedSessionIds`），**不搬不删工作区文件**；画布媒体因此长期留在工作区。本版补上搬迁。
+- **行为**：归档 → `<工作区>/canvas/<sessionId>` → `<archiveRoot>/<sessionId>/`；取消归档 → 搬回原位置。插件启动 8 秒后自动对账，设置页「立即同步归档」可手动补搬（把已归档但仍在工作区的搬出去、已取消归档但仍在归档区的搬回来）。
+- **不丢数据**：跨盘（NAS / 外置盘）`rename` 失败自动退化为「拷到 `<目标>.partial-*` → 改名就位 → 删源」，中断时源目录原样保留；目标已有同名不同内容文件改名 `.dup-<时间>` 保留，**绝不覆盖**；崩溃后重放按内容一致去重；归档/取消归档均幂等。
+- **竞态**：按 sessionId 串行，执行前复核 registry 现状；「归档 → 立刻取消归档」不会把刚回迁的画布再搬走；归档留 2s 稳定等待、搬后复查 3s，避开「停止并归档」的取消时序。
+- **回迁体验**：`GET /canvas` 在「已取消归档但回迁未落位」时等待完成再返回，避免读到空工程（大工程从 NAS 回迁需几秒到几十秒）。
+- **索引**：归档区 `.dsh-svs-archive-index.json` 记录来源工作区 / 标题 / 时间 / 大小；工作区被删后仍可兜底定位。
+- **设置页**：ComfyUI → 归档 新增 `归档路径 archiveRoot`（系统目录选择器「浏览…」+ 手输）、路径探测（不存在 / 不可写）、归档区份数与最近操作、「立即同步归档」。
+- **注意**：① 该路径属于**本机插件配置**，对所有工作区生效；② 改归档路径**不会**自动迁移旧归档区里的内容；③ 「浏览…」弹的是 DSH 原生对话框（`osascript` + `NSOpenPanel`），其标准文案按调用方 app bundle 选语言，**中文系统下也会显示英文**（DSH 实现所致，插件无法改其语言）；④ `archiveRoot` 留空＝不迁移，行为与旧版本完全一致。
+- **配置**：`archiveRoot`（环境变量 `DSH_SVS_ARCHIVE_ROOT` 可覆盖；`DSH_SVS_ARCHIVE_SETTLE_MS` 调稳定等待）。
+
+#### `video.regenerate`：Sol-Attn 变体（2K 整轮 2.50×）
+
+- **清单**：`workflows/minimax-h3-regenerate-2k-solattn.json`——与 dense 版逐字相同，只在 `OpenH3RegenLora` 与 `BasicGuider` 之间插原生 `BlockSparseAttention`（sol-attn，`tau=1.0`、`start_percent=0.2`、`min_tokens=12288`）；`priority: -31`，**不改隐式默认**，设置页可显式选用。
+- **实测（A800 80GB · 124 帧 · 2560×1440 · 同草稿/同 prompt/同 seed）**：3 步采样 **506.2s → 176.9s（2.86×）**，整轮 **549.7s → 220.2s（2.50×）**；`tau=1.3` 再降至 149.7s / 193.9s（3.38× / 2.84×）。
+- **质量**：与 dense 输出 PSNR Y 31.2 dB / SSIM 0.930，闪烁代理 7.20 vs 7.37（没有变抖），1:1 目检无可见差；快解码器（`sol_h3_vae`）19.2s vs 原版 VAE 54.1s（2.82×）。
+- 细节与复现见 [`docs/video-regenerate.md`](docs/video-regenerate.md) §11。
+
+#### 测试 / 文档
+
+- 新增 `scripts/smoke-archive-move.mjs`（**78 项**：迁移 / 回迁 / 幂等 / 冲突 / 崩溃重放 / 跨盘语义 / 事件联动 / 竞态 / 对账 / 路径边界），并入 `npm run smoke`。
+- `scripts/smoke-client-settings.mjs` 新增 6 项：设置页「浏览…」选择、自动保存、无系统选择器环境降级。
+- `scripts/smoke-regenerate.mjs` 改为**不读本机配置**（此前用户把 `video.regenerate` 的 quality 档选成 Sol-Attn 变体后，"默认仍是 dense" 的断言会失败），发布门与本机状态解耦。
+- README 与 USER-MANUAL 更新（配置键 `archiveRoot` + 新增 3.5 节「会话归档与画布搬迁」）。
+- 全量 `npm run smoke` 通过（与 CI 发布门同一条链路）。
+
 ### v1.17.0 — Open-H3 Regenerate 2K · RelayVSR 超分 · balanced 自动存 draft latent（2026-11-07）
 
 > **本版重点：社区加速 / 放大技术全部「可选化」**——Pika H3 Flex 6 步、PDD 8 步、Sol-Attn 块稀疏、SeedVR2 3B、RelayVSR ×2/×4、Open-H3 Regenerate 2K、RIFE 补帧都已在注册表里，可在设置页「＋ 新增策略 / 逐档下拉」选用；**全部不改变既有默认**（`priority<0` / `internal`），缺节点 / 缺权重会如实置灰。速查表见 [社区加速与放大技术](#社区加速与放大技术2026-11-重点)。
