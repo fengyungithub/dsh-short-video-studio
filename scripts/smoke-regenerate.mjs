@@ -14,9 +14,14 @@
  *
  * 用法：node scripts/smoke-regenerate.mjs
  */
-import { _internals } from '../lib/index.js'
-import { validateManifest, buildGraphFromManifest, CAPABILITIES } from '../lib/manifest.js'
-import { planRegenerate, resolveRegenerateTarget, normalizeRegenerateTargets, decideRegenerateHandoff, REGENERATE_ALIGN } from '../lib/regenerate.js'
+// 测试隔离：不读本机 ~/.dsh 里的真实配置。否则用户把 video.regenerate 的 quality
+// 档显式选成 Sol-Attn 变体后，"默认仍是 dense" 的断言会因本机选择而失败（CI 是空配置，
+// 本地却挂——发布门必须与本机状态无关）。env 必须先于 import 生效，故用动态 import。
+process.env.DSH_SVS_CONFIG = process.env.DSH_SVS_CONFIG || '/nonexistent/svs-smoke-regenerate.json'
+
+const { _internals } = await import('../lib/index.js')
+const { validateManifest, buildGraphFromManifest, CAPABILITIES } = await import('../lib/manifest.js')
+const { planRegenerate, resolveRegenerateTarget, normalizeRegenerateTargets, decideRegenerateHandoff, REGENERATE_ALIGN } = await import('../lib/regenerate.js')
 
 const I = _internals
 let pass = 0
