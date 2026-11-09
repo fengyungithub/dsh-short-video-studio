@@ -187,9 +187,11 @@ MiniMax 官方 H3 系统 = **H3-Context-IR**（托管，闭源）→ **H3-Base**
 落地前的估算（保留作口径对照）：按 56 帧纯二遍 6 步 843.9 s（≈140.6 s/前向 @63k token）线性外推，
 124 帧 3 步 ≈ 843 s + 解码 30–60 s ⇒ 15–16 min。**实测证明 token 线性外推过于保守**。
 
-**Sol-Attn 仍未验证**：2K 上历史上不稳（见
-[`2k-acceleration-variants-analysis.md`](../2k-acceleration-variants-analysis.md)：2K 叠 sol 有过崩服务记录），
-第一版按 dense 落地，把 sol 当第二个实验变量。
+**Sol-Attn 已验证（2026-11-09，本机 A800 80 GB）**：原生 `BlockSparseAttention`（不是历史崩服务的第三方 `SolAttnMiniMaxH3`）
+在 2K/124 帧上稳定跑通，且收益超预期——3 步采样 **506.2 s → 176.9 s（2.86×）**、整轮 **549.7 s → 220.2 s（2.50×）**
+（tau 1.3 再降到 149.7 s / 193.9 s）；与 dense 同 seed 输出 PSNR Y 31.2 dB / SSIM 0.930，闪烁代理反而略低。
+清单 `open-h3-regenerate-2k-solattn`（`priority: -31`，不改隐式默认），详见 [`video-regenerate.md`](../video-regenerate.md) §11。
+2K 历史上那次崩服务是第三方节点在 `cudaMallocAsync` 下的问题，与核心稀疏注意力无关。
 
 ## 5. 与现有 U1 路线逐项对比
 

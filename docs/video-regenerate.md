@@ -310,7 +310,52 @@ A/B 之后我们把交接链路做成了产品可用的形态（B 的清单仍�
 
 复现：`node scripts/e2e-2k-vs-regen.mjs`（新写 prompt，约 12–15 分钟，产物落 `e2e-out/2k-vs-regen/`）。
 
-## 11. 参考
+## 11. Sol-Attn 与快解码器 A/B（2026-11-09，本机 A800 80 GB）
+
+**目的**：社区的 3.9× 是 B200 + MXFP8 + CUDA graph 的账；本机能不能只靠**原生 `BlockSparseAttention`（sol-attn）** 拿到大头？
+以及清单里已在用的**快解码器**（`sol_h3_vae`）到底省多少。
+
+**清单**：`workflows/minimax-h3-regenerate-2k-solattn.json`（由 `scripts/make-regen-solattn-manifest.mjs` 从 C 派生，
+`priority: -31`，不改隐式默认）。与 C 的唯一差异 = 在 `OpenH3RegenLora` 与 `BasicGuider` 之间插一个
+`BlockSparseAttention(selection=sol-attn, tau=1.0, start_percent=0.2, min_tokens=12288)`。
+
+**夹具**：同一份 768p 草稿（`e2e-out/2k-vs-regen/rain-alley-draft.mp4`，1344×768 / 124 帧 / 24fps / 带音轨）、
+同 prompt、同 refine seed（424242）、同目标网格 2560×1440、3 步 σ₀.909、同 int8 FL2VA + 合并 LoRA。
+节点级耗时来自 ComfyUI `/ws` 的 `executing` 事件（脚本 `scripts/experiment-regen-solattn.mjs`）。
+
+| 臂 | 3 步采样 | VAEDecode | 整轮 | 采样加速 | 整轮加速 |
+|---|---:|---:|---:|---:|---:|
+| C（dense） | **506.2 s** | 18.4 s | **549.7 s** | 1× | 1× |
+| **sol-attn（tau 1.0）** | **176.9 s** | 19.2 s | **220.2 s** | **2.86×** | **2.50×** |
+| sol-attn（tau 1.3） | **149.7 s** | 18.8 s | **193.9 s** | **3.38×** | **2.84×** |
+| sol-attn + 原版 VAE | 176.1 s | **54.1 s** | 254.0 s | — | — |
+
+* **快解码器**：19.2 s vs 原版 VAE 54.1 s ⇒ **2.82×**、每轮省 ~35 s（2K/124 帧）。清单里本来就是它，
+  这次是把它和替代项放在同一张图里量了一次。
+* **质量证据（同 seed、同输入，只差注意力路径）**：
+  - sol(tau1.0) vs dense：PSNR Y **31.17 dB**（avg 32.85）、SSIM All **0.930**；
+  - sol(tau1.3) vs dense：PSNR Y **30.02 dB**、SSIM All **0.914**；
+  - 闪烁代理（相邻帧 mean|Δ|，8-bit）：dense **7.374** / tau1.0 **7.203** / tau1.3 **7.230** ⇒ **没有变抖**；
+  - 1:1 裁切目检（[`e2e-out/regen-solattn/compare-3arms-1to1.png`](../e2e-out/regen-solattn/compare-3arms-1to1.png)）：
+    结构 / 光影 / 植物叶簇与 dense 一致，只有微纹理级的重画差异。
+* **口径提醒**：3 步模型对舍入级变化极敏感（上游自己也写了），**PSNR 不能当质量判据**；这里只用它证明「没有结构性崩坏」。
+  真正判据是 1:1 目检 + 闪烁 + 逐镜抽帧核身份/口型（后者仍是人工/自检门的事）。
+* **冷启成本**：sol-attn 首次调用有 JIT 编译（17 帧冒烟里采样 27.2 s；同图第二次 15.5 s），
+  批量跑第二镜起就没有这项开销。
+
+**怎么用**：设置页 → `video.regenerate` 的档位选择里会多出这个实现（非 `internal`）；
+脚本可走内部通道 `_internals.runRegenerate(..., implementation: 'open-h3-regenerate-2k-solattn')`。
+默认（不改配置）仍是 dense C，行为与以前一致。
+
+**复现**：
+
+```bash
+node scripts/experiment-regen-solattn.mjs --arm=sol   --vae=fast  --length=124 --tag=sol-124f
+node scripts/experiment-regen-solattn.mjs --arm=dense --vae=fast  --length=124 --tag=dense-124f
+node scripts/experiment-regen-solattn.mjs --arm=sol   --vae=stock --length=124 --tag=sol-124f-stockdec
+```
+
+## 12. 参考
 
 - 调研与选型：[`research/open-h3-regenerate-2k.md`](research/open-h3-regenerate-2k.md)
 - 上游：<https://huggingface.co/Efficient-Large-Model/Open-H3-Regenerate-2K> ·

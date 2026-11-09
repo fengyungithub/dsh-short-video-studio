@@ -1,0 +1,467 @@
+{
+  "id": "open-h3-regenerate-2k-solattn",
+  "version": 1,
+  "capability": "video.regenerate",
+  "tier": "quality",
+  "group": "minimax-h3-regenerate",
+  "displayName": "MiniMax H3 视频重生成（Open-H3 · Sol-Attn · 2K/1080p）",
+  "description": "与 open-h3-regenerate-2k 逐字相同，只把原生 BlockSparseAttention（sol-attn）插在合并 LoRA 之后。实测（A800 80GB，124 帧 2K）：3 步采样 506.2s → 176.9s（2.86×），整轮 549.7s → 220.2s（2.50×）；tau 1.3 再降到 149.7s / 193.9s（3.38× / 2.84×）。与 dense 输出 PSNR Y 31.2 dB、SSIM 0.930，1:1 目检无可见差。",
+  "output": {
+    "mediaType": "video",
+    "hasAudio": true
+  },
+  "assets": {
+    "unet": {
+      "kind": "checkpoint",
+      "default": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "env": "DSH_SVS_H3_MODEL_FL",
+      "label": "H3 FL2VA UNet（精修 base，必须 fl2va）"
+    },
+    "clip": {
+      "kind": "clip",
+      "default": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "env": "DSH_SVS_H3_CLIP",
+      "label": "H3 CLIP"
+    },
+    "vae": {
+      "kind": "vae",
+      "default": "minimax_h3_video_vae_fp16.safetensors",
+      "env": "DSH_SVS_H3_VAE",
+      "label": "H3 视频 VAE（编码草稿）"
+    },
+    "vae_decode": {
+      "kind": "vae",
+      "default": "sol_h3_vae.safetensors",
+      "env": "DSH_SVS_H3_SOL_VAE",
+      "label": "Sol-H3-VAE / StreamRender-H3 快解码器（解码）"
+    },
+    "audio_vae": {
+      "kind": "vae",
+      "default": "minimax_h3_audio_vae_fp32.safetensors",
+      "env": "DSH_SVS_H3_AUDIO_VAE",
+      "label": "H3 音频 VAE"
+    },
+    "latent_upscaler": {
+      "kind": "other",
+      "default": "minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors",
+      "env": "DSH_SVS_H3_LATENT_UPSCALER",
+      "label": "H3 学习式 latent 放大器（3D）"
+    },
+    "regenerate_lora": {
+      "kind": "lora",
+      "default": "open_h3_regenerate_2k_lora.safetensors",
+      "env": "DSH_SVS_OPEN_H3_LORA",
+      "label": "Open-H3 合并 LoRA（refiner + LightX2V FL2VA Turbo + LMS Sharp）"
+    },
+    "sharp_curves": {
+      "kind": "lora",
+      "default": "sharp_curve_branches.safetensors",
+      "env": "DSH_SVS_OPEN_H3_CURVES",
+      "label": "LMS Sharp 50 条 AdaLN 曲线分支"
+    },
+    "curve_table": {
+      "kind": "checkpoint",
+      "default": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "env": "DSH_SVS_H3_MODEL_REF",
+      "label": "提供 adaln_t_table 的 pruned checkpoint（只读 32KB 曲线表）"
+    }
+  },
+  "graph": {
+    "1": {
+      "class_type": "LoadVideo",
+      "inputs": {
+        "file": null
+      }
+    },
+    "2": {
+      "class_type": "GetVideoComponents",
+      "inputs": {
+        "video": [
+          "1",
+          0
+        ]
+      }
+    },
+    "3": {
+      "class_type": "OpenH3RegenPrepareDraft",
+      "inputs": {
+        "images": [
+          "2",
+          0
+        ],
+        "size": "768p (1344x768)",
+        "max_frames": 0,
+        "source_fps": 24
+      }
+    },
+    "4": {
+      "class_type": "VAEEncode",
+      "inputs": {
+        "pixels": [
+          "3",
+          0
+        ],
+        "vae": [
+          "22",
+          0
+        ]
+      }
+    },
+    "5": {
+      "class_type": "LatentUpscaleModelLoader",
+      "inputs": {
+        "model_name": "$assets.latent_upscaler"
+      }
+    },
+    "6": {
+      "class_type": "MiniMaxH3LatentUpscaleWithModel",
+      "inputs": {
+        "model": [
+          "5",
+          0
+        ],
+        "samples": [
+          "4",
+          0
+        ],
+        "width": null,
+        "height": null
+      }
+    },
+    "7": {
+      "class_type": "OpenH3RegenRefineLatent",
+      "inputs": {
+        "latent": [
+          "6",
+          0
+        ],
+        "audio_mode": "silence (reference)",
+        "audio_vae": [
+          "23",
+          0
+        ],
+        "audio": [
+          "2",
+          1
+        ]
+      }
+    },
+    "8": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "$assets.unet",
+        "weight_dtype": "default"
+      }
+    },
+    "9": {
+      "class_type": "OpenH3RegenLora",
+      "inputs": {
+        "model": [
+          "8",
+          0
+        ],
+        "lora_name": "$assets.regenerate_lora",
+        "curve_name": "$assets.sharp_curves",
+        "curve_table": "$assets.curve_table",
+        "strength": 1,
+        "curve_strength": 1,
+        "lora_dtype": "bf16"
+      }
+    },
+    "10": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "$assets.clip",
+        "type": "minimax",
+        "device": "default"
+      }
+    },
+    "11": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "clip": [
+          "10",
+          0
+        ],
+        "text": null
+      }
+    },
+    "12": {
+      "class_type": "OpenH3RegenSigmas",
+      "inputs": {
+        "steps": 3,
+        "start_sigma": 0
+      }
+    },
+    "13": {
+      "class_type": "RandomNoise",
+      "inputs": {
+        "noise_seed": null
+      }
+    },
+    "14": {
+      "class_type": "KSamplerSelect",
+      "inputs": {
+        "sampler_name": "euler"
+      }
+    },
+    "15": {
+      "class_type": "BasicGuider",
+      "inputs": {
+        "model": [
+          "8b",
+          0
+        ],
+        "conditioning": [
+          "11",
+          0
+        ]
+      }
+    },
+    "16": {
+      "class_type": "SamplerCustomAdvanced",
+      "inputs": {
+        "noise": [
+          "13",
+          0
+        ],
+        "guider": [
+          "15",
+          0
+        ],
+        "sampler": [
+          "14",
+          0
+        ],
+        "sigmas": [
+          "12",
+          0
+        ],
+        "latent_image": [
+          "7",
+          0
+        ]
+      }
+    },
+    "17": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "$assets.vae_decode"
+      }
+    },
+    "18": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "16",
+          0
+        ],
+        "vae": [
+          "17",
+          0
+        ]
+      }
+    },
+    "19": {
+      "class_type": "OpenH3RegenFinish",
+      "inputs": {
+        "images": [
+          "18",
+          0
+        ],
+        "frame_count": [
+          "3",
+          1
+        ],
+        "crop": "auto (1088 -> 1080, 2176 -> 2160)",
+        "audio": [
+          "2",
+          1
+        ]
+      }
+    },
+    "20": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": [
+          "19",
+          0
+        ],
+        "audio": [
+          "19",
+          1
+        ],
+        "fps": 24
+      }
+    },
+    "21": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": [
+          "20",
+          0
+        ],
+        "filename_prefix": null,
+        "format": "mp4",
+        "codec": "h264"
+      }
+    },
+    "22": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "$assets.vae"
+      }
+    },
+    "23": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "$assets.audio_vae"
+      }
+    },
+    "8b": {
+      "class_type": "BlockSparseAttention",
+      "inputs": {
+        "selection": "sol-attn",
+        "selection.tau": 1,
+        "start_percent": 0.2,
+        "end_percent": 1,
+        "dense_blocks": "",
+        "min_tokens": 12288,
+        "extra_tokens": 256,
+        "sink_conditioning": "exact_kv_and_rows",
+        "verbose": true,
+        "model": [
+          "9",
+          0
+        ]
+      }
+    }
+  },
+  "params": {
+    "source_video": {
+      "inject": "video",
+      "via": "field",
+      "to": {
+        "node": "1",
+        "field": "file"
+      }
+    },
+    "prompt": {
+      "inject": "scalar",
+      "to": {
+        "node": "11",
+        "field": "text"
+      }
+    },
+    "width": {
+      "inject": "scalar",
+      "to": {
+        "node": "6",
+        "field": "width"
+      }
+    },
+    "height": {
+      "inject": "scalar",
+      "to": {
+        "node": "6",
+        "field": "height"
+      }
+    },
+    "seed": {
+      "inject": "scalar",
+      "to": {
+        "node": "13",
+        "field": "noise_seed"
+      }
+    },
+    "audio_mode": {
+      "inject": "scalar",
+      "to": {
+        "node": "7",
+        "field": "audio_mode"
+      },
+      "default": "silence (reference)"
+    },
+    "steps": {
+      "inject": "scalar",
+      "to": {
+        "node": "12",
+        "field": "steps"
+      },
+      "default": 3
+    },
+    "start_sigma": {
+      "inject": "scalar",
+      "to": {
+        "node": "12",
+        "field": "start_sigma"
+      },
+      "default": 0
+    },
+    "prefix": {
+      "inject": "scalar",
+      "to": {
+        "node": "21",
+        "field": "filename_prefix"
+      }
+    }
+  },
+  "regenerate": {
+    "targets": {
+      "1080p": {
+        "graph": [
+          1920,
+          1088
+        ],
+        "delivery": [
+          1920,
+          1080
+        ]
+      },
+      "2k": {
+        "graph": [
+          2560,
+          1440
+        ],
+        "delivery": [
+          2560,
+          1440
+        ]
+      }
+    },
+    "default": "2k",
+    "inputFps": 24,
+    "fpsTolerance": 0.02,
+    "minFrames": 121,
+    "maxFrames": 362,
+    "requiresPrompt": true,
+    "note": "4K 需要两次放大（经 2K）⇒ 不是这一份图能表达的，另加清单。graph 是图内渲染网格（32 对齐：1080p 实际 1088 行），delivery 是裁切后的交付尺寸；竖屏由 runner 自动翻转宽高。"
+  },
+  "requiresNodes": [
+    "BasicGuider",
+    "BlockSparseAttention",
+    "CLIPLoader",
+    "CLIPTextEncode",
+    "CreateVideo",
+    "GetVideoComponents",
+    "KSamplerSelect",
+    "LatentUpscaleModelLoader",
+    "LoadVideo",
+    "MiniMaxH3LatentUpscaleWithModel",
+    "OpenH3RegenFinish",
+    "OpenH3RegenLora",
+    "OpenH3RegenPrepareDraft",
+    "OpenH3RegenRefineLatent",
+    "OpenH3RegenSigmas",
+    "RandomNoise",
+    "SamplerCustomAdvanced",
+    "SaveVideo",
+    "UNETLoader",
+    "VAEDecode",
+    "VAEEncode",
+    "VAELoader"
+  ],
+  "note": "Sol-Attn 变体（原生 BlockSparseAttention，ComfyUI 0.42+ 内置，非第三方 SolAttnMiniMaxH3）。实测：dense 549.7s → sol(tau1.0) 220.2s → sol(tau1.3) 193.9s（124 帧 / 2560×1440 / A800 80GB）；解码器仍用 sol_h3_vae（快解码 19s vs 原版 54s）。与 dense 同 seed 输出 PSNR Y 31.2 / SSIM 0.930，闪烁代理指标（相邻帧平均 |Δ|）7.20 vs dense 7.37（更稳）。仍是「重画内容」，产物必须抽帧核对身份/口型。",
+  "priority": -31,
+  "estSeconds": 194
+}

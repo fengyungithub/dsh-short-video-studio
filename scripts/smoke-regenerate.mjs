@@ -199,9 +199,18 @@ console.log('\n[6] 注册表/工具集成')
   ok('video.regenerate 进能力词汇表', CAPABILITIES.includes('video.regenerate'))
   const list = reg.byCapability['video.regenerate'] || []
   const visible = list.filter((m) => !m.internal)
-  ok('非内部实现只有 C（视频入口）一份', visible.length === 1, visible.map((m) => m.id).join(','))
+  ok('非内部实现都是视频入口（声明 regenerate + params.source_video）',
+    visible.length >= 1 && visible.every((m) => m.regenerate && m.params?.source_video),
+    visible.map((m) => m.id).join(','))
   const resolved = await I.resolveTieredManifest('video.regenerate', 'quality', null, { registry: reg })
-  eq('quality 档仍解析到 C（B 实验清单是 internal，不参与解析）', resolved.manifest.id, ID)
+  eq('quality 档仍解析到 C（dense 是默认；B 实验清单 internal、sol 变体 priority 更低）', resolved.manifest.id, ID)
+  // Sol-Attn 变体：非 internal、设置页可选，但 priority 低于 base ⇒ 不抢隐式默认
+  const solVar = reg.byId['open-h3-regenerate-2k-solattn']
+  ok('sol 变体已注册且非 internal', Boolean(solVar) && !solVar.internal)
+  ok('sol 变体 priority 低于 base（不改隐式默认）',
+    Number(solVar?.priority) < Number(reg.byId[ID]?.priority), `${solVar?.priority} vs ${reg.byId[ID]?.priority}`)
+  ok('sol 变体带 BlockSparseAttention',
+    Object.values(solVar?.graph || {}).some((n) => n.class_type === 'BlockSparseAttention'))
   // B 实验（latent 交接）：清单在、标记 internal、入口是 latent_file
   const bLatent = reg.byId['open-h3-regenerate-2k-latent']
   ok('B 实验清单已注册', Boolean(bLatent))
